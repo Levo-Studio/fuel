@@ -123,7 +123,7 @@ struct AIModelSection: View {
     /// is a borrowed neighbour rather than an export value: the export draws no
     /// row with two actions in it.
     private var billingLink: some View {
-        Link(destination: ProviderBilling.url(for: preferences.provider)) {
+        Link(destination: AIError.billingPage(for: preferences.provider)) {
             Text(KeyTestNote.billingActionTitle)
                 .fuelStyle(FuelTypography.inlineAction)
                 .foregroundStyle(palette.ink)

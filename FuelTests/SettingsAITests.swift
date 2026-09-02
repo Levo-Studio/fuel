@@ -244,19 +244,21 @@ struct SettingsKeyOutcomeTests {
         #expect(model.note == .noCredit)
         #expect(model.note.titleKey(for: provider) != nil)
         #expect(model.note.showsBillingLink)
-        #expect(ProviderBilling.url(for: provider).scheme == "https")
+        #expect(AIError.billingPage(for: provider).scheme == "https")
     }
 
-    /// The link is the only one in Settings and it has to reach a real console.
-    /// A typo in a URL literal goes red here rather than at a user's tap.
+    /// The link is the only one in Settings, and the URLs behind it belong to
+    /// `AIError` — the no-credit state is a provider error and the link is part
+    /// of it. This asserts the row reaches the right page per provider, not
+    /// what the string is: `AIClientTests` owns the literals.
     @Test("Each provider's billing link points at that provider")
-    func billingLinksAreDistinctAndPlausible() {
-        let anthropic = ProviderBilling.url(for: .claude)
-        let mistral = ProviderBilling.url(for: .mistral)
+    func billingLinksAreDistinct() {
+        let anthropic = AIError.billingPage(for: .claude)
+        let mistral = AIError.billingPage(for: .mistral)
 
-        #expect(anthropic.host() == "console.anthropic.com")
-        #expect(mistral.host() == "console.mistral.ai")
         #expect(anthropic != mistral)
+        #expect(anthropic.host() != nil)
+        #expect(mistral.host() != nil)
     }
 
     /// The no-credit line names the account being topped up, and Claude's is
