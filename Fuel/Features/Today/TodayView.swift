@@ -213,7 +213,13 @@ private struct TodayListFade: View {
 /// The day the export draws, so a preview shows the screen the design shows.
 private enum TodayPreviewData {
 
-    static let date = Date(timeIntervalSince1970: 1_756_771_200)
+    /// Local midnight, because the rows print `TimeZone.current`. Anchoring to
+    /// UTC would slide every drawn time by the machine's offset and the
+    /// preview would stop being the day the export draws.
+    static let date: Date = {
+        let reference = Date(timeIntervalSince1970: 1_756_771_200)
+        return Calendar.current.startOfDay(for: reference)
+    }()
 
     static let day: [NutritionEntry] = [
         NutritionEntry(
