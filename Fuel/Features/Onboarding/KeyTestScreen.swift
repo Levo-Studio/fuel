@@ -148,36 +148,45 @@ struct KeyTestStepMarker: View {
         .frame(width: FuelMetrics.Control.stepMarkerSlot, height: FuelMetrics.Control.stepMarkerSlot)
     }
 
-    /// The done marker.
+    /// The done marker, as the export draws it.
     ///
-    /// The export draws it as an SVG path — `M4 10.5l4 4L16 6`, stroked at
-    /// 1.7 inside the 20-unit slot — and neither those coordinates nor that
-    /// stroke weight exist in `FuelMetrics`. Rather than write the numbers into
-    /// a feature file or add them to the design layer unasked, this uses the
-    /// system checkmark scaled to the slot. It is the one place in this flow
-    /// where the drawn glyph is not reproduced exactly, and it is reported as a
-    /// design-layer gap rather than left to be noticed.
+    /// A system checkmark stood here while `FuelMetrics` had no stroke weight
+    /// for a drawn glyph. It has one now, and the design layer's rule is that
+    /// a glyph drawn as a path is built from the path: a symbol's weight is a
+    /// design of its own and would not have matched, and a symbol scaled to
+    /// fill the slot is half again the size of the drawn mark, which spans only
+    /// x 4→16 and y 6→14.5 of the twenty.
     private var check: some View {
-        Image(systemName: "checkmark")
-            .resizable()
-            .scaledToFit()
-            .foregroundStyle(palette.ink)
+        KeyTestCheck()
+            .stroke(
+                palette.ink,
+                style: StrokeStyle(
+                    lineWidth: FuelMetrics.Line.Glyph.check,
+                    lineCap: .round,
+                    lineJoin: .round
+                )
+            )
     }
 
-    /// The active marker: a ring in `soft` with a quarter of it in `ink`,
-    /// turning.
+    /// The active marker: a ring in `soft` with `Line.spinnerArc` of it in
+    /// `ink`, turning.
     ///
-    /// The quarter is what the export's `border-top-color` paints, and a full
-    /// turn is a full turn — neither is a drawn measurement, so neither belongs
-    /// in the design layer. The duration and the decision to run at all come
-    /// from `FuelMotion`, so Reduce Motion is honoured in the one place it is
-    /// honoured everywhere else.
+    /// A full turn is a full turn rather than a measurement, so that one stays
+    /// here; the arc the export paints is a drawn value and lives in the design
+    /// layer with the stroke it belongs to.
+    ///
+    /// The `reduceMotion` guard is not a design-layer bypass and is meant to
+    /// come out. `FuelMotion` has no representation for a *repeating*
+    /// animation: `progress` reduces to a cross-fade, and `.repeatForever` on a
+    /// 0.15s linear curve spins faster rather than stopping — the opposite of
+    /// what the user asked for. Until `FuelMotion` can say "this one does not
+    /// repeat when motion is reduced", the flag is read here and only here.
     private var spinner: some View {
         ZStack {
             Circle()
                 .strokeBorder(palette.soft, lineWidth: FuelMetrics.Line.spinner)
             Circle()
-                .trim(from: 0, to: 0.25)
+                .trim(from: 0, to: FuelMetrics.Line.spinnerArc)
                 .stroke(palette.ink, lineWidth: FuelMetrics.Line.spinner)
                 .padding(FuelMetrics.Line.spinner / 2)
         }
@@ -188,6 +197,39 @@ struct KeyTestStepMarker: View {
                 isSpinning = true
             }
         }
+    }
+}
+
+// MARK: - Check glyph
+
+/// The check the export draws on a completed step: `d="M4 10.5l4 4L16 6"`.
+///
+/// The three points are the path's own coordinates in the export's twenty-unit
+/// glyph box, which is why they sit here rather than in `FuelMetrics` — they
+/// describe the shape of a mark, not a distance in the app's layout, and the
+/// design layer says as much where it supplies the box and the stroke and
+/// leaves the path to the call site. Scaled by the frame so the glyph follows
+/// its slot instead of assuming the two are the same size.
+private struct KeyTestCheck: Shape {
+
+    private static let points: [CGPoint] = [
+        CGPoint(x: 4, y: 10.5),
+        CGPoint(x: 8, y: 14.5),
+        CGPoint(x: 16, y: 6)
+    ]
+
+    nonisolated func path(in rect: CGRect) -> Path {
+        let scale = min(rect.width, rect.height) / FuelMetrics.Line.Glyph.viewBox
+        var path = Path()
+        for (position, point) in Self.points.enumerated() {
+            let scaled = CGPoint(x: point.x * scale, y: point.y * scale)
+            if position == 0 {
+                path.move(to: scaled)
+            } else {
+                path.addLine(to: scaled)
+            }
+        }
+        return path
     }
 }
 
