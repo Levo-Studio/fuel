@@ -244,6 +244,13 @@ struct TodayCopyTests {
         #expect(TodayCopy.entryMeta(time: "08:14", source: .photo) == "08:14 · Photo")
     }
 
+    @Test("the ring is announced as a share of something")
+    func ringLabel() {
+        // The drawn label is a bare `68%`, which read aloud on its own names no
+        // quantity at all.
+        #expect(TodayCopy.ringAccessibilityLabel(68) == "68% of the calorie goal")
+    }
+
     @Test("the day total carries no thousands separator")
     func figureGrouping() {
         #expect(TodayFormat.figure(1640) == "1640")

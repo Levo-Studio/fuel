@@ -47,6 +47,12 @@ nonisolated enum TodayCopy {
         String(format: String(localized: "today.ring.percentage"), percent)
     }
 
+    /// What the ring is announced as. The drawn `68%` says nothing on its own
+    /// once it is read out away from the figure it sits beside.
+    static func ringAccessibilityLabel(_ percent: Int) -> String {
+        String(format: String(localized: "today.ring.accessibilityLabel"), percent)
+    }
+
     // MARK: - Macros
 
     static func macroName(_ macro: TodayMacro) -> String {

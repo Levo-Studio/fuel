@@ -145,6 +145,18 @@
         }
       }
     },
+    "today.ring.accessibilityLabel" : {
+      "comment" : "Spoken description of the calorie ring, which is drawn as a bare percentage.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%% of the calorie goal"
+          }
+        }
+      }
+    },
     "today.ring.percentage" : {
       "comment" : "The share of the calorie goal reached, centred in the ring.",
       "extractionState" : "manual",

@@ -110,7 +110,10 @@ private struct TodayRing: View {
                 .fuelStyle(FuelTypography.monoValue)
                 .foregroundStyle(palette.ink)
         }
-        .accessibilityElement(children: .combine)
+        // Combined on its own the ring reads as a bare "68%", which says
+        // nothing about what the share is of.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(TodayCopy.ringAccessibilityLabel(percentage)))
     }
 }
 
