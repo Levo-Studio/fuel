@@ -1,0 +1,249 @@
+Fuel Source-Available License
+Version 1.0
+
+Copyright (c) 2026 Levo Studio. All rights reserved.
+
+## In short
+
+The source code of Fuel is open. You may read it, clone it, study it, change it,
+build it yourself and run it on devices you own. What you may not do is pass it
+on: no store, no TestFlight — not even your own — no sideloading to anyone else,
+no handing a compiled build to a friend, no selling it, and no presenting
+yourself as the author or provider of Fuel under any name whatsoever. The one
+exception is the fork you need in order to contribute: a public fork carrying
+the source code and the notices, and no build of any kind. Fuel is and stays a
+product of Levo Studio. Pull requests are expressly welcome, and every
+contribution is named in the credits.
+
+This is not an open-source license in the sense of the Open Source Definition,
+because it restricts distribution and commercial use. From here on the sections
+apply. Where the summary and the sections disagree, the sections win.
+
+## 1. Acceptance
+
+Whoever exercises one of the permissions granted below accepts this license.
+Whoever does not accept it has no rights in the software.
+
+## 2. Grant of rights
+
+Subject to the conditions and limits of this license, the licensor grants you a
+worldwide, royalty-free, non-exclusive, non-transferable and non-sublicensable
+right
+
+  (a) to retrieve, read and study the source code of the software;
+
+  (b) to reproduce, compile, build and run the software on devices that you own
+      or control;
+
+  (c) to modify the software for your own use and to build and run the modified
+      version under the terms of (b); and
+
+  (d) to make the source code available as a public fork within the limits of
+      the paragraph "Public forks" in section 3, and to submit contributions
+      under section 4.
+
+No further rights are granted. Section 3 limits this grant and prevails in the
+event of a conflict.
+
+## 3. What is not permitted
+
+Without a separate written agreement with Levo Studio, the following is
+prohibited:
+
+  (a) distributing the software or a version derived from it in any form —
+      including publication in the App Store or in any other app store,
+      marketplace or distribution channel, distribution via TestFlight
+      including a TestFlight program of your own, sideloading to third
+      parties, and passing a compiled binary or an installable build to any
+      other person at all, regardless of the name used, regardless of whether
+      anything is charged for it, and regardless of whose developer account is
+      involved;
+
+  (b) selling, renting, leasing, sublicensing or otherwise transferring the
+      software or a version derived from it for a fee or any other
+      consideration;
+
+  (c) using the software to offer a product or a service to third parties, for
+      a fee or free of charge, including any hosted offering, any offering
+      operated as software as a service, and any offering in which requests of
+      the software are routed through infrastructure you operate;
+
+  (d) incorporating the software into a commercially offered product or a
+      commercially offered service;
+
+  (e) presenting yourself as the author, publisher or provider of Fuel, or
+      creating that impression;
+
+  (f) making a modified version of the software publicly available, publishing
+      it or distributing it publicly; the only exceptions are the submission of
+      contributions under section 4 and a public fork within the limits of the
+      paragraph "Public forks" below;
+
+  (g) removing, altering or obscuring copyright, license or provenance notices
+      in the software;
+
+  (h) using the name "Fuel", the mark "Levo Studio", the logo, the app icon or
+      the visual design of the app for a product, a service or a version of the
+      software of your own.
+
+**Public forks.** A fork of the source code on a code-hosting platform is exempt
+from (a) and (f), provided that it
+
+  (i)   contains source code only — no compiled binary, no archive, no
+        installable build, and no link to one;
+
+  (ii)  leaves the notices under (g) unchanged and carries this license file
+        unchanged; and
+
+  (iii) serves the preparation of a contribution under section 4 or your own
+        use under section 2 (b) and (c).
+
+This exemption is limited to the source code in the fork itself. It permits no
+other form of distribution, and in particular it does not permit passing a
+compiled binary or an installable build to anyone, including to people testing
+your branch.
+
+## 4. Contributions
+
+Contributions are welcome. Whoever has an idea that makes Fuel better should
+open a pull request.
+
+  (a) Whoever submits a contribution grants Levo Studio a worldwide,
+      royalty-free, irrevocable, perpetual, non-exclusive and sublicensable
+      right to reproduce, modify, distribute, make publicly available and
+      exploit the contribution — in the project and in any release of the app
+      that Levo Studio may publish, now or in the future, including releases
+      offered for a fee. The restrictions in section 3 bind you, not
+      Levo Studio.
+
+  (b) Authorship of the contribution stays with the contributor. The grant of
+      rights under (a) is not a transfer of authorship.
+
+  (c) The contributor is named in the credits of the project. The rules for
+      that entry are in the README.
+
+  (d) Whoever submits a contribution warrants that they hold the rights
+      required to do so and that the contribution does not infringe the rights
+      of third parties.
+
+  (e) Levo Studio is under no obligation to accept, adopt or publish a
+      contribution.
+
+## 5. Trademarks and design
+
+This license grants no rights in the trademarks, signs, names, logos or product
+names of Levo Studio, in particular none in the designations "Levo Studio" and
+"Fuel" and none in the app icon, the word-and-figure mark and the visual design
+of the app.
+
+You may not use these signs for a product, a service or a version of the
+software of your own, and you may not act in a way that suggests a connection
+with Levo Studio or an endorsement by Levo Studio.
+
+Plain factual reference is permitted: you may say that your version is based on
+Fuel by Levo Studio.
+
+## 6. Patents
+
+This license grants no patent rights, neither expressly nor by implication.
+Whoever initiates or knowingly supports patent proceedings asserting that the
+software infringes a patent loses all rights under this license with immediate
+effect.
+
+## 7. Termination
+
+Your rights under this license end automatically if you breach any of its
+conditions.
+
+If the breach is curable, your rights are reinstated retroactively provided you
+cure the breach within 30 days of becoming aware of it and provided your rights
+have not already been reinstated once under this section.
+
+Sections 3 (g), 3 (h), 4, 5, 8, 9 and 11 survive termination.
+
+## 8. Warranty disclaimer
+
+THE SOFTWARE IS PROVIDED "AS IS" AND WITHOUT WARRANTY OF ANY KIND, WHETHER
+EXPRESS OR IMPLIED, INCLUDING THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE, TITLE AND NON-INFRINGEMENT OF THIRD-PARTY RIGHTS. IF THIS
+DISCLAIMER IS INEFFECTIVE UNDER APPLICABLE LAW, IT APPLIES TO THE FULLEST EXTENT
+PERMITTED.
+
+The software records nutritional values for the user's own purposes, and those
+values are estimates produced by a language model from a photograph or a
+sentence. They are not measurements. No assurance is given that they are
+accurate, and they must not be relied upon where accurate nutritional
+information matters. The software is not a medical device, gives no medical,
+dietary or nutritional advice, and is not a substitute for professional advice.
+
+The software talks to an AI provider chosen by the user, using access the user
+obtained themselves. That provider is a third party. Its availability, its
+results, its terms and any charges it makes are its own affair and not the
+licensor's, and this license grants no rights in it.
+
+## 9. Limitation of liability
+
+The licensor is not liable for damages arising out of this license or out of the
+use or the inability to use the software, in particular not for indirect
+damages, consequential damages, lost profit, lost revenue, loss of data, costs
+charged by a third-party AI provider, or lost opportunities — on whatever legal
+basis.
+
+Liability for intent and gross negligence, for injury to life, body or health,
+under the German Product Liability Act, and for the culpable breach of material
+contractual obligations remains unaffected; in the last case liability is
+limited to the foreseeable damage typical of this kind of agreement. Liability
+that cannot be excluded or limited under mandatory law is neither excluded nor
+limited.
+
+## 10. Definitions
+
+**Licensor** is Levo Studio, the rights holder in the software.
+
+**Software** is the work provided under this license, including source code,
+build configuration, design assets and accompanying files, in every version
+provided by the licensor.
+
+**You** is the natural or legal person exercising rights under this license.
+
+**Modified version** is any editing, adaptation, translation, extension or other
+transformation of the software, as well as any work that builds upon it.
+
+**Contribution** is any work that someone knowingly submits for inclusion in the
+project, in particular by pull request.
+
+**Publicly** means any circle of recipients beyond yourself.
+
+## 11. Governing law and venue
+
+The law of the Federal Republic of Germany applies, excluding the UN Convention
+on Contracts for the International Sale of Goods and the conflict-of-laws rules
+of private international law. Mandatory consumer protection provisions of the
+state in which a consumer has their habitual residence remain unaffected.
+
+The exclusive venue for all disputes arising out of or in connection with this
+license is Tübingen, to the extent such a venue can validly be agreed.
+
+If a provision of this license is ineffective, the remaining provisions stay
+effective. The ineffective provision is replaced by what comes closest to its
+purpose.
+
+## 12. Third-party components
+
+Fuel uses the fonts Plus Jakarta Sans and DM Mono, which are licensed separately
+under the SIL Open Font License 1.1. Wherever the font files are shipped — in
+this repository or in a build of the software — that license accompanies them
+and governs them. This license does not restrict your rights in those fonts, and
+the SIL Open Font License grants you no rights in the remaining parts of the
+software.
+
+## 13. Further rights
+
+Everything not permitted here — publication in a store, distribution of any
+kind, commercial use, passing a build to other people — requires a separate
+written agreement. Just ask.
+
+---
+
+Rights holder: **Levo Studio**, Europaplatz 2/1, 72072 Tübingen
+Contact: julius@levo-studio.com
