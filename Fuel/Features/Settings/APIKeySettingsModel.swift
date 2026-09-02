@@ -102,10 +102,6 @@ final class APIKeySettingsModel {
         note = .none
     }
 
-    func hasStoredKey(for provider: AIProvider) -> Bool {
-        keychain.hasKey(for: provider)
-    }
-
     // MARK: - Submitting a typed key
 
     /// Takes what the user typed, empties the field, and tests it.
