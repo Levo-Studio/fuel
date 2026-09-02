@@ -74,22 +74,31 @@ nonisolated struct KeychainStore: Sendable {
         kSecAttrAccessibleWhenUnlockedThisDeviceOnly
     }
 
-    /// iCloud Keychain sync, pinned to false.
-    ///
-    /// This is passed on **every** query — add, update, read, delete, and the
-    /// existence check — and never left out. `kSecAttrSynchronizable` is not
-    /// merely an attribute: in a search query it is also a filter. Present and
-    /// false, it means "non-synchronising items only", so this wrapper can
-    /// neither create a synced item nor accidentally read or update one that
-    /// some other code left behind. Omitting it would mean "either kind", which
-    /// is a quietly different and weaker guarantee.
+    /// iCloud Keychain sync, pinned to false on every query.
     ///
     /// A synced key would be copied to Apple's servers and pushed to every
     /// device on the account. Fuel has no cloud, no account and no sync by
-    /// design; the user's credential must not be the one exception. Combined
-    /// with the `ThisDeviceOnly` accessibility above — which the Keychain will
-    /// not allow on a synchronising item at all — there is no configuration of
-    /// this store that puts a key in iCloud.
+    /// design; the user's credential must not be the one exception.
+    ///
+    /// `kSecAttrSynchronizable` is not merely an attribute: in a search it is
+    /// also a filter, and pinned to false it means "non-synchronising items
+    /// only" — so this store cannot create a synced item, and cannot read or
+    /// update one that some other code left in the same slot.
+    ///
+    /// **Being explicit here does not change behaviour, and that is the point
+    /// of writing it down.** Omitting the attribute gives the same result,
+    /// because the Security framework already defaults to false for both adds
+    /// and searches. But a guarantee this file exists to make should not rest
+    /// on a reader remembering an unwritten default correctly, and a default is
+    /// the kind of thing that is easy to misremember in the wrong direction —
+    /// the first version of this comment did exactly that. Stated in the query,
+    /// the intent is visible at the line where it takes effect and survives
+    /// anyone rewriting the code around it.
+    ///
+    /// The guarantee that a key cannot reach iCloud is carried by two things
+    /// together: nothing here ever sets the flag true, and the `ThisDeviceOnly`
+    /// accessibility above is a combination the Keychain refuses to synchronise
+    /// at all. `KeychainTests` asserts both on the stored item.
     ///
     /// Computed for the same strict-concurrency reason as `accessibility`.
     private static var synchronizable: Any {
@@ -104,12 +113,13 @@ nonisolated struct KeychainStore: Sendable {
     /// of Settings after a key is removed — so `errSecItemNotFound` comes back
     /// as `nil` rather than as a thrown error.
     func readKey(for provider: AIProvider) throws -> APIKey? {
-        var query = baseQuery(for: provider)
-        query[kSecReturnData as String] = true
-        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        let query = itemQuery(for: provider, adding: [
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ])
 
         var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        let status = SecItemCopyMatching(query, &item)
 
         switch status {
         case errSecSuccess:
@@ -138,11 +148,12 @@ nonisolated struct KeychainStore: Sendable {
     /// Anything that actually needs the key calls `readKey(for:)` and gets a
     /// real error.
     func hasKey(for provider: AIProvider) -> Bool {
-        var query = baseQuery(for: provider)
-        query[kSecReturnData as String] = false
-        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        let query = itemQuery(for: provider, adding: [
+            kSecReturnData as String: false,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ])
 
-        return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
+        return SecItemCopyMatching(query, nil) == errSecSuccess
     }
 
     // MARK: - Writing
@@ -157,11 +168,12 @@ nonisolated struct KeychainStore: Sendable {
     func store(_ key: APIKey, for provider: AIProvider) throws {
         let secret = Data(key.secret.utf8)
 
-        var addQuery = baseQuery(for: provider)
-        addQuery[kSecValueData as String] = secret
-        addQuery[kSecAttrAccessible as String] = Self.accessibility
+        let addQuery = itemQuery(for: provider, adding: [
+            kSecValueData as String: secret,
+            kSecAttrAccessible as String: Self.accessibility
+        ])
 
-        let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+        let addStatus = SecItemAdd(addQuery, nil)
 
         switch addStatus {
         case errSecSuccess:
@@ -177,16 +189,20 @@ nonisolated struct KeychainStore: Sendable {
         // The accessibility class is rewritten alongside the data so an item
         // written by an older build under a weaker class is healed the next
         // time the user touches their key, rather than staying weak forever.
+        // `KeychainTests` writes a weakened item and checks that this repairs
+        // it, because a comment promising a repair nobody verifies is worse
+        // than no comment.
+        //
         // `kSecAttrSynchronizable` is deliberately not in the update payload:
-        // the base query already restricts the match to non-synchronising
-        // items, and the Keychain rejects changing that attribute in place.
+        // the query below already restricts the match to non-synchronising
+        // items, so there is nothing to change.
         let attributes: [String: Any] = [
             kSecValueData as String: secret,
             kSecAttrAccessible as String: Self.accessibility
         ]
 
         let status = SecItemUpdate(
-            baseQuery(for: provider) as CFDictionary,
+            itemQuery(for: provider),
             attributes as CFDictionary
         )
 
@@ -207,7 +223,7 @@ nonisolated struct KeychainStore: Sendable {
     /// Idempotent: deleting a key that is not there succeeds. "It is gone" is
     /// the caller's desired end state, and it holds either way.
     func deleteKey(for provider: AIProvider) throws {
-        let status = SecItemDelete(baseQuery(for: provider) as CFDictionary)
+        let status = SecItemDelete(itemQuery(for: provider))
 
         switch status {
         case errSecSuccess, errSecItemNotFound:
@@ -219,15 +235,48 @@ nonisolated struct KeychainStore: Sendable {
 
     // MARK: - Query
 
-    /// The attributes that identify exactly one item: this app's service, this
-    /// provider's account, and non-synchronising. Every operation starts here,
-    /// so no call site can forget the sync flag.
-    private func baseQuery(for provider: AIProvider) -> [String: Any] {
-        [
+    /// The single place in this type where a Keychain query is built.
+    ///
+    /// Every `SecItem*` call above passes through here and adds only the flags
+    /// specific to what it is doing. That is deliberate: with four call sites
+    /// each assembling their own dictionary, "every query pins
+    /// `kSecAttrSynchronizable` to false" was a convention that a fifth method
+    /// could quietly break. Funnelled through one function it is structure —
+    /// the sync flag and the item's identity cannot be omitted, because no
+    /// caller gets to write them.
+    ///
+    /// Returns a `CFDictionary` rather than a Swift dictionary so a caller
+    /// cannot take the result and mutate an attribute back out of it.
+    private func itemQuery(
+        for provider: AIProvider,
+        adding extra: [String: Any] = [:]
+    ) -> CFDictionary {
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: provider.keychainAccount,
+            kSecAttrAccount as String: account(for: provider),
             kSecAttrSynchronizable as String: Self.synchronizable
         ]
+        query.merge(extra) { _, addition in addition }
+        return query as CFDictionary
+    }
+
+    /// The Keychain account name a provider's key is filed under.
+    ///
+    /// One account per provider, under a single service, is what lets a user
+    /// hold a Claude key and a Mistral key at the same time and switch between
+    /// them without losing the one they are not currently using.
+    ///
+    /// **These strings are on-device state, not labels.** They are written out
+    /// here rather than derived from `AIProvider.rawValue` so that renaming a
+    /// case — a harmless-looking edit in a domain type that has nothing to do
+    /// with storage — cannot orphan a key already on a user's device. An
+    /// orphaned item stays in the Keychain, unreachable, and the user is asked
+    /// for a key they already gave. Changing a string here is a migration.
+    private func account(for provider: AIProvider) -> String {
+        switch provider {
+        case .claude: "claude"
+        case .mistral: "mistral"
+        }
     }
 }

@@ -4,6 +4,13 @@ import Foundation
 
 /// The AI providers Fuel can talk to.
 ///
+/// This is a domain concept, not a storage detail. The provider decides which
+/// endpoint a request goes to, which request shape it has, which model label
+/// the design draws, and which segment is selected on screen 01. The Keychain
+/// happens to file a key per provider, but it does not own the idea of one —
+/// which is why the type lives here and the mapping onto a Keychain account
+/// lives in `KeychainStore`.
+///
 /// There are exactly two cases and there is no `case other(String)` escape
 /// hatch. Adding a third provider is a product decision — it changes the
 /// Settings segment, the model labels drawn in the design, and the shape of the
@@ -17,20 +24,4 @@ nonisolated enum AIProvider: String, CaseIterable, Sendable {
 
     /// Mistral, reached directly at Mistral's endpoint.
     case mistral
-
-    // MARK: - Keychain identity
-
-    /// The Keychain account name for this provider's key.
-    ///
-    /// One account per provider, under a single service, is what lets a user
-    /// hold a Claude key and a Mistral key at the same time and switch between
-    /// them without losing the one they are not currently using.
-    ///
-    /// The value is derived from `rawValue`, so it is stable as long as the raw
-    /// values are. Renaming a case's raw value orphans the key already stored
-    /// on a user's device — the item stays in the Keychain, unreachable, and
-    /// the user is asked for a key they already gave. Do not rename these.
-    var keychainAccount: String {
-        rawValue
-    }
 }
