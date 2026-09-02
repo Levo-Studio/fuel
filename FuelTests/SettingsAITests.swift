@@ -444,6 +444,21 @@ struct SettingsAppearanceTests {
 
         #expect(preferences.theme == .dark)
         #expect(preferences.accent == .mono)
+        #expect(SettingsPreferences.Default.theme == .dark)
+        #expect(SettingsPreferences.Default.accent == .mono)
+        #expect(SettingsPreferences.Default.provider == .claude)
+    }
+
+    /// The three storage keys are on-device state: renaming one breaks no
+    /// build and silently drops the user's choice, so they are pinned here
+    /// rather than left to whoever edits the type next. The shell reads the
+    /// same three through `SettingsPreferences`, which is why there is one
+    /// copy of each string and this is it.
+    @Test("The storage keys are the ones already on devices")
+    func storageKeysArePinned() {
+        #expect(SettingsPreferences.Key.theme == "settings.appearance.theme")
+        #expect(SettingsPreferences.Key.accent == "settings.appearance.accent")
+        #expect(SettingsPreferences.Key.provider == "settings.ai.provider")
     }
 
     @Test("A chosen theme round-trips", arguments: FuelTheme.allCases)
@@ -472,8 +487,8 @@ struct SettingsAppearanceTests {
     func unknownStoredValuesFallBack() {
         let defaults = Fixtures.makeDefaults()
         defer { Fixtures.removeEverything(from: defaults) }
-        defaults.set("sepia", forKey: "settings.appearance.theme")
-        defaults.set("magenta", forKey: "settings.appearance.accent")
+        defaults.set("sepia", forKey: SettingsPreferences.Key.theme)
+        defaults.set("magenta", forKey: SettingsPreferences.Key.accent)
 
         let preferences = SettingsPreferences(defaults: defaults)
 

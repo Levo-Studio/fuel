@@ -21,6 +21,15 @@ import Foundation
 ///
 /// The suite is injectable so a test can use its own and leave the app's
 /// defaults untouched.
+///
+/// **This type is the only place the three keys and their defaults are
+/// written down.** Settings is not the only reader — the shell needs the theme
+/// and the accent before it draws its first frame — so `Key` and `Default` are
+/// visible, and anything that needs a preference constructs a
+/// `SettingsPreferences` rather than reading a raw key out of `UserDefaults`.
+/// A second copy of `"settings.appearance.theme"` somewhere else is drift no
+/// compiler can catch: it keeps working until one of the two is renamed, and
+/// then the app quietly opens on the wrong theme.
 @Observable
 final class SettingsPreferences {
 
@@ -30,16 +39,38 @@ final class SettingsPreferences {
 
     /// Namespaced, because `UserDefaults` for an app target is one flat
     /// dictionary shared with every framework that writes into it.
-    private enum Key {
+    ///
+    /// **These are on-device state, not identifiers.** Renaming one does not
+    /// break a build; it silently drops the user's choice and opens the app on
+    /// the default. Changing one is a migration.
+    enum Key {
         static let theme = "settings.appearance.theme"
         static let accent = "settings.appearance.accent"
         static let provider = "settings.ai.provider"
     }
 
+    // MARK: - Defaults
+
+    /// What each preference is before the user has chosen.
+    ///
+    /// Named rather than written inline at the three `??`s below, so a reader
+    /// who has to know what the app opens on — the shell, deciding a colour
+    /// scheme before any of this has been read — finds one answer instead of
+    /// three literals buried in an initialiser.
+    enum Default {
+
+        /// Dark, matching the palette's own default and the pairing the export
+        /// treats as the default.
+        static let theme: FuelTheme = .dark
+
+        static let accent: FuelAccent = .mono
+
+        /// Claude is the selected segment in every drawn frame.
+        static let provider: AIProvider = .claude
+    }
+
     // MARK: - Choices
 
-    /// Dark is what the app opens on, matching the palette's own default and
-    /// the pairing the export treats as the default.
     var theme: FuelTheme {
         didSet { defaults.set(theme.rawValue, forKey: Key.theme) }
     }
@@ -48,7 +79,6 @@ final class SettingsPreferences {
         didSet { defaults.set(accent.rawValue, forKey: Key.accent) }
     }
 
-    /// Claude is the selected segment in every drawn frame.
     var provider: AIProvider {
         didSet { defaults.set(Self.storedValue(for: provider), forKey: Key.provider) }
     }
@@ -57,9 +87,12 @@ final class SettingsPreferences {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        self.theme = defaults.string(forKey: Key.theme).flatMap(FuelTheme.init(rawValue:)) ?? .dark
-        self.accent = defaults.string(forKey: Key.accent).flatMap(FuelAccent.init(rawValue:)) ?? .mono
-        self.provider = Self.provider(fromStored: defaults.string(forKey: Key.provider)) ?? .claude
+        self.theme = defaults.string(forKey: Key.theme)
+            .flatMap(FuelTheme.init(rawValue:)) ?? Default.theme
+        self.accent = defaults.string(forKey: Key.accent)
+            .flatMap(FuelAccent.init(rawValue:)) ?? Default.accent
+        self.provider = Self.provider(fromStored: defaults.string(forKey: Key.provider))
+            ?? Default.provider
     }
 
     // MARK: - Provider mapping
