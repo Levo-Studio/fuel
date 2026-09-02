@@ -170,10 +170,23 @@ Concretely, for anyone touching AI code:
   discovered at the first photo scan.
 - Images are **compressed on the device before upload.** The user is paying for
   those tokens.
-- Error states are the ones in the design: `401` invalid key, `429` or
-  `insufficient_quota` no credit with a link to that provider's billing page,
-  network failure a plain retry. **No stack trace and no raw provider message
-  reaches the interface.**
+- Error states are the ones in the design, and the mapping is by **what the
+  provider actually means**, not by status code alone:
+  - `401` and `403` → key not accepted. A key that is rejected and a key that
+    is not permitted are the same thing to a user, and the remedy is the same.
+  - An explicit credit signal in the response — `insufficient_quota`, or
+    Anthropic's `credit balance is too low` — → no credit, with a link to that
+    provider's billing page. This is matched on the body, at any status.
+  - `429` on its own → **retry**, not no-credit. Both providers document `429`
+    as rate limiting; Anthropic names it `rate_limit_error` and Mistral ships a
+    `Retry-After` header. Telling a merely throttled user to go top up is
+    wrong, and it was wrong in an earlier version of this file.
+  - Anything else, and any transport failure → retry.
+  Mistral publishes no distinct out-of-credit signal, so an exhausted Mistral
+  balance may surface as retry rather than as no-credit. That is the honest
+  outcome; do not invent a signal to make the third state reachable on both
+  providers.
+  **No stack trace and no raw provider message reaches the interface.**
 
 ## Toolchain and commands
 
