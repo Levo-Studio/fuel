@@ -77,14 +77,30 @@ struct FuelOklchTests {
         #expect(FuelPalette.errorRGBA.isInGamut)
     }
 
-    @Test("light green is reported as outside sRGB rather than silently clamped")
-    func lightGreenIsOutOfGamut() {
-        // The one accent the design asks for that sRGB cannot show. The point
-        // of the test is not the clamp — it is that the type says so, so a
-        // future reader does not assume every accent is exact.
+    @Test("light green is gamut-mapped to the pixel the export draws, and says so")
+    func lightGreenIsGamutMapped() {
+        // The one accent the design asks for that sRGB cannot show, and so the
+        // one whose value rests on a judgement rather than on arithmetic. It is
+        // pinned harder than the rest, not less: #007D51 is what the export
+        // renders, reached by reducing chroma at the requested lightness and
+        // hue per CSS Color 4. Per-channel clamping would give #007F4E, two
+        // 8-bit steps off the drawn pixel — this expectation is what keeps
+        // anyone from simplifying the mapping back into a clamp.
         let green = FuelAccent.green.rgba(for: .light)
+        expectClose(green, red: 0x00 / 255, green: 0x7D / 255, blue: 0x51 / 255)
         #expect(!green.isInGamut)
-        #expect(green.red < 0)
+    }
+
+    @Test("gamut mapping keeps lightness and hue and only gives up chroma")
+    func gamutMappingPreservesLightnessAndHue() {
+        // What makes chroma reduction the right mapping rather than merely a
+        // different one. A wildly out-of-range chroma at a reachable lightness
+        // must come back as the same colour, only less saturated — never as a
+        // different hue and never as a different brightness.
+        let requested = FuelRGBA.oklch(0.52, 0.4, 160)
+        let mapped = FuelAccent.green.rgba(for: .light)
+        #expect(!requested.isInGamut)
+        expectClose(requested, red: mapped.red, green: mapped.green, blue: mapped.blue)
     }
 
     @Test("every other accent and theme pair is inside sRGB")

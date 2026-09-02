@@ -54,7 +54,8 @@ nonisolated struct FuelRGBA: Equatable, Sendable {
 
 nonisolated extension FuelRGBA {
 
-    /// Converts an `oklch(L C H)` triple to sRGB.
+    /// Converts an `oklch(L C H)` triple to sRGB, gamut-mapping it if sRGB
+    /// cannot show it.
     ///
     /// The design was authored in oklch because it keeps the five accents at a
     /// matched lightness across hues, which is the whole reason they read as
@@ -69,11 +70,85 @@ nonisolated extension FuelRGBA {
     /// before the transfer function, because that is where a negative channel
     /// actually means "outside sRGB".
     ///
+    /// A colour outside sRGB is brought in by **reducing chroma** at the
+    /// requested lightness and hue, which is what CSS Color 4 specifies and
+    /// therefore what the browser that rendered the design export did. It is
+    /// not the same as clamping each channel: clamping shifts hue and
+    /// lightness as well as saturation, and for the one accent this affects it
+    /// lands two 8-bit steps away from the pixel that was actually drawn. The
+    /// design export wins on pixel values, so the mapping matches it.
+    ///
+    /// `isInGamut` still reports `false` for a mapped colour. The result is the
+    /// drawn one, but it is not the colour that was asked for, and a reader
+    /// should be able to tell the difference.
+    ///
     /// - Parameters:
     ///   - l: Perceptual lightness, 0…1.
     ///   - c: Chroma, unbounded in principle.
     ///   - h: Hue angle in degrees.
     static func oklch(_ l: Double, _ c: Double, _ h: Double, opacity: Double = 1) -> FuelRGBA {
+        let requested = linearSRGB(l, c, h)
+        if inGamut(requested) {
+            return FuelRGBA(
+                red: encodeSRGB(requested.red),
+                green: encodeSRGB(requested.green),
+                blue: encodeSRGB(requested.blue),
+                opacity: opacity
+            )
+        }
+
+        // Binary search for the largest chroma that still fits. Chroma zero is
+        // the achromatic axis and is always inside sRGB for a lightness in
+        // 0…1, so the search always has a lower bound to fall back on.
+        var reachable = 0.0
+        var unreachable = c
+        for _ in 0..<Self.gamutSearchSteps {
+            let midpoint = (reachable + unreachable) / 2
+            // Strict here, unlike the test above. The tolerance exists so a
+            // colour sitting on the boundary is not called out-of-gamut over a
+            // rounding artefact; letting the *search* keep that slack would
+            // hand back a result with a faintly negative channel, which then
+            // needs clamping after all.
+            if inGamut(linearSRGB(l, midpoint, h), tolerance: 0) {
+                reachable = midpoint
+            } else {
+                unreachable = midpoint
+            }
+        }
+
+        let mapped = linearSRGB(l, reachable, h)
+        return FuelRGBA(
+            red: encodeSRGB(mapped.red),
+            green: encodeSRGB(mapped.green),
+            blue: encodeSRGB(mapped.blue),
+            opacity: opacity,
+            isInGamut: false
+        )
+    }
+
+    /// Enough halvings to settle chroma well below the 8-bit step a screen can
+    /// show, so the search never decides the result.
+    private static let gamutSearchSteps = 40
+
+    /// A hair of tolerance, because the matrices are rounded decimals and a
+    /// colour landing on the gamut boundary should not be pushed off it.
+    private static let gamutTolerance = 0.0005
+
+    private static func inGamut(
+        _ value: (red: Double, green: Double, blue: Double),
+        tolerance: Double = gamutTolerance
+    ) -> Bool {
+        [value.red, value.green, value.blue]
+            .allSatisfy { $0 >= -tolerance && $0 <= 1 + tolerance }
+    }
+
+    /// oklch → oklab → LMS → linear sRGB. Stops before the transfer function so
+    /// the gamut test above reads real out-of-range channels.
+    private static func linearSRGB(
+        _ l: Double,
+        _ c: Double,
+        _ h: Double
+    ) -> (red: Double, green: Double, blue: Double) {
         let radians = h * .pi / 180
         let a = c * cos(radians)
         let b = c * sin(radians)
@@ -86,23 +161,10 @@ nonisolated extension FuelRGBA {
         let medium = mediumRoot * mediumRoot * mediumRoot
         let short = shortRoot * shortRoot * shortRoot
 
-        let linearRed = 4.0767416621 * long - 3.3077115913 * medium + 0.2309699292 * short
-        let linearGreen = -1.2684380046 * long + 2.6097574011 * medium - 0.3413193965 * short
-        let linearBlue = -0.0041960863 * long - 0.7034186147 * medium + 1.7076147010 * short
-
-        // A hair of tolerance, because the matrices are rounded decimals and a
-        // colour that lands on the gamut boundary should not be reported as
-        // outside it.
-        let tolerance = 0.0005
-        let inGamut = [linearRed, linearGreen, linearBlue]
-            .allSatisfy { $0 >= -tolerance && $0 <= 1 + tolerance }
-
-        return FuelRGBA(
-            red: encodeSRGB(linearRed),
-            green: encodeSRGB(linearGreen),
-            blue: encodeSRGB(linearBlue),
-            opacity: opacity,
-            isInGamut: inGamut
+        return (
+            red: 4.0767416621 * long - 3.3077115913 * medium + 0.2309699292 * short,
+            green: -1.2684380046 * long + 2.6097574011 * medium - 0.3413193965 * short,
+            blue: -0.0041960863 * long - 0.7034186147 * medium + 1.7076147010 * short
         )
     }
 
@@ -174,12 +236,12 @@ nonisolated enum FuelAccent: String, CaseIterable, Identifiable, Sendable {
         case (.blue, .dark): .oklch(0.72, 0.13, 250)   // oklch(0.72 0.13 250) -> #60AAF3
         case (.blue, .light): .oklch(0.52, 0.15, 256)  // oklch(0.52 0.15 256) -> #2368BD
         case (.green, .dark): .oklch(0.76, 0.13, 160)  // oklch(0.76 0.13 160) -> #5ACA94
-        // oklch(0.52 0.13 160) -> #007F4E, and this one sits *outside* sRGB:
-        // linear red comes out at about -0.014. `color` clamps that channel to
-        // zero, which is the closest sRGB can get. The shift is not visible
-        // against the design render, which was itself produced by a browser
-        // doing the same clamp — but it is a clamp, not an exact match, and
-        // `isInGamut` reports it rather than hiding it.
+        // The one accent sRGB cannot show: oklch(0.52 0.13 160) needs a linear
+        // red of about -0.014. `oklch` gamut-maps it by pulling chroma back to
+        // roughly 0.118 at the same lightness and hue, which lands on #007D51
+        // — the pixel the export actually renders, because the browser that
+        // drew it followed the same CSS Color 4 rule. `isInGamut` stays false
+        // so the mapping is visible rather than assumed.
         case (.green, .light): .oklch(0.52, 0.13, 160)
         case (.sand, .dark): .oklch(0.82, 0.11, 72)    // oklch(0.82 0.11 72)  -> #F0B871
         case (.sand, .light): .oklch(0.58, 0.12, 62)   // oklch(0.58 0.12 62)  -> #AC6820
