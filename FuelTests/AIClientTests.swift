@@ -581,6 +581,54 @@ struct ReplyParsingTests {
         #expect(estimate.kilocalories == 500)
     }
 
+    @Test("a photo row without a weight is dropped rather than shown as 0 g")
+    func photoRowWithoutGrams() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let reply = """
+            {"title":"Porridge","kilocalories":420,"protein_g":14,"carbs_g":62,\
+            "fat_g":11,"items":[{"name":"Porridge","kilocalories":300,\
+            "grams":250,"confidence":"confident"},\
+            {"name":"Berries","kilocalories":120,"confidence":"unsure"}]}
+            """
+        let client = AnthropicClient(
+            transport: RecordingTransport(status: 200, body: Reply.anthropic(reply)),
+            keys: keys.source
+        )
+
+        let estimate = try await client.estimate(photo: tinyPhoto())
+
+        // "approx. 0 g" would be a number the model never gave, drawn in the
+        // same type as the ones it did.
+        #expect(estimate.items.count == 1)
+        #expect(estimate.items[0].name == "Porridge")
+        // Nothing is lost but the row: the day is built from the top-level
+        // totals, not from summing these.
+        #expect(estimate.kilocalories == 420)
+        #expect(estimate.macros == MacroTotals(protein: 14, carbs: 62, fat: 11))
+    }
+
+    @Test("a text row needs no weight, because its note carries none")
+    func textRowWithoutGrams() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let reply = """
+            {"title":"Porridge","kilocalories":420,"protein_g":14,"carbs_g":62,\
+            "fat_g":11,"items":[{"name":"Berries","kilocalories":120,\
+            "amount":"estimated"}]}
+            """
+        let client = AnthropicClient(
+            transport: RecordingTransport(status: 200, body: Reply.anthropic(reply)),
+            keys: keys.source
+        )
+
+        let estimate = try await client.estimate(text: "porridge with berries")
+        #expect(estimate.items.count == 1)
+        #expect(estimate.items[0].note == .text(amount: .estimated))
+    }
+
     @Test("an unreadable row is dropped without taking the estimate with it")
     func unreadableRow() async throws {
         let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")

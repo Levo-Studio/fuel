@@ -215,28 +215,44 @@ private nonisolated struct EstimatePayload: Decodable {
         var confidence: String?
         var amount: String?
 
-        /// Converts one row, or `nil` if it carries nothing worth drawing.
+        /// Converts one row, or `nil` if it carries nothing the result screen
+        /// can honestly draw.
         ///
-        /// A row needs a name and a calorie figure — those are the two things
-        /// the result screen prints. Weight and confidence are the second
-        /// line, and a missing one falls back the same way `RecognisedItem`
-        /// does when reading an entry written by another build: to the less
-        /// certain of the two, because overstating what the model was sure of
-        /// is the worse failure.
+        /// Every row needs a name and a calorie figure — those are the two
+        /// things the screen prints on the first line.
+        ///
+        /// A photo row additionally needs a weight, and a row without one is
+        /// **dropped rather than defaulted**. The design's second line reads
+        /// `confident · approx. 150 g`; with no weight to put there it would
+        /// read `approx. 0 g`, which is a number the model never gave, drawn
+        /// in the same type as the ones it did. Dropping the row loses nothing
+        /// that matters — the calories and macros the day is built from come
+        /// from the top-level fields, not from summing these — and a missing
+        /// row is visibly missing, where a zero is a quiet lie.
+        ///
+        /// Confidence is different, and does fall back: it has only two
+        /// values, and an absent one reads as `unsure` the same way
+        /// `RecognisedItem` reads an entry written by another build.
+        /// Overstating what the model was sure of is the worse failure, and
+        /// `unsure` claims nothing the model did not say.
         func recognisedItem(mode: AILogMode) -> RecognisedItem? {
             let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             guard !trimmed.isEmpty, let kilocalories = kilocalories?.value else {
                 return nil
             }
 
-            let note: RecognisedItem.Note = switch mode {
+            let note: RecognisedItem.Note
+            switch mode {
             case .photo:
-                .photo(
+                guard let grams = grams?.value else {
+                    return nil
+                }
+                note = .photo(
                     confidence: confidence == "confident" ? .confident : .unsure,
-                    approximateGrams: max(0, grams?.value ?? 0)
+                    approximateGrams: max(0, grams)
                 )
             case .text:
-                .text(amount: amount == "recognised" ? .recognised : .estimated)
+                note = .text(amount: amount == "recognised" ? .recognised : .estimated)
             }
 
             return RecognisedItem(
