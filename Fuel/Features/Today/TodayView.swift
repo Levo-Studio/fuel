@@ -112,14 +112,15 @@ private struct TodayAddButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "plus")
-                .resizable()
-                .scaledToFit()
-                // The export draws the glyph as a 20×20 path. Its 1.6 stroke is
-                // not in the design layer, so the symbol's own weight stands in
-                // rather than a number invented here.
-                .frame(width: FuelMetrics.Space.s20, height: FuelMetrics.Space.s20)
-                .foregroundStyle(palette.onAccent)
+            TodayPlusGlyph()
+                .stroke(
+                    palette.onAccent,
+                    style: StrokeStyle(lineWidth: FuelMetrics.Line.Glyph.plus, lineCap: .round)
+                )
+                .frame(
+                    width: FuelMetrics.Line.Glyph.viewBox,
+                    height: FuelMetrics.Line.Glyph.viewBox
+                )
                 .frame(
                     width: FuelMetrics.Control.addButton,
                     height: FuelMetrics.Control.addButton
@@ -128,6 +129,27 @@ private struct TodayAddButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text(TodayCopy.addLabel))
+    }
+}
+
+/// The plus on the add button, as the export draws it: `M10 3v14M3 10h14` in a
+/// 20-unit box — two arms crossing at the centre, each held 3 off the edge.
+///
+/// Drawn as a path rather than taken from a symbol font: `plus` is butt-capped
+/// and its arms are a different length against the box, so it is the drawing
+/// next to it that would look wrong, not this.
+private struct TodayPlusGlyph: Shape {
+
+    nonisolated func path(in rect: CGRect) -> Path {
+        let scale = rect.width / FuelMetrics.Line.Glyph.viewBox
+        let inset = FuelMetrics.Space.s3 * scale
+
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY + inset))
+        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY - inset))
+        path.move(to: CGPoint(x: rect.minX + inset, y: rect.midY))
+        path.addLine(to: CGPoint(x: rect.maxX - inset, y: rect.midY))
+        return path
     }
 }
 
