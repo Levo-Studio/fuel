@@ -27,8 +27,15 @@ nonisolated struct GoalProgress: Hashable, Sendable {
     ///
     /// Truncated, not rounded: at 99.6% of the goal the ring is visibly still
     /// open, and a label reading `100%` beside it would contradict the drawing.
+    ///
+    /// Worked out in integers rather than by truncating `ringFraction × 100`.
+    /// A share that is exactly a whole percent is not exact in binary floating
+    /// point — 696 ÷ 2400 × 100 comes out as 28.999999999999996 — so
+    /// truncating the Double drops a percent from a figure that is not short
+    /// of it at all.
     var percentage: Int {
-        Int(ringFraction * 100)
+        guard targets.kilocalories > 0 else { return 0 }
+        return min(100, totals.kilocalories * 100 / targets.kilocalories)
     }
 
     /// The macro bars, each capped at full like the ring.

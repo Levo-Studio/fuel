@@ -77,6 +77,18 @@ struct GoalProgressTests {
         #expect(progress.percentage == 68)
     }
 
+    @Test(
+        "a whole percent is printed whole",
+        arguments: [(696, 29), (1368, 57), (1392, 58), (1640, 68)]
+    )
+    func wholePercentages(kilocalories: Int, expected: Int) {
+        let progress = GoalProgress(
+            totals: DailyTotals(kilocalories: kilocalories, macros: .zero),
+            targets: targets
+        )
+        #expect(progress.percentage == expected)
+    }
+
     @Test("a day just short of the goal does not read as full")
     func percentageDoesNotRoundUp() {
         let progress = GoalProgress(
