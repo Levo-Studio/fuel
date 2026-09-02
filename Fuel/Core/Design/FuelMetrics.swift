@@ -63,15 +63,26 @@ nonisolated enum FuelMetrics {
         /// The horizontal inset every ordinary screen sits in.
         static let horizontalPadding = Space.s28
 
-        /// The camera surface runs its content at a slightly tighter inset than
-        /// the ordinary screens, so the viewfinder gets the width.
-        static let cameraHorizontalPadding = Space.s26
+        /// The log flow heads its screens at a tighter inset than the ordinary
+        /// ones. Not a camera value: the export draws it on all five — camera,
+        /// text and recent, and on both result screens, which are not camera
+        /// surfaces at all. The body of a result screen returns to
+        /// `horizontalPadding`; only the header row sits in this.
+        static let logFlowHorizontalPadding = Space.s26
 
-        /// The drop from the top of the safe area to the first line on an
-        /// onboarding screen — `88px` on the key screen, `96px` on the goal
-        /// screen, which carries less below it.
+        /// The drop from the top of the frame to the first line on the two
+        /// onboarding screens that carry content — the API key screen and the
+        /// goal screen.
         static let onboardingTopPadding = Space.s88
-        static let onboardingTopPaddingTall = Space.s96
+
+        /// The same drop on the two key-test screens, which sit lower.
+        ///
+        /// The larger value goes to the screen with *less* on it, which is the
+        /// opposite of the intuition: screens 02 and 03 carry a headline and
+        /// four step rows and nothing else, so the block is centred by being
+        /// pushed down, while the goal screen has two choice cards and a footer
+        /// under its headline and needs the height.
+        static let keyTestTopPadding = Space.s96
     }
 
     // MARK: - Radii
