@@ -1,6 +1,492 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "onboarding.cancel" : {
+      "comment" : "Screen 02 footer button, while the key test is running.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        }
+      }
+    },
+    "onboarding.continue" : {
+      "comment" : "The footer button on screens 01, 03 and 04.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue"
+          }
+        }
+      }
+    },
+    "onboarding.goal.countOnly" : {
+      "comment" : "Screen 04, the second choice.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Just count"
+          }
+        }
+      }
+    },
+    "onboarding.goal.countOnly.subtitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The day's total, nothing else"
+          }
+        }
+      }
+    },
+    "onboarding.goal.footnote" : {
+      "comment" : "Screen 04 footer line.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local. No account."
+          }
+        }
+      }
+    },
+    "onboarding.goal.headline" : {
+      "comment" : "Screen 04 headline. The line break is drawn.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "With a goal,\nor without."
+          }
+        }
+      }
+    },
+    "onboarding.goal.macro.carbs" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carbs"
+          }
+        }
+      }
+    },
+    "onboarding.goal.macro.fat" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fat"
+          }
+        }
+      }
+    },
+    "onboarding.goal.macro.protein" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protein"
+          }
+        }
+      }
+    },
+    "onboarding.goal.option" : {
+      "comment" : "Screen 04, the first choice. Doubles as the accessibility label of the calorie field.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set a calorie goal"
+          }
+        }
+      }
+    },
+    "onboarding.goal.unit" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "kcal"
+          }
+        }
+      }
+    },
+    "onboarding.key.fieldLabel" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API key"
+          }
+        }
+      }
+    },
+    "onboarding.key.footnote" : {
+      "comment" : "Screen 01 footer line.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changeable later in Settings."
+          }
+        }
+      }
+    },
+    "onboarding.key.headline" : {
+      "comment" : "Screen 01 headline. The line break is drawn.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your model,\nyour key."
+          }
+        }
+      }
+    },
+    "onboarding.key.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The estimate runs on your own access. The key stays on the device."
+          }
+        }
+      }
+    },
+    "onboarding.key.placeholder.claude" : {
+      "comment" : "Field placeholder. It names the shape of an Anthropic key; it is not a validation rule.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sk-ant-…"
+          }
+        }
+      }
+    },
+    "onboarding.key.placeholder.mistral" : {
+      "comment" : "Field placeholder only. Mistral publishes no key prefix and none is checked.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mist-…"
+          }
+        }
+      }
+    },
+    "onboarding.keyTest.changeKey" : {
+      "comment" : "Footer button of the failed state.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change key"
+          }
+        }
+      }
+    },
+    "onboarding.keyTest.headline.failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key was not accepted."
+          }
+        }
+      }
+    },
+    "onboarding.keyTest.headline.passed" : {
+      "comment" : "Screen 03 headline.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All set."
+          }
+        }
+      }
+    },
+    "onboarding.keyTest.headline.running" : {
+      "comment" : "Screen 02 headline. The line break is drawn.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking the\nconnection."
+          }
+        }
+      }
+    },
+    "onboarding.keyTest.note.anthropicPrefix" : {
+      "comment" : "Offline format check. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A Claude key starts with sk-ant-."
+          }
+        }
+      }
+    },
+    "onboarding.keyTest.note.empty" : {
+      "comment" : "Offline format check. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter your key first."
+          }
+        }
+      }
+    },
+    "onboarding.keyTest.note.invalidKey" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key not accepted."
+          }
+        }
+      }
+    },
+    "onboarding.keyTest.note.network" : {
+      "comment" : "Network failure. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No connection. Try again."
+          }
+        }
+      }
+    },
+    "onboarding.keyTest.note.noCredit" : {
+      "comment" : "429 or insufficient_quota. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This account has no credit left."
+          }
+        }
+      }
+    },
+    "onboarding.keyTest.note.storageFailed" : {
+      "comment" : "The Keychain refused the write. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The key could not be saved on this device."
+          }
+        }
+      }
+    },
+    "onboarding.keyTest.note.tooLong" : {
+      "comment" : "Offline format check. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That is more than one key."
+          }
+        }
+      }
+    },
+    "onboarding.keyTest.note.tooShort" : {
+      "comment" : "Offline format check. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That key looks incomplete."
+          }
+        }
+      }
+    },
+    "onboarding.keyTest.note.whitespace" : {
+      "comment" : "Offline format check. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "There is a space inside the key."
+          }
+        }
+      }
+    },
+    "onboarding.keyTest.step.connection" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opening connection"
+          }
+        }
+      }
+    },
+    "onboarding.keyTest.step.model" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Model ready"
+          }
+        }
+      }
+    },
+    "onboarding.keyTest.step.request" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sending test request"
+          }
+        }
+      }
+    },
+    "onboarding.keyTest.step.response" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Response received"
+          }
+        }
+      }
+    },
+    "onboarding.model.claude" : {
+      "comment" : "Under the key field on screen 01.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Model: Claude Sonnet 5"
+          }
+        }
+      }
+    },
+    "onboarding.model.mistral" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Model: Mistral Large"
+          }
+        }
+      }
+    },
+    "onboarding.modelName.claude" : {
+      "comment" : "The eyebrow on the key-test screens.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Sonnet 5"
+          }
+        }
+      }
+    },
+    "onboarding.modelName.mistral" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mistral Large"
+          }
+        }
+      }
+    },
+    "onboarding.provider.claude" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude"
+          }
+        }
+      }
+    },
+    "onboarding.provider.mistral" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mistral"
+          }
+        }
+      }
+    },
+    "onboarding.step1" : {
+      "comment" : "Eyebrow on screen 01. Uppercased by the text style, not here.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Step 1 of 2"
+          }
+        }
+      }
+    },
+    "onboarding.step2" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Step 2 of 2"
+          }
+        }
+      }
+    },
     "today.add.label" : {
       "comment" : "Accessibility label of the accent-filled add button on Today. Drawn as a plus glyph.",
       "extractionState" : "manual",
