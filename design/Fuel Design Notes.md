@@ -146,6 +146,29 @@ The day list groups in the order Breakfast, Lunch, Snack, Dinner — not
 chronologically — and within a group the entries sort by time. A group with no
 entries is not rendered at all.
 
+### Owner ruling: the late hours
+
+The rule above leaves one case open, and the export does not settle it: an entry
+at 23:30 on a day that never got a dinner. Read one way it is a Snack, because
+the dinner window closed at 22:59. Read the other way it is Dinner, by exactly
+the reasoning the 16:00 case uses — the window passed unused and no further
+main-meal window has been reached.
+
+**Settled: dinner's reach runs to the end of the calendar day, and 00:00–03:59
+is always a Snack.**
+
+- `23:00–23:59` with no dinner yet is **Dinner**. Symmetric with lunch, which
+  already reaches through the 15:00–17:59 gap. Without this, a day whose only
+  meal was at 23:30 shows a Snack group and no Dinner group, which is not what
+  the day was.
+- `00:00–03:59` is **Snack**, whatever the day did. Reach does not cross
+  midnight. A 02:00 entry belongs to a day that has barely started, and calling
+  it that day's dinner is nonsense; entries are filed by calendar day, so a
+  reach that crossed midnight would attach a dinner to the wrong day entirely.
+
+That is a ruling, not something read out of the screens. It is written here so
+the code can cite it instead of asserting it.
+
 ### Two things in the export that are not the rule
 
 - **Settings draws four rows with clock ranges**, Snack among them at
