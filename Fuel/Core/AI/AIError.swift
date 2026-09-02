@@ -80,10 +80,13 @@ extension AIError {
     static func billingPage(for provider: AIProvider) -> URL {
         switch provider {
         case .claude:
-            // Anthropic's billing settings, where a user tops up their
-            // credit balance. Force-unwrapped because a literal that fails
-            // to parse is a typo, not a runtime condition.
-            URL(string: "https://console.anthropic.com/settings/billing")!
+            // Anthropic's billing settings, where a user tops up their credit
+            // balance. `platform.claude.com` rather than the older
+            // `console.anthropic.com`, which only 301s here — Fuel should not
+            // spend the user's first tap on a redirect. Force-unwrapped
+            // because a literal that fails to parse is a typo, not a runtime
+            // condition.
+            URL(string: "https://platform.claude.com/settings/billing")!
         case .mistral:
             URL(string: "https://console.mistral.ai/billing/")!
         }

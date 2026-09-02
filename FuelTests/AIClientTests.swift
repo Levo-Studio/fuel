@@ -415,7 +415,7 @@ struct AIErrorMappingTests {
 
         let expected = AIError.noCredit(
             provider: .claude,
-            billingPage: URL(string: "https://console.anthropic.com/settings/billing")!
+            billingPage: URL(string: "https://platform.claude.com/settings/billing")!
         )
         await #expect(throws: expected) {
             _ = try await client.estimate(text: "an apple")
@@ -801,7 +801,7 @@ struct KeyCheckTests {
         let expected = KeyCheckResult.failed(
             .noCredit(
                 provider: .claude,
-                billingPage: URL(string: "https://console.anthropic.com/settings/billing")!
+                billingPage: URL(string: "https://platform.claude.com/settings/billing")!
             )
         )
         #expect(await client.checkKey(APIKey("sk-ant-abcdefghijklmnop")) == expected)
