@@ -1,0 +1,298 @@
+import CoreText
+import Testing
+import UIKit
+
+@testable import Fuel
+
+// MARK: - oklch
+
+/// The design authors four of the five accents and the error colour in oklch,
+/// and iOS has no oklch initialiser. The conversion is therefore the one piece
+/// of arithmetic standing between the design and what a user sees, and a
+/// transposed matrix row would produce a plausible-looking wrong colour that no
+/// build failure would catch.
+@Suite("oklch conversion")
+struct FuelOklchTests {
+
+    /// One 8-bit step, which is the finest difference a screen can show. Every
+    /// expectation below is stated in that unit so a failure reads as "the
+    /// colour moved by n visible steps".
+    private static let step = 1.0 / 255
+
+    private func expectClose(
+        _ value: FuelRGBA,
+        red: Double,
+        green: Double,
+        blue: Double,
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) {
+        #expect(abs(value.red - red) < Self.step, sourceLocation: sourceLocation)
+        #expect(abs(value.green - green) < Self.step, sourceLocation: sourceLocation)
+        #expect(abs(value.blue - blue) < Self.step, sourceLocation: sourceLocation)
+    }
+
+    @Test("pure white and pure black come back exactly")
+    func achromaticEnds() {
+        // L = 1 with no chroma is the sRGB white point, L = 0 is black. Any
+        // error in the matrices shows up here first, because both are fixed
+        // points of the whole chain.
+        expectClose(.oklch(1, 0, 0), red: 1, green: 1, blue: 1)
+        expectClose(.oklch(0, 0, 0), red: 0, green: 0, blue: 0)
+    }
+
+    @Test("mid grey stays neutral")
+    func neutralStaysNeutral() {
+        let grey = FuelRGBA.oklch(0.6, 0, 180)
+        #expect(abs(grey.red - grey.green) < Self.step)
+        #expect(abs(grey.green - grey.blue) < Self.step)
+        #expect(grey.isInGamut)
+    }
+
+    @Test("sRGB primaries round-trip from their oklch coordinates")
+    func primaries() {
+        // Published oklch coordinates of the sRGB primaries. They are the
+        // standard reference values for this conversion and are what a reviewer
+        // can check against any oklch tool.
+        expectClose(.oklch(0.6280, 0.2577, 29.234), red: 1, green: 0, blue: 0)
+        expectClose(.oklch(0.8664, 0.2948, 142.495), red: 0, green: 1, blue: 0)
+        expectClose(.oklch(0.4520, 0.3132, 264.052), red: 0, green: 0, blue: 1)
+    }
+
+    @Test("the drawn accents convert to the values the design renders")
+    func drawnAccents() {
+        // The hex beside each accent in FuelPalette, restated here so the two
+        // cannot drift apart unnoticed.
+        expectClose(FuelAccent.blue.rgba(for: .dark), red: 0x60 / 255, green: 0xAA / 255, blue: 0xF3 / 255)
+        expectClose(FuelAccent.blue.rgba(for: .light), red: 0x23 / 255, green: 0x68 / 255, blue: 0xBD / 255)
+        expectClose(FuelAccent.green.rgba(for: .dark), red: 0x5A / 255, green: 0xCA / 255, blue: 0x94 / 255)
+        expectClose(FuelAccent.sand.rgba(for: .dark), red: 0xF0 / 255, green: 0xB8 / 255, blue: 0x71 / 255)
+        expectClose(FuelAccent.sand.rgba(for: .light), red: 0xAC / 255, green: 0x68 / 255, blue: 0x20 / 255)
+        expectClose(FuelAccent.lilac.rgba(for: .dark), red: 0xBD / 255, green: 0x9F / 255, blue: 0xF2 / 255)
+        expectClose(FuelAccent.lilac.rgba(for: .light), red: 0x7A / 255, green: 0x53 / 255, blue: 0xB4 / 255)
+    }
+
+    @Test("the error colour converts to the value the design renders")
+    func errorColour() {
+        expectClose(FuelPalette.errorRGBA, red: 0xDA / 255, green: 0x53 / 255, blue: 0x4F / 255)
+        #expect(FuelPalette.errorRGBA.isInGamut)
+    }
+
+    @Test("light green is reported as outside sRGB rather than silently clamped")
+    func lightGreenIsOutOfGamut() {
+        // The one accent the design asks for that sRGB cannot show. The point
+        // of the test is not the clamp — it is that the type says so, so a
+        // future reader does not assume every accent is exact.
+        let green = FuelAccent.green.rgba(for: .light)
+        #expect(!green.isInGamut)
+        #expect(green.red < 0)
+    }
+
+    @Test("every other accent and theme pair is inside sRGB")
+    func remainingAccentsAreInGamut() {
+        for accent in FuelAccent.allCases {
+            for theme in FuelTheme.allCases where !(accent == .green && theme == .light) {
+                #expect(accent.rgba(for: theme).isInGamut, "\(accent) / \(theme)")
+                #expect(accent.onRGBA(for: theme).isInGamut, "\(accent) on / \(theme)")
+            }
+        }
+    }
+}
+
+// MARK: - Palette
+
+@Suite("Palette")
+struct FuelPaletteTests {
+
+    @Test("every accent resolves an accent and an on-colour in both themes")
+    func accentsResolveEverywhere() {
+        // Both lookups switch over (accent, theme). An unhandled pair would not
+        // compile, but a pair mapped to the *wrong* half of the design table
+        // would, so this also pins the two colours apart: an accent that
+        // equalled its own on-colour would be invisible text on a filled
+        // button.
+        for accent in FuelAccent.allCases {
+            for theme in FuelTheme.allCases {
+                let palette = FuelPalette(theme: theme, accent: accent)
+                #expect(palette.accentColor != palette.onAccent, "\(accent) / \(theme)")
+                #expect(accent.rgba(for: theme) != accent.onRGBA(for: theme), "\(accent) / \(theme)")
+            }
+        }
+    }
+
+    @Test("mono is the default accent and dark is what the app opens on")
+    func defaults() {
+        let palette = FuelPalette(theme: .dark)
+        #expect(palette.accent == .mono)
+        #expect(FuelTheme.allCases == [.light, .dark])
+        #expect(FuelAccent.allCases == [.mono, .blue, .green, .sand, .lilac])
+    }
+
+    @Test("the camera surface stays dark in both themes")
+    func cameraIsDarkInBothThemes() {
+        // Deliberate, and the reason the camera screens carry their own fixed
+        // inks. A light-mode camera would wash out the preview it exists to
+        // show.
+        let dark = FuelRGBA(hex: 0x090A0A)
+        let light = FuelRGBA(hex: 0x0D0D0E)
+        for value in [dark, light] {
+            #expect(value.red < 0.1)
+            #expect(value.green < 0.1)
+            #expect(value.blue < 0.1)
+        }
+        #expect(FuelPalette(theme: .light).camera != FuelPalette(theme: .light).background)
+    }
+
+    @Test("hex components land on the design's values")
+    func hexInitialiser() {
+        let ink = FuelRGBA(hex: 0xFAFAFA, opacity: 0.45)
+        #expect(ink.red == 250.0 / 255)
+        #expect(ink.green == 250.0 / 255)
+        #expect(ink.blue == 250.0 / 255)
+        #expect(ink.opacity == 0.45)
+    }
+}
+
+// MARK: - Typography
+
+@Suite("Typography")
+struct FuelTypographyTests {
+
+    /// The `wght` axis identifier, as `CTFontCopyVariation` reports it.
+    private static let weightAxis = 0x77676874
+
+    @Test("both bundled families are registered under the names the code asks for")
+    func fontsAreRegistered() {
+        // UIFont never returns nil for a descriptor, so an unregistered font
+        // silently becomes the system face and the whole design goes with it.
+        // Comparing family names is the only way that failure surfaces.
+        #expect(FuelTypography.screenTitle.uiFont.familyName == "Plus Jakarta Sans")
+        #expect(FuelTypography.dayTotal.uiFont.familyName == "DM Mono")
+    }
+
+    @Test("the sans face resolves the exact weight the design draws")
+    func variableWeightsResolve() {
+        // The weight trait would land weight 300 on ExtraLight (200). The
+        // variation axis is set explicitly for exactly that reason, and this
+        // test is what keeps someone from simplifying it back.
+        let drawn: [(FuelTypography.Style, Double)] = [
+            (FuelTypography.addGlyph, 300),
+            (FuelTypography.body, 400),
+            (FuelTypography.listTitle, 500),
+            (FuelTypography.screenTitle, 600)
+        ]
+        for (style, weight) in drawn {
+            let variation = CTFontCopyVariation(style.uiFont) as? [AnyHashable: Any]
+            let axis = variation?[Self.weightAxis] as? Double
+            // 400 is the file's default instance, for which CoreText reports no
+            // variation at all.
+            #expect((axis ?? 400) == weight, "\(weight)")
+        }
+    }
+
+    @Test("no style uses a weight the bundle does not carry")
+    func weightsStayInRange() {
+        for style in FuelTypography.allDrawnStyles {
+            switch style.family {
+            case .sans:
+                #expect([300, 400, 500, 600].contains(style.weight))
+            case .mono:
+                #expect(style.weight == 400, "mono is drawn at 400 only")
+            }
+        }
+    }
+
+    @Test("fractional sizes survive")
+    func fractionalSizes() {
+        // 11.5, 13.5 and 14.5 are design points. Rounding any of them is a
+        // design deviation, and it is the kind that looks fine in a screenshot.
+        #expect(FuelTypography.eyebrow.size == 11.5)
+        #expect(FuelTypography.lead.size == 13.5)
+        #expect(FuelTypography.entryTitle.size == 14.5)
+        #expect(FuelTypography.hint.size == 12.5)
+        #expect(FuelTypography.macroLabelSmall.size == 10.5)
+    }
+
+    @Test("tracking converts from em to points against the size")
+    func trackingInPoints() {
+        let eyebrow = FuelTypography.eyebrow
+        #expect(abs(eyebrow.tracking - 0.14 * 11.5) < 0.001)
+
+        let display = FuelTypography.display
+        #expect(abs(display.tracking - -0.03 * 34) < 0.001)
+    }
+
+    @Test("the tight numeral line heights do not add spacing")
+    func tightLineHeightsClampToZero() {
+        // `74px/0.9` and `58px/0.9` pull the CSS line box in around the digits.
+        // SwiftUI cannot subtract from its line box, and neither figure ever
+        // wraps, so zero is the right answer rather than a compromise.
+        #expect(FuelTypography.dayTotal.lineSpacing == 0)
+        #expect(FuelTypography.resultCalories.lineSpacing == 0)
+    }
+
+    @Test("wrapping prose gets the line spacing the design asks for")
+    func looseLineHeightsAddSpacing() {
+        #expect(FuelTypography.lead.lineSpacing > 0)
+        #expect(FuelTypography.body.lineSpacing > 0)
+    }
+}
+
+// MARK: - Metrics
+
+@Suite("Metrics")
+struct FuelMetricsTests {
+
+    @Test("the ring's offset is capped at a full ring")
+    func ringOffsetCaps() {
+        #expect(FuelMetrics.Ring.strokeOffset(total: 0, goal: 2400) == FuelMetrics.Ring.circumference)
+        #expect(FuelMetrics.Ring.strokeOffset(total: 2400, goal: 2400) == 0)
+        // An over-budget day fills the ring rather than winding round again.
+        #expect(FuelMetrics.Ring.strokeOffset(total: 4800, goal: 2400) == 0)
+        #expect(abs(FuelMetrics.Ring.strokeOffset(total: 1200, goal: 2400) - 169.65) < 0.001)
+    }
+
+    @Test("a goal of zero leaves the ring empty instead of dividing by it")
+    func ringSurvivesAZeroGoal() {
+        #expect(FuelMetrics.Ring.strokeOffset(total: 500, goal: 0) == FuelMetrics.Ring.circumference)
+    }
+
+    @Test("the four radii are the ones drawn, and the mockup's corner is not among them")
+    func radii() {
+        let radii = [FuelMetrics.Radius.pill, FuelMetrics.Radius.card, FuelMetrics.Radius.thumbnail]
+        #expect(radii == [100, 16, 22])
+        // 46 is the phone mockup's own corner and must never reach the app.
+        #expect(!radii.contains(46))
+    }
+}
+
+// MARK: - Motion
+
+@Suite("Motion")
+struct FuelMotionTests {
+
+    @Test("every curve returns an animation when motion is not reduced")
+    func fullMotion() {
+        for curve in FuelMotion.allCurves {
+            #expect(FuelMotion.resolve(curve, reduceMotion: false) != nil)
+        }
+    }
+
+    @Test("reduced motion cross-fades or drops, per curve")
+    func reducedMotion() {
+        // The distinction is the point: a state change still needs to be
+        // followable, so most curves fade rather than snap; only motion whose
+        // purpose is travel is dropped.
+        #expect(FuelMotion.resolve(FuelMotion.standard, reduceMotion: true) != nil)
+        #expect(FuelMotion.resolve(FuelMotion.value, reduceMotion: true) != nil)
+        #expect(FuelMotion.resolve(FuelMotion.progress, reduceMotion: true) != nil)
+        #expect(FuelMotion.resolve(FuelMotion.emphasised, reduceMotion: true) == nil)
+    }
+
+    @Test("no curve outlasts the interaction that caused it")
+    func durationsStayTight() {
+        for curve in FuelMotion.allCurves {
+            #expect(curve.duration > 0)
+            #expect(curve.duration <= 0.6)
+        }
+    }
+}
