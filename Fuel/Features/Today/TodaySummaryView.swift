@@ -82,11 +82,6 @@ private struct TodayRing: View {
 
     @Environment(\.fuelPalette) private var palette
 
-    /// The export rotates the ring's SVG a quarter turn back so the arc starts
-    /// at twelve o'clock. A quarter turn is geometry rather than a design
-    /// token, which is why it is written as one and not as a number.
-    private static let start = Angle.radians(-.pi / 2)
-
     /// `Circle` fills its frame, so its radius is half the box; the export's
     /// stroke is centred on r 54, which is that inset in.
     private static let radiusInset = FuelMetrics.Ring.viewBox / 2 - FuelMetrics.Ring.radius
@@ -104,7 +99,7 @@ private struct TodayRing: View {
                     palette.accentColor,
                     style: StrokeStyle(lineWidth: FuelMetrics.Ring.strokeWidth, lineCap: .round)
                 )
-                .rotationEffect(Self.start)
+                .rotationEffect(.degrees(FuelMetrics.Ring.startAngleDegrees))
                 .fuelAnimation(FuelMotion.value, value: fraction)
         }
         .frame(width: FuelMetrics.Ring.viewBox, height: FuelMetrics.Ring.viewBox)
