@@ -264,6 +264,11 @@ nonisolated enum FuelMetrics {
     /// way the mockup's own `46px` corner stays out. A test that checks the
     /// three radii it just pinned proves nothing; a sweep over the whole layer
     /// goes red the moment the number appears anywhere in it.
+    /// Lengths only. The roster exists so `mockupCornerNeverReachesTheApp` can
+    /// assert the phone frame's 46pt corner is absent, so what belongs here is
+    /// anything that could plausibly collide with a mockup dimension. A
+    /// dimensionless ratio such as `Line.spinnerArc` cannot, and putting one in
+    /// would make the list mean two things at once.
     static let allDrawnValues: [CGFloat] = [
         Space.s2, Space.s3, Space.s4, Space.s7, Space.s8, Space.s10, Space.s11, Space.s12,
         Space.s13, Space.s14, Space.s15, Space.s16, Space.s17, Space.s18, Space.s20, Space.s22,
