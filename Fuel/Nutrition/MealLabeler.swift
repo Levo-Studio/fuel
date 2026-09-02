@@ -27,11 +27,12 @@ import Foundation
 /// it should reason about, so the rule is testable without a clock.
 nonisolated struct MealLabeler {
 
-    /// The calendar decides what an entry's local time of day is. It is
-    /// injected so a test can pin a time zone.
+    /// The calendar decides what an entry's local time of day is. It has no
+    /// default: the whole rule is about time of day, and a default would let a
+    /// caller — a future test above all — read the ambient one by omission.
     var calendar: Calendar
 
-    init(calendar: Calendar = .current) {
+    init(calendar: Calendar) {
         self.calendar = calendar
     }
 
