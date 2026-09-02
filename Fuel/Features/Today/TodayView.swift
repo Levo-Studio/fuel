@@ -38,11 +38,14 @@ struct TodayView: View {
                         .padding(.top, listTopPadding)
                 }
                 .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
-                // The last row would otherwise sit under the add button, which
-                // floats rather than taking part in the layout.
-                .padding(.bottom, FuelMetrics.Control.addButton + FuelMetrics.Control.addButtonBottomInset)
+                // The last row has to clear the whole fade band, not just the
+                // button: a row scrolled to rest inside the band would be
+                // legible at the top of it and gone at the bottom.
+                .padding(.bottom, FuelMetrics.ListFade.height)
             }
             .scrollBounceBehavior(.basedOnSize)
+
+            TodayListFade()
 
             TodayAddButton(action: onAddEntry)
                 .padding(.trailing, FuelMetrics.Control.addButtonTrailingInset)
@@ -150,6 +153,32 @@ private struct TodayPlusGlyph: Shape {
         path.move(to: CGPoint(x: rect.minX + inset, y: rect.midY))
         path.addLine(to: CGPoint(x: rect.maxX - inset, y: rect.midY))
         return path
+    }
+}
+
+// MARK: - List fade
+
+/// The band that takes the day list out under the add button.
+///
+/// Behind the button and in front of the list, and deliberately not
+/// hit-testable: it covers the last rows, and a row under it still has to be
+/// reachable.
+private struct TodayListFade: View {
+
+    @Environment(\.fuelPalette) private var palette
+
+    var body: some View {
+        LinearGradient(
+            stops: [
+                Gradient.Stop(color: palette.background, location: .zero),
+                Gradient.Stop(color: palette.background, location: FuelMetrics.ListFade.opaqueStop),
+                Gradient.Stop(color: palette.background.opacity(.zero), location: 1),
+            ],
+            startPoint: .bottom,
+            endPoint: .top
+        )
+        .frame(height: FuelMetrics.ListFade.height)
+        .allowsHitTesting(false)
     }
 }
 
