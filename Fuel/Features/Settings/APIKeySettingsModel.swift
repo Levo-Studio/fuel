@@ -4,9 +4,12 @@ import Foundation
 
 /// The states of the note beside `Re-check`.
 ///
-/// The export draws three: nothing at all, `Connection works`, and `Key not
-/// accepted` in the error colour. `noCredit` is a fourth, added on an owner
-/// ruling, and it is the one undrawn state that could not stay empty: a user
+/// Two are drawn in `Screens2c.dc.html`: nothing at all, and `Connection works`.
+/// `Key not accepted` is spec but not drawn — it is a `[P]` row in the notes'
+/// copy table, and grepping the screens for it comes back empty — and the
+/// colour it takes is the error colour, which is `[P]` for the same reason.
+/// `noCredit` is a fourth, added on an owner ruling, and it is the one undrawn
+/// state that could not stay empty: a user
 /// who cannot pay for a scan and is shown nothing has no way to work out what
 /// happened or what to do. It is built out of drawn parts rather than invented
 /// — the same slot and the same error colour as `notAccepted`, and a second
