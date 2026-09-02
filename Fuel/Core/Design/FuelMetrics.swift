@@ -273,6 +273,7 @@ nonisolated enum FuelMetrics {
         Screen.onboardingTopPadding, Screen.keyTestTopPadding,
         Radius.pill, Radius.card, Radius.thumbnail,
         Line.hairline, Line.selectionBorder, Line.spinner,
+        Line.Glyph.chevron, Line.Glyph.plus, Line.Glyph.check, Line.Glyph.viewBox,
         Control.circleButton, Control.swatchRing, Control.swatchDot, Control.shutterRing,
         Control.shutterFill, Control.stepMarkerSlot, Control.stepMarkerDot,
         Control.macroLabelColumn, Control.macroBarHeight, Control.thumbnailHeight,
@@ -280,7 +281,8 @@ nonisolated enum FuelMetrics {
         Control.selectionDot,
         Ring.viewBox, Ring.radius, Ring.strokeWidth, Ring.size, Ring.trailingGap,
         Ring.circumference,
-        Progress.width, Progress.height, Progress.labelGap
+        Progress.width, Progress.height, Progress.labelGap,
+        ListFade.height
     ]
 
     // MARK: - Progress
