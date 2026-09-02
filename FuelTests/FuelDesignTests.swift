@@ -259,6 +259,7 @@ struct FuelTypographyTests {
         // a 74pt numeral with a suffix beside it, the percentage centred in a
         // 104pt ring, a name in a 52pt column, a label in a three-column bar.
         #expect(FuelTypography.display.scalesRelativeTo != nil)
+        #expect(FuelTypography.displaySmall.scalesRelativeTo != nil)
         #expect(FuelTypography.screenTitle.scalesRelativeTo != nil)
         #expect(FuelTypography.dayTotal.scalesRelativeTo == nil)
         #expect(FuelTypography.monoValue.scalesRelativeTo == nil)

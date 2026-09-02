@@ -263,6 +263,10 @@ nonisolated enum FuelTypography {
 
     /// `600 30px/1.16`, tracking `-.03em`. The headline on a key-test screen,
     /// one step down because that screen carries a step list underneath it.
+    ///
+    /// Scales for the same reason as `display`, and would be the odd one out if
+    /// it did not: it is the same headline one size smaller, on a screen with
+    /// more room under it, so anything `display` can absorb this can.
     static let displaySmall = Style(
         .sans,
         weight: 600,
