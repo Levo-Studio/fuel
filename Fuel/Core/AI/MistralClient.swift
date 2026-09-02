@@ -14,16 +14,15 @@ nonisolated struct MistralClient: AIClient {
 
     /// The model id sent as `model`, for the design's "Modell: Mistral Large".
     ///
-    /// **This constant is the one thing in this file the owner may need to
-    /// correct, and it is deliberately the only place the string appears.**
-    /// Mistral's own documentation is not self-consistent at the time of
-    /// writing: the model-overview page lists Mistral Large 3 as
-    /// `mistral-large-3-25-12`, while the vision page's runnable example — the
-    /// one that is actually a request body — uses `mistral-large-2512`. The
-    /// second is what every previous Mistral Large has looked like
-    /// (`mistral-large-2411`, `mistral-large-2407`), so it is what is written
-    /// here, but it could not be confirmed against a live `GET /v1/models`
-    /// without a key.
+    /// **Deliberately the only place the string appears.** The
+    /// model-overview page prints no API id for Mistral Large 3 at all — the
+    /// `mistral-large-3-25-12` that appears around it is a documentation URL
+    /// slug, not something to send as `model` — so the id was taken from the
+    /// two places that do publish one: the Large 3 model page's API-names
+    /// badge, and the vision page's runnable example, which is an actual
+    /// request body. Both say `mistral-large-2512`, and that matches the shape
+    /// of every previous Mistral Large (`mistral-large-2411`,
+    /// `mistral-large-2407`).
     ///
     /// Deliberately **not** `mistral-large-latest`. An alias can move under
     /// the app to a model with different pricing and a different answer shape,
