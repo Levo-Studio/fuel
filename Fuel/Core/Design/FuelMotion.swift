@@ -130,6 +130,25 @@ nonisolated enum FuelMotion {
     static func resolve(_ curve: Curve) -> Animation? {
         resolve(curve, reduceMotion: UIAccessibility.isReduceMotionEnabled)
     }
+
+    /// A curve that runs until something stops it — the key-test spinner is the
+    /// only one Fuel draws.
+    ///
+    /// `resolve` cannot answer this, and that is not an oversight in the caller:
+    /// `ReducedBehaviour` describes what replaces a *transition*, and neither
+    /// answer fits a loop. `.crossFade` hands back a 0.15s linear curve, and
+    /// `.repeatForever` on that spins the ring roughly twice as fast as the
+    /// design draws it — the opposite of reducing motion. `.none` returns nil,
+    /// which stops the spinner but leaves the row looking pending forever.
+    ///
+    /// So a repeating curve is its own question with its own answer: run it,
+    /// or return nil and let the caller draw the still state. A view must not
+    /// improvise this by reading the accessibility flag itself — that is the
+    /// rule this function exists to keep true.
+    static func resolveRepeating(_ curve: Curve, reduceMotion: Bool) -> Animation? {
+        guard !reduceMotion else { return nil }
+        return curve.animation.repeatForever(autoreverses: false)
+    }
 }
 
 // MARK: - Applying a curve
