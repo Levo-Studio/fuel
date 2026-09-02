@@ -143,10 +143,11 @@ is a mistake.
 
 This is the rule people break first, so it gets its own section.
 
-**`design/` is the source of truth for every colour, size, spacing value, radius,
-opacity, letter-spacing, line-height and state.** Not a mood board, not a
-starting point. The export contains `Fuel Design Notes.md` — the written spec —
-and `Screens2c.dc.html` with all seventeen screens in light and dark at 390×844.
+**`design/` is the source of truth for every colour, size, spacing value,
+radius, opacity, letter-spacing, line-height and state.** Not a mood board, not
+a starting point. The export contains `Fuel Design Notes.md` — the written
+spec — and `Screens2c.dc.html` with all seventeen screens in light and dark at
+390×844.
 The HTML sizes are design points and transfer 1:1 to SwiftUI points.
 
 Read it before the first line of code. Yes, also for a one-line change.
@@ -239,8 +240,9 @@ merge to `main`.
 
 ## Branches
 
-You work in your fork, but the same rule applies there: **never on `main`.** Keep
-it clean so you can branch off it at any time without your own work in the way.
+You work in your fork, but the same rule applies there: **never on `main`.**
+Keep it clean so you can branch off it at any time without your own work in the
+way.
 
 Pull once before every new branch, otherwise your PR sits on the state of the
 day before yesterday and you rebase afterwards:
@@ -374,7 +376,8 @@ So match the file you are editing.
   functions.
 - **No numeric or colour literals outside the design layer.** No `.padding(17)`,
   no `Color(hex:)`, no hand-rolled `timingCurve` in a feature file. A missing
-  value goes into `FuelMetrics`, `FuelPalette`, `FuelTypography` or `FuelMotion`.
+  value goes into `FuelMetrics`, `FuelPalette`, `FuelTypography` or
+  `FuelMotion`.
 - **Every visible string is a catalog key.** No literal in a view.
 - No `print`, no `debugPrint`, no commented-out leftovers, no `TODO` without a
   name and a reason beside it. Preferably no `TODO` at all.

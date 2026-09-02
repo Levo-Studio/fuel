@@ -12,11 +12,11 @@ Calorie tracker for iOS 26 · SwiftUI · SwiftData
 Calorie tracking without selling your soul. No account, no cloud, no 12-screen
 onboarding — just type what you ate and move on.
 
-Counting calories is a two-second decision that most apps turn into a four-minute
-errand. You open the app, you search a database for "cottage cheese", you get
-nineteen entries with different brands and one of them is somebody's guess from
-2014, you pick one, you set a portion, you confirm. Do that three times a day and
-you stop doing it by Thursday.
+Counting calories is a two-second decision that most apps turn into a
+four-minute errand. You open the app, you search a database for "cottage
+cheese", you get nineteen entries with different brands and one of them is
+somebody's guess from 2014, you pick one, you set a portion, you confirm. Do
+that three times a day and you stop doing it by Thursday.
 
 And that is only the part after the sign-up. Before any of it there is an
 account, an email address, a body weight, a target weight, a birth date, an
@@ -109,8 +109,8 @@ exist at all:
   with the first hosted API call, so Fuel does not make one.
 - **There are no request logs, because there is no place they could exist.**
   Not a promise about a retention policy — no server, no logs.
-- **You stay anonymous.** There is no Levo Studio account. There is no Levo
-  Studio anything. There is your device, your key, and your provider.
+- **You stay anonymous.** There is no Levo Studio account, and no Levo Studio
+  anything else either. There is your device, your key, and your provider.
 
 Concretely:
 
@@ -204,9 +204,9 @@ The repository is public, so no development team is stored in the project at
 all. Nothing above needs one. Running Fuel on a physical iPhone does, and Xcode
 would otherwise write the team you pick straight back into `project.pbxproj`. So
 it lives outside the project instead: copy `Local.xcconfig.example` to
-`Local.xcconfig`, put your own Team ID in, and build. `Base.xcconfig` includes it
-optionally, so a clone without it still builds. `Local.xcconfig` is ignored by
-git and cannot end up in a commit.
+`Local.xcconfig`, put your own Team ID in, and build. `Base.xcconfig` includes
+it optionally, so a clone without it still builds. `Local.xcconfig` is ignored
+by git and cannot end up in a commit.
 
 The project uses synchronized folders — new files under `Fuel/` and `FuelTests/`
 join the target on their own, and `Fuel.xcodeproj/project.pbxproj` does not have
