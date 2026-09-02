@@ -545,6 +545,69 @@ struct ReplyParsingTests {
         #expect(estimate.items[0].note == .photo(confidence: .confident, approximateGrams: 250))
     }
 
+    @Test("a number far outside Int's range is a parse error, not a trap")
+    func absurdNumber() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        // 1e300 is a perfectly finite Double and converts to no Int at all.
+        // This is the one path where a third party fully controls the input,
+        // so it has to end in a typed error rather than in a trap.
+        let reply = """
+            {"title":"Porridge","kilocalories":1e300,"protein_g":14,\
+            "carbs_g":62,"fat_g":11,"items":[]}
+            """
+        let client = AnthropicClient(
+            transport: RecordingTransport(status: 200, body: Reply.anthropic(reply)),
+            keys: keys.source
+        )
+
+        await #expect(throws: AIError.malformedResponse) {
+            _ = try await client.estimate(text: "porridge")
+        }
+    }
+
+    @Test("an absurd number quoted as a string is a parse error, not a trap")
+    func absurdQuotedNumber() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        // The string path has the same hole: Double("1e300") is finite too.
+        let reply = """
+            {"title":"Porridge","kilocalories":"1e300","protein_g":"14",\
+            "carbs_g":"62","fat_g":"11","items":[]}
+            """
+        let client = AnthropicClient(
+            transport: RecordingTransport(status: 200, body: Reply.anthropic(reply)),
+            keys: keys.source
+        )
+
+        await #expect(throws: AIError.malformedResponse) {
+            _ = try await client.estimate(text: "porridge")
+        }
+    }
+
+    @Test("an absurd number in a line item drops the row, not the app")
+    func absurdNumberInItem() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let reply = """
+            {"title":"Porridge","kilocalories":420,"protein_g":14,"carbs_g":62,\
+            "fat_g":11,"items":[{"name":"Porridge","kilocalories":300,\
+            "grams":250,"confidence":"confident"},\
+            {"name":"Berries","kilocalories":1e300,"grams":-1e300}]}
+            """
+        let client = AnthropicClient(
+            transport: RecordingTransport(status: 200, body: Reply.anthropic(reply)),
+            keys: keys.source
+        )
+
+        let estimate = try await client.estimate(photo: tinyPhoto())
+        #expect(estimate.kilocalories == 420)
+        #expect(estimate.items.count == 1)
+    }
+
     @Test("a code fence around the object is tolerated")
     func codeFence() async throws {
         let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")

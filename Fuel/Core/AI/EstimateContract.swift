@@ -92,8 +92,10 @@ nonisolated enum EstimateContract {
     ///   unreadable *total* throws, because zeroed macros would look like a
     ///   real meal in the day's ring.
     ///
-    /// Throws `AIError.malformedResponse`. Never crashes, never returns a
-    /// silently empty estimate.
+    /// Throws `AIError.malformedResponse`. Never crashes — including on a
+    /// number too large to be an `Int`, which is a value a provider can put on
+    /// the wire and which `LenientInt` is careful to convert rather than force
+    /// — and never returns a silently empty estimate.
     static func estimate(from reply: String, mode: AILogMode) throws -> MealEstimate {
         guard
             let object = firstJSONObject(in: reply),
@@ -275,6 +277,15 @@ private nonisolated struct EstimatePayload: Decodable {
 /// them would cost the user a request over punctuation. Anything that is
 /// genuinely not a number — a range, a unit, prose — decodes as `nil`, and
 /// `EstimateContract` decides whether that is fatal.
+///
+/// **A number outside `Int`'s range is one of those non-numbers, and getting
+/// that wrong crashed the app.** `1e300` is a finite `Double`, so an
+/// `isFinite` guard waves it through, and `Int(1e300)` then traps — inside the
+/// decoder, on the one path where a third party fully controls every byte.
+/// `Int(exactly:)` is what actually asks the question "is this an `Int`",
+/// which is the question being asked; `isFinite` only rules out NaN and the
+/// infinities. Nothing above this type can defend the trap, because a trap is
+/// not catchable.
 private nonisolated struct LenientInt: Decodable {
 
     let value: Int?
@@ -287,8 +298,8 @@ private nonisolated struct LenientInt: Decodable {
             return
         }
 
-        if let double = try? container.decode(Double.self), double.isFinite {
-            value = Int(double.rounded())
+        if let double = try? container.decode(Double.self) {
+            value = Self.int(from: double)
             return
         }
 
@@ -296,8 +307,8 @@ private nonisolated struct LenientInt: Decodable {
             let trimmed = string.trimmingCharacters(in: .whitespaces)
             if let int = Int(trimmed) {
                 value = int
-            } else if let double = Double(trimmed), double.isFinite {
-                value = Int(double.rounded())
+            } else if let double = Double(trimmed) {
+                value = Self.int(from: double)
             } else {
                 value = nil
             }
@@ -305,5 +316,15 @@ private nonisolated struct LenientInt: Decodable {
         }
 
         value = nil
+    }
+
+    /// The rounded value of `double`, or `nil` if it is not an `Int` at all.
+    ///
+    /// Rounded first so `48.7` reads as 49, then converted with
+    /// `Int(exactly:)`, which answers `nil` rather than trapping for anything
+    /// out of range — including NaN and the infinities, which is why no
+    /// separate `isFinite` check is left here.
+    private static func int(from double: Double) -> Int? {
+        Int(exactly: double.rounded())
     }
 }
