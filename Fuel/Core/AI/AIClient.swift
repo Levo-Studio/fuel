@@ -122,6 +122,15 @@ extension AIError {
     /// **Nothing read here leaves this function.** The body is matched against
     /// two fixed substrings and discarded; no fragment of it, and no status
     /// line, is carried into the returned error.
+    ///
+    /// One caveat on "at any status": the match also has a size bound, and a
+    /// body of 8 KiB or more is **not searched at all** — it falls through to
+    /// the retry state. An error body that large is not an error message any
+    /// provider writes; it is an HTML page from something in front of the API,
+    /// or a response Fuel has misread. Decoding megabytes of unknown bytes to
+    /// a `String` and lowercasing them, on the failure path, to look for two
+    /// substrings, is work done at the request of whoever sent it. A real
+    /// credit message is a sentence.
     static func from(status: Int, body: Data, provider: AIProvider) -> AIError {
         if mentionsExhaustedCredit(body) {
             return .noCredit(for: provider)
@@ -138,6 +147,10 @@ extension AIError {
         return .network
     }
 
+    /// Whether the body says, in words, that the balance is spent.
+    ///
+    /// The 8 KiB bound is documented on `from(status:body:provider:)` above,
+    /// with the reason it is a guard rather than a limitation.
     private static func mentionsExhaustedCredit(_ body: Data) -> Bool {
         guard
             body.count < 8 * 1024,
