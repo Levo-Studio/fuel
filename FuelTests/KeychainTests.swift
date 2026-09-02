@@ -129,7 +129,10 @@ struct KeychainStorageTests {
     /// Goes through the Keychain directly rather than through the wrapper,
     /// because the wrapper has no way of writing a weak item — which is the
     /// point of it.
-    private func weakenAccessibility(inService service: String) {
+    private func weakenAccessibility(
+        inService service: String,
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -139,7 +142,16 @@ struct KeychainStorageTests {
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
         ]
         let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
-        #expect(status == errSecSuccess, "the fixture itself failed to write")
+
+        // A fixture that did not write leaves the test asserting nothing, so it
+        // aborts rather than reports — and it reports at the test that asked
+        // for it, not here, because that is the line someone has to go and
+        // look at.
+        try #require(
+            status == errSecSuccess,
+            "the fixture itself failed to write",
+            sourceLocation: sourceLocation
+        )
     }
 
     /// Plants a synchronising item in the slot the store uses for `.claude`.
@@ -153,8 +165,10 @@ struct KeychainStorageTests {
     /// `WhenUnlocked` rather than `ThisDeviceOnly` because the Keychain refuses
     /// the combination of a device-only class and synchronisation outright,
     /// which is itself part of why the store's own attributes are safe.
-    @discardableResult
-    private func plantSynchronisingItem(inService service: String) -> OSStatus {
+    private func plantSynchronisingItem(
+        inService service: String,
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) throws {
         let item: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -163,7 +177,12 @@ struct KeychainStorageTests {
             kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked,
             kSecValueData as String: Data("sk-ant-api03-999999999999999999999999".utf8)
         ]
-        return SecItemAdd(item as CFDictionary, nil)
+
+        try #require(
+            SecItemAdd(item as CFDictionary, nil) == errSecSuccess,
+            "the fixture itself failed to write",
+            sourceLocation: sourceLocation
+        )
     }
 
     // MARK: - Round trip
@@ -212,8 +231,7 @@ struct KeychainStorageTests {
         let store = makeStore()
         defer { removeEverything(from: store) }
 
-        let planted = plantSynchronisingItem(inService: store.service)
-        try #require(planted == errSecSuccess, "the fixture itself failed to write")
+        try plantSynchronisingItem(inService: store.service)
 
         // The half of the sync guarantee the attribute assertions cannot reach:
         // that the store cannot *touch* an iCloud-backed item, only that it
@@ -236,13 +254,56 @@ struct KeychainStorageTests {
         #expect(rawItems(inService: store.service).count == 2)
     }
 
+    @Test("a caller cannot override the pinned identity or the sync flag")
+    func pinnedAttributesSurviveHostileExtra() throws {
+        let store = makeStore()
+        defer { removeEverything(from: store) }
+
+        let decoyService = "apps.levo-studio.Fuel.tests.\(UUID().uuidString)"
+
+        // Everything `itemQuery` pins, set to the worst plausible value: a
+        // synchronising item, filed somewhere else, under someone else's
+        // account. No call site does this today. The funnel exists so that the
+        // fifth method — written by someone who has not read this file and is
+        // passing a dictionary through because it worked — cannot, and that is
+        // only true if the pinned values win the collision.
+        let hostile: [String: Any] = [
+            kSecClass as String: kSecClassInternetPassword,
+            kSecAttrService as String: decoyService,
+            kSecAttrAccount as String: "hijacked",
+            kSecAttrSynchronizable as String: kCFBooleanTrue as Any
+        ]
+
+        let query = try #require(store.itemQuery(for: .claude, adding: hostile) as NSDictionary as? [String: Any])
+
+        #expect(query[kSecClass as String] as? String == kSecClassGenericPassword as String)
+        #expect(query[kSecAttrService as String] as? String == store.service)
+        #expect(query[kSecAttrAccount as String] as? String == "claude")
+        #expect(query[kSecAttrSynchronizable as String] as? Bool == false)
+
+        // And end to end, because a dictionary is only an argument until the
+        // Keychain has seen it: an item written through that hostile query is
+        // an ordinary Fuel item, readable by the provider that asked for it,
+        // and nothing lands in the decoy service.
+        let write = store.itemQuery(for: .claude, adding: hostile.merging([
+            kSecValueData as String: Data(Self.anthropicKey.secret.utf8),
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        ]) { _, addition in addition })
+
+        try #require(SecItemAdd(write, nil) == errSecSuccess, "the fixture itself failed to write")
+
+        expectStoredSafely(inService: store.service, expectedItems: 1)
+        #expect(try store.readKey(for: .claude) == Self.anthropicKey)
+        #expect(rawItems(inService: decoyService).isEmpty)
+    }
+
     @Test("an item left weak by an older build is repaired on the next write")
     func weakItemIsHealedOnWrite() throws {
         let store = makeStore()
         defer { removeEverything(from: store) }
 
         try store.store(Self.anthropicKey, for: .claude)
-        weakenAccessibility(inService: store.service)
+        try weakenAccessibility(inService: store.service)
 
         // Sanity: the fixture really did weaken the item, so the assertion
         // afterwards is about the repair and not about a no-op.

@@ -241,13 +241,20 @@ nonisolated struct KeychainStore: Sendable {
     /// specific to what it is doing. That is deliberate: with four call sites
     /// each assembling their own dictionary, "every query pins
     /// `kSecAttrSynchronizable` to false" was a convention that a fifth method
-    /// could quietly break. Funnelled through one function it is structure —
-    /// the sync flag and the item's identity cannot be omitted, because no
-    /// caller gets to write them.
+    /// could quietly break. Funnelled through one function it is structure: a
+    /// caller adds the flags specific to its own operation and can neither omit
+    /// the sync flag and the item's identity nor overwrite them, because the
+    /// pinned values win every collision. `KeychainTests` hands this function a
+    /// dictionary that tries all four and checks that none of them takes.
     ///
     /// Returns a `CFDictionary` rather than a Swift dictionary so a caller
     /// cannot take the result and mutate an attribute back out of it.
-    private func itemQuery(
+    ///
+    /// Not `private`: the guarantee above is about what this function does with
+    /// a hostile `extra`, and `KeychainTests` proves it by handing it one. The
+    /// seam is safe to widen because the function performs no Security call —
+    /// it builds a dictionary, and the dictionary it builds is always pinned.
+    func itemQuery(
         for provider: AIProvider,
         adding extra: [String: Any] = [:]
     ) -> CFDictionary {
@@ -257,7 +264,14 @@ nonisolated struct KeychainStore: Sendable {
             kSecAttrAccount as String: account(for: provider),
             kSecAttrSynchronizable as String: Self.synchronizable
         ]
-        query.merge(extra) { _, addition in addition }
+        // The pinned value wins every collision. `merge` hands the closure
+        // `(existing, new)`, and returning `new` — the obvious-looking way to
+        // write this, and the way it was written first — would let a caller
+        // overwrite the class, the service, the account or the sync flag by
+        // passing them in `extra`. That is the exact convention this funnel was
+        // built to make impossible. No call site needs to override those four,
+        // so keeping them is free.
+        query.merge(extra) { existing, _ in existing }
         return query as CFDictionary
     }
 
@@ -268,11 +282,14 @@ nonisolated struct KeychainStore: Sendable {
     /// them without losing the one they are not currently using.
     ///
     /// **These strings are on-device state, not labels.** They are written out
-    /// here rather than derived from `AIProvider.rawValue` so that renaming a
-    /// case — a harmless-looking edit in a domain type that has nothing to do
-    /// with storage — cannot orphan a key already on a user's device. An
-    /// orphaned item stays in the Keychain, unreachable, and the user is asked
-    /// for a key they already gave. Changing a string here is a migration.
+    /// here rather than derived from the enum so that renaming a case — a
+    /// harmless-looking edit in a domain type that has nothing to do with
+    /// storage — cannot orphan a key already on a user's device. An orphaned
+    /// item stays in the Keychain, unreachable, and the user is asked for a key
+    /// they already gave. Changing a string here is a migration.
+    ///
+    /// `AIProvider` carries no raw value for the same reason: there must be
+    /// nothing convenient to derive these from.
     private func account(for provider: AIProvider) -> String {
         switch provider {
         case .claude: "claude"
