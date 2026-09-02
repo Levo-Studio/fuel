@@ -116,12 +116,7 @@ nonisolated struct TodayPresentation: Hashable, Sendable {
         self.totals = totals
         self.groups = DayGrouping.groups(of: entries)
 
-        // `CountingMode.progress(for:)` says the same thing more directly, but
-        // it sits in an extension that the project's main-actor default
-        // isolation puts on the main actor, and this type is pure so its tests
-        // need no simulator. The targets themselves are nonisolated.
-        if let targets = mode.targets {
-            let progress = GoalProgress(totals: totals, targets: targets)
+        if let progress = mode.progress(for: totals) {
             self.summary = .goal(
                 TodaySummary.Goal(
                     progress: progress,
