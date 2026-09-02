@@ -97,8 +97,18 @@ struct GoalScreen: View {
     /// does: `2400`, with no group separator.
     private var goalValue: some View {
         HStack(alignment: .firstTextBaseline, spacing: FuelMetrics.Space.s8) {
-            TextField("onboarding.goal.option", text: $goalDraft)
-                .labelsHidden()
+            // The title is empty, the same pattern the key field uses.
+            // `TextField(_:text:)` draws its title as the placeholder whenever
+            // the field is empty, so passing the choice-card title here
+            // rendered "Set a calorie goal" at 50pt mono, straight through both
+            // 28pt margins, in the cleared state this field is built to allow.
+            // Neither `.labelsHidden()` nor `prompt: nil` suppresses it — both
+            // look as though they should, and `OnboardingTests` measures a
+            // field written each way to keep that from being rediscovered. The
+            // export draws no placeholder here, so there is none; the title
+            // names the field for VoiceOver, which is what it was for.
+            TextField("", text: $goalDraft)
+                .accessibilityLabel(Text("onboarding.goal.option"))
                 .fixedSize()
                 .focused($isEditingGoal)
                 .keyboardType(.numberPad)

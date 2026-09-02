@@ -1,5 +1,7 @@
 import Foundation
+import SwiftUI
 import Testing
+import UIKit
 
 @testable import Fuel
 
@@ -374,6 +376,39 @@ struct OnboardingTests {
     )
     func fieldKeepsOnlyDigits(typed: String, expected: String) {
         #expect(GoalFieldInput.digits(in: typed) == expected)
+    }
+
+    /// The counter-check for the placeholder that reached the calorie field.
+    ///
+    /// `TextField(_:text:)` draws its title as the placeholder whenever the
+    /// field is empty, and `.labelsHidden()` does not suppress it — so passing
+    /// the choice-card title rendered "Set a calorie goal" at 50pt mono in the
+    /// cleared state, through both margins.
+    ///
+    /// **`prompt: nil` does not suppress it either**, which is the part worth
+    /// pinning: it looks like it should, and a field written that way measures
+    /// exactly as wide as the titled one. Only an empty title leaves nothing to
+    /// draw, which is what `GoalScreen` passes; the title stays on the field as
+    /// its accessibility label, which is what it was for.
+    @Test("only an empty title leaves a text field with nothing to draw")
+    func aTitleIsDrawnAsThePlaceholder() {
+        let titled = intrinsicWidth(of: TextField("Set a calorie goal", text: .constant("")))
+        let prompted = intrinsicWidth(
+            of: TextField("Set a calorie goal", text: .constant(""), prompt: nil)
+        )
+        let untitled = intrinsicWidth(of: TextField("", text: .constant("")))
+
+        #expect(titled > untitled)
+        #expect(prompted > untitled)
+    }
+
+    private func intrinsicWidth(of view: some View) -> CGFloat {
+        let controller = UIHostingController(rootView: view.fixedSize())
+        let unbounded = CGSize(
+            width: CGFloat.greatestFiniteMagnitude,
+            height: CGFloat.greatestFiniteMagnitude
+        )
+        return controller.sizeThatFits(in: unbounded).width
     }
 
     @Test("a typed goal reaches the settings row")
