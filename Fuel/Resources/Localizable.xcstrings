@@ -1,0 +1,258 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "today.add.label" : {
+      "comment" : "Accessibility label of the accent-filled add button on Today. Drawn as a plus glyph.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add"
+          }
+        }
+      }
+    },
+    "today.entry.meta" : {
+      "comment" : "Line under an entry's name on Today: the time, then where the entry came from.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "today.group.breakfast" : {
+      "comment" : "Heading over the breakfast group in the day list. Uppercased by the text style, not here.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Breakfast"
+          }
+        }
+      }
+    },
+    "today.group.dinner" : {
+      "comment" : "Heading over the dinner group in the day list.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dinner"
+          }
+        }
+      }
+    },
+    "today.group.kilocalories" : {
+      "comment" : "The calories of one meal group, printed beside its heading.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld kcal"
+          }
+        }
+      }
+    },
+    "today.group.lunch" : {
+      "comment" : "Heading over the lunch group in the day list.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lunch"
+          }
+        }
+      }
+    },
+    "today.group.snack" : {
+      "comment" : "Heading over the snack group in the day list.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Snack"
+          }
+        }
+      }
+    },
+    "today.macro.carbs" : {
+      "comment" : "Macro name, beside its bar in goal mode and over its figure in count-only mode.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carbs"
+          }
+        }
+      }
+    },
+    "today.macro.fat" : {
+      "comment" : "Macro name, beside its bar in goal mode and over its figure in count-only mode.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fat"
+          }
+        }
+      }
+    },
+    "today.macro.grams" : {
+      "comment" : "A macro figure in count-only mode, where there is no goal to show it against.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld g"
+          }
+        }
+      }
+    },
+    "today.macro.protein" : {
+      "comment" : "Macro name, beside its bar in goal mode and over its figure in count-only mode.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protein"
+          }
+        }
+      }
+    },
+    "today.macro.ratio" : {
+      "comment" : "The used-against-goal figure at the end of a macro bar: grams used, then the goal.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld/%2$lld"
+          }
+        }
+      }
+    },
+    "today.ring.percentage" : {
+      "comment" : "The share of the calorie goal reached, centred in the ring.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%%"
+          }
+        }
+      }
+    },
+    "today.settings.glyph" : {
+      "comment" : "The gear drawn in the circular button top right of Today. A glyph, not an icon asset.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚙"
+          }
+        }
+      }
+    },
+    "today.settings.label" : {
+      "comment" : "Accessibility label of the circular settings button on Today.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings"
+          }
+        }
+      }
+    },
+    "today.source.photo" : {
+      "comment" : "Where an entry came from, printed after its time.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo"
+          }
+        }
+      }
+    },
+    "today.source.recent" : {
+      "comment" : "Where an entry came from, printed after its time.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recent"
+          }
+        }
+      }
+    },
+    "today.source.text" : {
+      "comment" : "Where an entry came from, printed after its time.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text"
+          }
+        }
+      }
+    },
+    "today.title" : {
+      "comment" : "The screen title of Today.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today"
+          }
+        }
+      }
+    },
+    "today.total.countOnlySuffix" : {
+      "comment" : "Replaces the goal suffix beside the day total in count-only mode, where there is no goal.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "kcal logged"
+          }
+        }
+      }
+    },
+    "today.total.goalSuffix" : {
+      "comment" : "The calorie goal beside the day total in goal mode.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "/ %lld kcal"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}
