@@ -16,8 +16,9 @@ anything:
   first glance. Read it before you suggest anything involving TestFlight,
   sideloading or a store.
 
-And one thing that is not a file: **the design.** See "Design fidelity" below.
-It is the first thing you read and the last thing you check.
+And one folder: **`design/`** — the design export. See "Design fidelity" below.
+It is the first thing you read and the last thing you check, and it is never
+edited.
 
 ## Language
 
@@ -45,27 +46,30 @@ The estimation is done by a language model, and the model is **yours**. See
 
 ## Design fidelity — the hard rule
 
-There is **no design export checked into this repository.** The design lives in
-Claude Design and is reached over the `claude_design` MCP:
+`design/` holds the design export, pulled from Claude Design over the design MCP
+and committed here so that every writer and every reviewer reads the same bytes:
 
-- Project: `19fcd463-c5c8-4d6d-989c-1d4dcdf5bc33`
-- Entry point: `Kalorien App 2c Screens.dc.html` — a wrapper that sets the
-  colour tokens per theme and imports the screens four times (dark/mono,
-  light/mono, dark/blue, light/green).
-- **The screens themselves are in `Screens2c.dc.html`.** That is the file with
-  the pixels in it. Reading only the wrapper tells you the palette and nothing
-  about a single screen.
-- `support.js` is the generic dc-runtime. It contains no design information.
-  Do not spend a token on it.
+- `Screens2c.dc.html` — **the file with the pixels in it.** All seventeen
+  screens, light and dark, at 390×844.
+- `Kalorien App 2c Screens.dc.html` — the wrapper that sets the colour tokens
+  per theme and imports the screens four times (dark/mono, light/mono,
+  dark/blue, light/green). Reading only the wrapper tells you the palette and
+  nothing about a single screen.
+- `Fuel Design Notes.md` — the written spec: the rules behind the screens, the
+  values a static render cannot show, and the German-to-English copy table.
+- `support.js` — the generic dc-runtime. It contains no design information. Do
+  not spend a token on it.
 
-**Every writer and every reviewer fetches the current state over MCP before the
-first line of code or the first line of a review. No exceptions, including for a
-one-line change.** If you do not have the `claude_design` MCP available, you
-stop and say so. You do not work from a description of the design that someone
-put in your prompt, and you do not work from this file's summary of it — the
-summary below exists so you can tell when you are looking at the wrong file, not
-so you can skip fetching.
+**Every writer and every reviewer reads `design/` before the first line of code
+or the first line of a review. No exceptions, including for a one-line change.**
 
+- **`design/` is read-only.** It is never edited to match the code. If the code
+  and the design disagree, the code is wrong. If you think the design itself is
+  wrong, that is a question for the owner.
+- Where the HTML and the notes disagree, **the HTML wins for pixel values** — it
+  is what was actually drawn — and **the notes win for behaviour**, because
+  behaviour is not a pixel. The meal-label rule is the live example of the
+  second case; the notes say why.
 - No colour, size, spacing, radius, opacity, letter-spacing or line-height is
   invented, rounded, or implemented "close enough". The HTML sizes are design
   points and transfer 1:1 to SwiftUI points.
@@ -73,6 +77,10 @@ so you can skip fetching.
   not a gap you fill with taste.
 - **A reviewer who waves through a deviation from the design has not done the
   job.** The deviation is the thing the review is for.
+
+The export is a snapshot, and the owner refreshes it from the MCP before a
+feature starts. The refresh lands as its own commit, so a design change is
+visible as a diff rather than appearing silently inside a feature.
 
 ### The seventeen screens
 
@@ -95,7 +103,7 @@ There is **no search screen.** A manual food-search mode was considered and cut:
 Fuel has three log modes — camera, text, recent — and the README says three. Do
 not add a fourth because a list screen would be easy.
 
-### Two decisions the export does not explain
+### Two decisions worth stating up front
 
 Both were settled by the owner. Neither is reopened by an agent.
 
@@ -104,16 +112,19 @@ Both were settled by the owner. Neither is reopened by an agent.
   The disabled states for camera and text entry still exist and still matter —
   a key can be removed or go invalid later in Settings — but there is no "skip
   for now" button, because there is none in the design.
-- **The `Snack` label is derived from the day, not from the clock.** Breakfast,
-  lunch and dinner are each assigned once per day, the first time an entry falls
-  into their window. An entry that arrives after one of them but before the next
-  window is reached is a snack, and so is everything after dinner. This rule
-  appears nowhere in the interface; only the resulting label does, and the user
-  can overwrite it on the result screen.
+- **The `Snack` label is derived from the course of the day, not from the clock
+  alone.** Breakfast, lunch and dinner are each assigned once per day, the first
+  time an entry falls into that meal's window; anything that arrives after one
+  of them but before the next main-meal window is a snack, and so is everything
+  after dinner. `Fuel Design Notes.md` has the full rule, the two consequences
+  that make it worth the trouble, and the two things in the export that look
+  like the rule and are not — Settings' four clock rows, and the prototype's
+  `labelFor(hour)` stub. Read it before writing the nutrition core.
 
 ### Palette, for orientation only
 
-Fetch the real values. This is here so a wrong file is obvious at a glance.
+Read the real values out of `design/`. This is here so a wrong file is obvious
+at a glance.
 
 ```
 dark    bg #111213   surface #1a1b1d   ink #fafafa   camera #090a0a
@@ -282,8 +293,7 @@ Fuel is built with a writer/reviewer split, and the split is the point.
 - One agent **writes** a feature in its own worktree
   (`git worktree add ../fuel-wt-<slug> feature/<slug>`).
 - A **different** agent, with its own context, reviews the diff in that same
-  worktree against the current design over MCP and against this file. It does
-  not write the fix.
+  worktree against `design/` and against this file. It does not write the fix.
 - Before anything reaches `main`, a **main-gate** agent — independent again, and
   never the feature's reviewer — sees the full diff plus the resulting state of
   `main`, and checks: clean build, no avoidable warnings, no dead code, no
@@ -379,6 +389,8 @@ Ask first, then touch:
 - **Anything that would put a Fuel request on a Levo Studio server**, or a key
   anywhere but the Keychain. There is no version of this that gets approved, but
   ask anyway so the answer is on the record.
+- **Anything in `design/`.** The export is read-only. Refreshing it from the
+  MCP is the owner's job and lands as its own commit.
 - **Adding a dependency.** Fuel has none, and that is a feature.
 - **A second AI provider** beyond Claude and Mistral.
 - **Deleting user data paths** — anything that calls `ModelContext.delete` or
