@@ -171,16 +171,14 @@ struct KeyTestStepMarker: View {
     /// The active marker: a ring in `soft` with `Line.spinnerArc` of it in
     /// `ink`, turning.
     ///
-    /// A full turn is a full turn rather than a measurement, so that one stays
-    /// here; the arc the export paints is a drawn value and lives in the design
-    /// layer with the stroke it belongs to.
+    /// `resolveRepeating` answers the whole Reduce Motion question, including
+    /// the still state — it returns nil, the turn is applied without animation,
+    /// and the arc sits where the export paints it. The flag is read from the
+    /// environment and handed straight over; deciding anything about it here
+    /// is what that function exists to prevent.
     ///
-    /// The `reduceMotion` guard is not a design-layer bypass and is meant to
-    /// come out. `FuelMotion` has no representation for a *repeating*
-    /// animation: `progress` reduces to a cross-fade, and `.repeatForever` on a
-    /// 0.15s linear curve spins faster rather than stopping — the opposite of
-    /// what the user asked for. Until `FuelMotion` can say "this one does not
-    /// repeat when motion is reduced", the flag is read here and only here.
+    /// A full turn is a turn rather than a measurement, which is why it is the
+    /// one number in this view that does not come from the design layer.
     private var spinner: some View {
         ZStack {
             Circle()
@@ -189,14 +187,30 @@ struct KeyTestStepMarker: View {
                 .trim(from: 0, to: FuelMetrics.Line.spinnerArc)
                 .stroke(palette.ink, lineWidth: FuelMetrics.Line.spinner)
                 .padding(FuelMetrics.Line.spinner / 2)
+                .rotationEffect(Self.arcRotation)
         }
-        .rotationEffect(.degrees(isSpinning ? 360 : 0))
+        .rotationEffect(.degrees(isSpinning ? Self.fullTurn : 0))
         .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(FuelMotion.resolve(FuelMotion.progress, reduceMotion: false)?.repeatForever(autoreverses: false)) {
+            withAnimation(FuelMotion.resolveRepeating(FuelMotion.progress, reduceMotion: reduceMotion)) {
                 isSpinning = true
             }
         }
+    }
+
+    /// One revolution. Not a drawn value — a turn is a turn — so it stays at
+    /// the call site rather than joining the measurements in `FuelMetrics`.
+    private static let fullTurn: CGFloat = 360
+
+    /// Where the painted quarter starts.
+    ///
+    /// `trim` begins at three o'clock, and the export paints the ring's *top*
+    /// border, so the arc is centred on twelve. `Ring.startAngleDegrees` is the
+    /// same twelve-o'clock correction the calorie ring needs; half the arc more
+    /// centres it there rather than hanging it off to one side. It shows while
+    /// the ring turns and is the whole of what is seen under Reduce Motion,
+    /// where nothing turns at all.
+    private static var arcRotation: Angle {
+        .degrees(FuelMetrics.Ring.startAngleDegrees - fullTurn * FuelMetrics.Line.spinnerArc / 2)
     }
 }
 
