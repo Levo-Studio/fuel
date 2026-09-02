@@ -185,7 +185,7 @@ struct SettingsKeyOutcomeTests {
         arguments: [
             (KeyValidationOutcome.passed, KeyTestNote.passed),
             (.invalidKey, .notAccepted),
-            (.noCredit, .none),
+            (.noCredit, .noCredit),
             (.retry, .none)
         ]
     )
@@ -226,6 +226,56 @@ struct SettingsKeyOutcomeTests {
         await model.submitDraft(for: .claude)
 
         #expect(store.hasKey(for: .claude))
+    }
+
+    /// The one undrawn state that could not stay empty: a user who cannot pay
+    /// for a scan gets both a note saying so and the way out of it.
+    @Test("No credit produces a note and a billing link", arguments: AIProvider.allCases)
+    func noCreditProducesNoteAndLink(provider: AIProvider) async {
+        let store = Fixtures.makeStore()
+        defer { Fixtures.removeEverything(from: store) }
+        let model = APIKeySettingsModel(keychain: store, validator: RecordingValidator(.noCredit))
+
+        model.draft = provider == .claude ? Fixtures.claudeKey : Fixtures.mistralKey
+        await model.submitDraft(for: provider)
+
+        #expect(model.note == .noCredit)
+        #expect(model.note.titleKey(for: provider) != nil)
+        #expect(model.note.showsBillingLink)
+        #expect(ProviderBilling.url(for: provider).scheme == "https")
+    }
+
+    /// The link is the only one in Settings and it has to reach a real console.
+    /// A typo in a URL literal goes red here rather than at a user's tap.
+    @Test("Each provider's billing link points at that provider")
+    func billingLinksAreDistinctAndPlausible() {
+        let anthropic = ProviderBilling.url(for: .claude)
+        let mistral = ProviderBilling.url(for: .mistral)
+
+        #expect(anthropic.host() == "console.anthropic.com")
+        #expect(mistral.host() == "console.mistral.ai")
+        #expect(anthropic != mistral)
+    }
+
+    /// The no-credit line names the account being topped up, and Claude's is
+    /// Anthropic's — so the two providers cannot share one string.
+    @Test("The no-credit note names the provider")
+    func noCreditNoteNamesTheProvider() {
+        let claude = KeyTestNote.noCredit.titleKey(for: .claude)
+        let mistral = KeyTestNote.noCredit.titleKey(for: .mistral)
+
+        #expect(claude != nil)
+        #expect(mistral != nil)
+        #expect(claude != mistral)
+    }
+
+    /// Only the no-credit state draws a second action in that row.
+    @Test("No other note offers a link")
+    func onlyNoCreditShowsTheLink() {
+        #expect(KeyTestNote.noCredit.showsBillingLink)
+        #expect(KeyTestNote.none.showsBillingLink == false)
+        #expect(KeyTestNote.passed.showsBillingLink == false)
+        #expect(KeyTestNote.notAccepted.showsBillingLink == false)
     }
 
     /// A rejected key does not take a working one away. Typing a bad key over a
@@ -368,9 +418,9 @@ struct SettingsKeyLeakTests {
     @Test("A note carries no payload")
     func noteCarriesNoPayload() {
         #expect(KeyTestNote.passed == .passed)
-        #expect(KeyTestNote.none.titleKey == nil)
-        #expect(KeyTestNote.passed.titleKey != nil)
-        #expect(KeyTestNote.notAccepted.titleKey != nil)
+        #expect(KeyTestNote.none.titleKey(for: .claude) == nil)
+        #expect(KeyTestNote.passed.titleKey(for: .claude) != nil)
+        #expect(KeyTestNote.notAccepted.titleKey(for: .claude) != nil)
     }
 }
 
