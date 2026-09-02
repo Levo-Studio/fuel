@@ -143,6 +143,17 @@ nonisolated enum FuelMetrics {
         /// The active step's spinner ring on the key-test screen.
         static let spinner: CGFloat = 2
 
+        /// How much of that ring is painted in `ink`.
+        ///
+        /// The export draws the spinner as a full circle bordered in `soft`
+        /// with `border-top-color: ink`, which colours exactly one of the four
+        /// CSS borders — a quarter of the ring. It is a fraction rather than a
+        /// length, and it sits beside the stroke it belongs to because it is
+        /// the same mark: a feature file trimming a circle to a number of its
+        /// own would be inventing the one part of the spinner the design does
+        /// specify.
+        static let spinnerArc: CGFloat = 0.25
+
         /// Stroke weights for the drawn glyphs. The export draws its icons as
         /// SVG paths inside a 20-unit box rather than as a font, so each one
         /// carries its own weight and none of them is `hairline`.
@@ -277,7 +288,7 @@ nonisolated enum FuelMetrics {
         Screen.horizontalPadding, Screen.logFlowHorizontalPadding,
         Screen.onboardingTopPadding, Screen.keyTestTopPadding,
         Radius.pill, Radius.card, Radius.thumbnail,
-        Line.hairline, Line.selectionBorder, Line.spinner,
+        Line.hairline, Line.selectionBorder, Line.spinner, Line.spinnerArc,
         Line.Glyph.chevron, Line.Glyph.plus, Line.Glyph.check, Line.Glyph.viewBox,
         Control.circleButton, Control.swatchRing, Control.swatchDot, Control.shutterRing,
         Control.shutterFill, Control.stepMarkerSlot, Control.stepMarkerDot,
