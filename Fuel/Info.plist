@@ -20,6 +20,11 @@
 	     goes. Fuel sends it to the user's own provider with the user's own key
 	     and keeps no copy anywhere but the log entry — the permission sheet is
 	     the one place a user asks that question, so it is answered there. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Fuel uses the camera to photograph a meal. The picture goes straight to the model provider you set up, with your key, and is kept only in the entry it creates.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Fuel reads a photo you pick so it can estimate the meal. The picture goes straight to the model provider you set up, with your key, and is kept only in the entry it creates.</string>
+
 	<!-- The two typefaces the design draws, both bundled so the app never
 	     reaches the network for a face. Plus Jakarta Sans ships as the variable
 	     file because the design uses four of its weights (300/400/500/600) and
@@ -37,10 +42,5 @@
 		<string>PlusJakartaSans[wght].ttf</string>
 		<string>DMMono-Regular.ttf</string>
 	</array>
-
-	<key>NSCameraUsageDescription</key>
-	<string>Fuel uses the camera to photograph a meal. The picture goes straight to the model provider you set up, with your key, and is kept only in the entry it creates.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Fuel reads a photo you pick so it can estimate the meal. The picture goes straight to the model provider you set up, with your key, and is kept only in the entry it creates.</string>
 </dict>
 </plist>
