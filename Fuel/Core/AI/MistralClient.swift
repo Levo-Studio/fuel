@@ -84,7 +84,7 @@ nonisolated struct MistralClient: AIClient {
             }
             return .passed
         } catch {
-            return .failed(.network)
+            return .failed(AIError.transportFailure(error))
         }
     }
 
@@ -150,7 +150,7 @@ nonisolated struct MistralClient: AIClient {
         do {
             response = try await transport.send(request)
         } catch {
-            throw AIError.network
+            throw AIError.transportFailure(error)
         }
 
         guard (200..<300).contains(response.statusCode) else {

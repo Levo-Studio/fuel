@@ -37,6 +37,11 @@ private final class RecordingTransport: HTTPTransport, @unchecked Sendable {
         RecordingTransport([.failure(URLError(.notConnectedToInternet))])
     }
 
+    /// Fails with a specific error, for the cancellation cases.
+    static func failing(with error: any Error) -> RecordingTransport {
+        RecordingTransport([.failure(error)])
+    }
+
     var requests: [URLRequest] {
         lock.withLock { recorded }
     }
@@ -424,6 +429,65 @@ struct AIErrorMappingTests {
 
     @Test("a transport failure is a plain retry")
     func offline() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let client = AnthropicClient(transport: RecordingTransport.offline(), keys: keys.source)
+
+        await #expect(throws: AIError.network) {
+            _ = try await client.estimate(text: "an apple")
+        }
+    }
+
+    @Test("a cancelled scan is cancelled, not a retry")
+    func cancelledScan() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        // Someone who has just tapped Cancel should be shown nothing, not
+        // offered a second go at a scan they abandoned.
+        let client = AnthropicClient(
+            transport: RecordingTransport.failing(with: CancellationError()),
+            keys: keys.source
+        )
+
+        await #expect(throws: AIError.cancelled) {
+            _ = try await client.estimate(text: "an apple")
+        }
+    }
+
+    @Test("URLSession's own cancellation is cancelled too")
+    func cancelledByURLSession() async throws {
+        let keys = try KeyFixture(provider: .mistral, secret: "0123456789abcdefghij")
+        defer { keys.tearDown(provider: .mistral) }
+
+        // Which of the two shapes arrives depends on where the cancellation
+        // lands, and a client should not have to care.
+        let client = MistralClient(
+            transport: RecordingTransport.failing(with: URLError(.cancelled)),
+            keys: keys.source
+        )
+
+        await #expect(throws: AIError.cancelled) {
+            _ = try await client.estimate(photo: tinyPhoto())
+        }
+    }
+
+    @Test("a cancelled key check is cancelled, not a verdict")
+    func cancelledKeyCheck() async {
+        let client = AnthropicClient(
+            transport: RecordingTransport.failing(with: CancellationError()),
+            keys: ProviderKeySource(
+                store: KeychainStore(service: "unused.\(UUID().uuidString)"),
+                provider: .claude
+            )
+        )
+
+        #expect(await client.checkKey(APIKey("sk-ant-abcdefghijklmnop")) == .failed(.cancelled))
+    }
+
+    @Test("an ordinary transport failure is still a retry, not a cancellation")
+    func offlineIsNotCancelled() async throws {
         let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
         defer { keys.tearDown(provider: .claude) }
 

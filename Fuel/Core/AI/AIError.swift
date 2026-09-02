@@ -49,6 +49,18 @@ nonisolated enum AIError: Error, Equatable {
     /// state, and in every one of those cases the correct advice.
     case network
 
+    /// The user backed out. Not a failure, and **not** the retry state.
+    ///
+    /// A cancelled scan is separated from `network` because the two want
+    /// opposite things from the interface: a lost connection should offer a
+    /// retry, and someone who has just tapped Cancel should be shown nothing
+    /// at all. Folding them together meant leaving the log flow and being
+    /// offered a second go at a scan you had abandoned.
+    ///
+    /// It carries nothing, because there is nothing to say. The feature layer
+    /// is expected to swallow it.
+    case cancelled
+
     /// The provider answered, but not with the JSON that was asked for —
     /// prose instead of an object, a missing field, a number that is not a
     /// number. Reported rather than repaired: an entry with silently zeroed
@@ -95,5 +107,27 @@ extension AIError {
     /// Convenience for the clients, which all raise this the same way.
     static func noCredit(for provider: AIProvider) -> AIError {
         .noCredit(provider: provider, billingPage: billingPage(for: provider))
+    }
+
+    /// Classifies whatever the transport threw.
+    ///
+    /// Only one distinction is worth drawing here, and it is the one between
+    /// "this went wrong" and "you stopped it". Both shapes cancellation takes
+    /// are checked: `CancellationError`, thrown by structured concurrency, and
+    /// `URLError.cancelled`, which is what `URLSession` reports when the task
+    /// backing a request is cancelled. Which one arrives depends on where the
+    /// cancellation lands, and a client should not have to care.
+    ///
+    /// Everything else is the retry state. The error is inspected for its
+    /// kind and then dropped: no `localizedDescription`, no underlying error,
+    /// no host name travels out of this function.
+    static func transportFailure(_ error: any Error) -> AIError {
+        if error is CancellationError {
+            return .cancelled
+        }
+        if let urlError = error as? URLError, urlError.code == .cancelled {
+            return .cancelled
+        }
+        return .network
     }
 }
