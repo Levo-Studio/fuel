@@ -53,7 +53,7 @@ nonisolated struct GoalProgress: Hashable, Sendable {
 
 // MARK: - Building it from the mode
 
-extension CountingMode {
+nonisolated extension CountingMode {
 
     /// Progress in goal mode, `nil` in count-only mode.
     func progress(for totals: DailyTotals) -> GoalProgress? {
