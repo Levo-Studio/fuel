@@ -213,7 +213,8 @@ nonisolated enum FuelTypography {
     /// a result screen — `Photo entry`, `Text entry`, `Done`.
     static let flowLabel = Style(.mono, weight: 400, size: 11.5, trackingEm: 0.12, uppercased: true)
 
-    /// `400 11.5px`. The date above `Today`, and the provider line in Settings.
+    /// `400 11.5px`. The date above `Today`, and the model line under the key
+    /// field on the first onboarding screen.
     static let meta = Style(.mono, weight: 400, size: 11.5)
 
     /// `400 11.5px`. The `used/goal` figure at the end of a macro bar.
