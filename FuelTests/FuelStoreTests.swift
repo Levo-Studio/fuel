@@ -143,3 +143,61 @@ struct FuelStoreTests {
     }
 }
 
+// MARK: - Recognised items
+
+/// The breakdown is stored as an encoded value rather than as its own model,
+/// so its coding is the thing that can break a row.
+@Suite("Recognised item")
+struct RecognisedItemTests {
+
+    @Test(
+        "a note survives a round trip",
+        arguments: [
+            RecognisedItem.Note.photo(confidence: .confident, approximateGrams: 150),
+            RecognisedItem.Note.photo(confidence: .unsure, approximateGrams: 90),
+            RecognisedItem.Note.text(amount: .recognised),
+            RecognisedItem.Note.text(amount: .estimated),
+        ]
+    )
+    func roundTrip(note: RecognisedItem.Note) throws {
+        let data = try JSONEncoder().encode(note)
+        #expect(try JSONDecoder().decode(RecognisedItem.Note.self, from: data) == note)
+    }
+
+    @Test("a note shape this build does not know reads as unknown")
+    func unknownNote() throws {
+        let data = Data(#"{"kind":"video","confidence":"confident"}"#.utf8)
+        #expect(try JSONDecoder().decode(RecognisedItem.Note.self, from: data) == .unknown)
+    }
+
+    @Test("a note missing its confidence reads as the less certain one")
+    func missingConfidence() throws {
+        let data = Data(#"{"kind":"photo"}"#.utf8)
+        let note = try JSONDecoder().decode(RecognisedItem.Note.self, from: data)
+        #expect(note == .photo(confidence: .unsure, approximateGrams: 0))
+    }
+
+    @Test("items come back off a stored entry")
+    func itemsSurviveTheStore() throws {
+        let store = try FuelStore(inMemory: true, calendar: testCalendar)
+        let items = [
+            RecognisedItem(
+                name: "Salmon fillet",
+                kilocalories: 240,
+                note: .photo(confidence: .confident, approximateGrams: 150)
+            ),
+            RecognisedItem(name: "Polenta", kilocalories: 150, note: .text(amount: .estimated)),
+        ]
+        try store.log(
+            title: "Salmon with polenta",
+            kilocalories: 390,
+            macros: .zero,
+            loggedAt: at(19, 20),
+            source: .photo,
+            items: items
+        )
+
+        let stored = try store.entries(on: at(19, 20)).first
+        #expect(stored?.items == items)
+    }
+}
