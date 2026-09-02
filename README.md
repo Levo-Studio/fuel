@@ -190,7 +190,7 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test \
   -project Fuel.xcodeproj -scheme Fuel \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
-  CODE_SIGNING_ALLOWED=NO
+  CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=YES
 ```
 
 `CODE_SIGNING_ALLOWED=NO` means **you do not need a developer team** to build

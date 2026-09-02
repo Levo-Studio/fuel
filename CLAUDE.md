@@ -197,10 +197,25 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
   CODE_SIGNING_ALLOWED=NO build
 ```
 
-Testing is the same command with `test` in place of `build`.
-`CODE_SIGNING_ALLOWED=NO` is deliberate: Fuel needs no entitlement and no
-development team for a simulator build, so a clone builds without an Apple
-Developer account.
+`CODE_SIGNING_ALLOWED=NO` is deliberate: Fuel needs no development team for a
+simulator build, so a clone builds without an Apple Developer account.
+
+**Testing takes different signing flags, and they are not optional:**
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test \
+  -project Fuel.xcodeproj -scheme Fuel \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=YES
+```
+
+An unsigned process has no keychain-access group, so on the simulator every
+Security call returns `errSecMissingEntitlement` (-34018) before it reaches any
+Fuel code — the keychain tests would pass by never running. Ad-hoc signing
+(`CODE_SIGN_IDENTITY="-"`) gives the test host an identity without requiring a
+development team, so both things stay true: a clone still needs no Apple
+Developer account, and the code that holds the user's API key is actually
+exercised. Do not "simplify" this back to `CODE_SIGNING_ALLOWED=NO`.
 
 `DEVELOPMENT_TEAM` is not stored in the project. It goes in `Local.xcconfig`,
 which is gitignored; `Base.xcconfig` includes it optionally so a clone without
