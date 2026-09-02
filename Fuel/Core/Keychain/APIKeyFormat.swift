@@ -91,8 +91,16 @@ nonisolated enum APIKeyFormat {
     private static let anthropicPrefix = "sk-ant-"
 
     /// Bounds, not exact lengths. Anthropic does not promise a key length and
-    /// has changed it before, so these are chosen wide enough that a real key
-    /// cannot fall outside them, and narrow enough to catch a truncated paste.
+    /// has changed it before, so the lower bound is chosen wide enough that a
+    /// real key cannot fall under it, and narrow enough to catch a truncated
+    /// paste.
+    ///
+    /// The 512 ceiling models no key length at all — neither provider publishes
+    /// one, and Fuel must not reject a key because it is longer than the ones
+    /// that existed when this line was written. It is there for one case: a
+    /// whole page pasted into the field instead of a single line, which is
+    /// worth naming as its own mistake rather than sending to the API. Both
+    /// providers share the value for that reason.
     private static let anthropicLengthRange = 20...512
 
     private static func checkAnthropic(_ secret: String) -> APIKeyFormatVerdict {
@@ -120,7 +128,8 @@ nonisolated enum APIKeyFormat {
     ///
     /// The lower bound is looser than Anthropic's for the same reason: with no
     /// published format, the only defensible floor is "too short to be a
-    /// credential at all".
+    /// credential at all". The ceiling is the shared pasted-page guard
+    /// described on `anthropicLengthRange`, not a claim about key length.
     private static let mistralLengthRange = 16...512
 
     private static func checkMistral(_ secret: String) -> APIKeyFormatVerdict {
