@@ -487,6 +487,258 @@
         }
       }
     },
+    "settings.accent.blue" : {
+      "comment" : "Name under the second accent swatch in Settings.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blue"
+          }
+        }
+      }
+    },
+    "settings.accent.green" : {
+      "comment" : "Name under the third accent swatch in Settings.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Green"
+          }
+        }
+      }
+    },
+    "settings.accent.lilac" : {
+      "comment" : "Name under the fifth accent swatch in Settings.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lilac"
+          }
+        }
+      }
+    },
+    "settings.accent.mono" : {
+      "comment" : "Name under the first accent swatch in Settings.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mono"
+          }
+        }
+      }
+    },
+    "settings.accent.sand" : {
+      "comment" : "Name under the fourth accent swatch in Settings.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sand"
+          }
+        }
+      }
+    },
+    "settings.apiKey.label" : {
+      "comment" : "Label of the API key row in Settings.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API key"
+          }
+        }
+      }
+    },
+    "settings.apiKey.placeholder.claude" : {
+      "comment" : "Placeholder in the key field while Claude is selected. A design placeholder, not a validation rule.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sk-ant-…"
+          }
+        }
+      }
+    },
+    "settings.apiKey.placeholder.mistral" : {
+      "comment" : "Placeholder in the key field while Mistral is selected. A design placeholder, not a validation rule.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mist-…"
+          }
+        }
+      }
+    },
+    "settings.appearance.cameraNote" : {
+      "comment" : "Note under the Light/Dark control saying the camera surface is dark in both themes.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The camera stays dark in both."
+          }
+        }
+      }
+    },
+    "settings.done" : {
+      "comment" : "Control that closes Settings.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        }
+      }
+    },
+    "settings.keyTest.notAccepted" : {
+      "comment" : "Note beside Re-check after a key was rejected. Drawn in the error colour.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key not accepted"
+          }
+        }
+      }
+    },
+    "settings.keyTest.passed" : {
+      "comment" : "Note beside Re-check after a successful key test. The check glyph is part of the drawn string.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "✓ Connection works"
+          }
+        }
+      }
+    },
+    "settings.keyTest.recheck" : {
+      "comment" : "Action that tests the stored key again.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Re-check"
+          }
+        }
+      }
+    },
+    "settings.provider.claude" : {
+      "comment" : "First segment of the provider control. A product name, not translated.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude"
+          }
+        }
+      }
+    },
+    "settings.provider.mistral" : {
+      "comment" : "Second segment of the provider control. A product name, not translated.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mistral"
+          }
+        }
+      }
+    },
+    "settings.section.accent" : {
+      "comment" : "Third section heading on the Settings screen.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accent colour"
+          }
+        }
+      }
+    },
+    "settings.section.aiModel" : {
+      "comment" : "First section heading on the Settings screen.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI model"
+          }
+        }
+      }
+    },
+    "settings.section.appearance" : {
+      "comment" : "Second section heading on the Settings screen.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appearance"
+          }
+        }
+      }
+    },
+    "settings.theme.dark" : {
+      "comment" : "Second segment of the appearance control.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dark"
+          }
+        }
+      }
+    },
+    "settings.theme.light" : {
+      "comment" : "First segment of the appearance control.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light"
+          }
+        }
+      }
+    },
+    "settings.title" : {
+      "comment" : "Title of the Settings screen.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings"
+          }
+        }
+      }
+    },
     "today.add.label" : {
       "comment" : "Accessibility label of the accent-filled add button on Today. Drawn as a plus glyph.",
       "extractionState" : "manual",
