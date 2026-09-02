@@ -6,12 +6,21 @@ import SwiftUI
 /// the top of the frame, the 28pt side margin, and the footer pinned to the
 /// bottom.
 ///
-/// The top padding extends into the status-bar area on purpose. The export
-/// draws its own mock status bar inside the 390×844 frame and measures every
-/// screen's first line from the *frame* edge, so a drop taken from the safe
-/// area instead would push the headline down by the height of a status bar
-/// iOS is already drawing for us. The footer keeps the safe area, because the
-/// bottom inset the export uses is the one that clears the home indicator.
+/// The two edges read the export differently, and they agree on hardware.
+///
+/// The top padding extends into the status-bar area. The export draws its own
+/// mock status bar inside the 390×844 frame and measures every screen's first
+/// line from the *frame* edge, so 88 and 96 are real distances from the top of
+/// the screen; taken from the safe area instead they would push the headline
+/// down by the height of a status bar iOS is already drawing for us.
+///
+/// The footer sits on the safe-area boundary with nothing added under it. The
+/// export's `bottom:34px` is not a margin the designer wanted — 34pt is exactly
+/// the iPhone's bottom safe inset, and the mockup has no home indicator, so he
+/// drew by hand the clearance the device provides for free. Adding the drawn 34
+/// on top of the inset would double it to about 68 on all four screens. Read
+/// either way the button lands in the same place: 34pt up from the bottom of
+/// the screen is the safe-area boundary.
 struct OnboardingScreen<Content: View, Footer: View>: View {
 
     @Environment(\.fuelPalette) private var palette
@@ -37,7 +46,6 @@ struct OnboardingScreen<Content: View, Footer: View>: View {
                 footer
             }
             .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
-            .padding(.bottom, FuelMetrics.Space.s34)
         }
     }
 }
