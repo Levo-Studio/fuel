@@ -8,26 +8,43 @@ the prototype computes rather than draws, and the German-to-English copy table.
 **Where the two disagree, the HTML wins for pixel values** — it is what was
 actually drawn. These notes win for behaviour, because behaviour is not a pixel.
 
-## Where this came from
+## What is here, and how to check a claim
 
-The design lives in Claude Design (project `19fcd463-c5c8-4d6d-989c-1d4dcdf5bc33`)
-and is pulled into this folder over the design MCP. **`design/` is read-only.**
-If the code and the design disagree, the code is wrong. If you believe the design
-itself is wrong, that is a question for the owner, not an edit you make here.
+**`design/` is read-only.** If the code and the design disagree, the code is
+wrong. If you believe the design itself is wrong, that is a question for the
+owner, not an edit you make here.
 
-The project also holds two files this export deliberately omits:
+Three files carry design information, and they do not carry the same kind:
 
-- `Kalorien App 2c.dc.html` — the interactive prototype. Everything in these
-  notes was read out of it. It is not exported because a running prototype
-  invites reading behaviour out of placeholder data (`RECENTS`, seeded
-  `entries`, the fake `estimate()` arithmetic) that is scaffolding, not spec.
-- `Kalorien App Richtungen.dc.html` — five explored directions, four of them
-  rejected. **Direction 2c is the one being built.** Nothing else is.
+- **`Screens2c.dc.html`** — the seventeen screens as drawn. Every pixel value in
+  the app comes from here, and every claim about a *drawn* value is greppable in
+  it.
+- **`Kalorien App 2c.dc.html`** — the interactive prototype. It holds the
+  behaviour a still image cannot show: the accent table with each accent's
+  on-colour, the step texts, the provider labels and key placeholders, the goal
+  defaults, and the Settings copy that only appears once a control is used.
+- **`Kalorien App 2c Screens.dc.html`** — the wrapper. Colour tokens per theme,
+  and nothing else.
+
+**Every claim below names which file backs it** — `[S]` for the screens, `[P]`
+for the prototype, `[W]` for the wrapper. A reviewer grep that comes back empty
+means you are grepping the wrong file, and a claim with no marker is a bug in
+these notes.
+
+The prototype ships with placeholder data — `RECENTS`, the seeded `entries`
+list, the fake arithmetic in `estimate()`, the `labelFor(hour)` stub. **None of
+that is spec.** It exists so the prototype can be clicked through.
+
+One file from the design project is deliberately not exported:
+`Kalorien App Richtungen.dc.html`, five explored directions with four rejected.
+**Direction 2c is the one being built.** Nothing else is.
 
 ## Palette
 
-Both themes, verbatim. `--cam` is the camera surface and stays dark in both —
-Settings says so out loud (`Kamera bleibt in beiden Modi dunkel`).
+Both themes, verbatim `[W]`. `--cam` is the camera surface and stays dark in
+both. Settings carries a line saying so under the Light/Dark control `[P]` — it
+is not drawn on screen 16, which goes straight from `Darstellung` to
+`Akzentfarbe`, because the note only appears once the control is used.
 
 | Token | Dark | Light |
 |---|---|---|
@@ -46,8 +63,13 @@ and **Dark**, as a two-segment control.
 
 ## Accents
 
-Five, in this order, `mono` first and default. The accent drives the ring, the
-macro bars, filled buttons, and selection. Each carries its own on-colour.
+Five `[P]`, in this order, `mono` first and default. The accent drives the ring,
+the macro bars, filled buttons, and selection. Each carries its own on-colour.
+
+Only four of the ten accent/theme pairs are realised in the screens — the
+wrapper renders dark/mono, light/mono, dark/blue and light/green `[W]`, and
+those four match this table exactly. The remaining on-colours are prototype
+values and cannot be grepped in this folder.
 
 | Key | Name (de → en) | Dark | Dark on | Light | Light on |
 |---|---|---|---|---|---|
@@ -68,18 +90,24 @@ The swatch in Settings is a 26px dot inside a 38px ring; the selected ring is
 Two families, both variable-weight Google fonts, both bundled — the app does not
 reach the network for a typeface.
 
-- **Plus Jakarta Sans** 400 / 500 / 600 / 700 — all prose, labels, buttons.
-- **DM Mono** 400 / 500 — every number, every timestamp, every uppercase
-  letter-spaced eyebrow.
+- **Plus Jakarta Sans** 300 / 400 / 500 / 600 `[S]` — all prose, labels,
+  buttons. Weight 300 is drawn exactly five times, for the `+` glyph on the
+  Recent rows (`font:300 22px`). **There is no 700 anywhere in the screens**,
+  even though the export's own Google Fonts import requests `wght@400;500;600;700`
+  — the import is wrong in both directions: it asks for a weight nothing uses
+  and omits the one that is drawn. Bundle 300 through 600.
+- **DM Mono** 400 only `[S]` — every number, every timestamp, every uppercase
+  letter-spaced eyebrow. No 500 is drawn, despite the same import requesting it.
 
 The split is not decorative: a figure that changes as you log belongs to the
 mono face so the layout does not shift under it. Sizes carry fractional values
 (`11.5px`, `13.5px`, `14.5px`) — transfer them as written, they are design
 points, not rounding artefacts.
 
-Radii are `100px` (pills), `50%` (circles) and `16px` (the macro cards on
-onboarding) — plus `22px` on the result screen's photo thumbnail. The 46px on
-the outer frame is the phone mockup's own corner and never reaches the code.
+Radii `[S]`, and there are no others: `100px` (pills, 21×), `50%` (circles,
+26×), `16px` (the macro cards on onboarding, 3×) and `22px` (the result
+screen's photo thumbnail, 1×). The `46px` that appears seventeen times is the
+phone mockup's own corner — one per frame — and never reaches the code.
 
 ## The meal label — read this before touching the nutrition core
 
@@ -134,9 +162,12 @@ entries is not rendered at all.
 - **Ring** — 120 viewBox, r 54, stroke 7, `stroke-linecap: round`, rotated −90°.
   Circumference is `339.3`; the offset is `339.3 × (1 − min(1, total ÷ goal))`.
   Rendered at 104×104. The percentage sits centred in 17px mono.
-- **Macro bars** — 4px tall, `soft` track, `accent` fill, capped at 100%. In
-  goal mode the value reads `used/goal`; in count-only mode it reads `N g` and
-  the ring is not drawn at all.
+- **Macro bars are goal-mode only** `[S]`. Screen 05 draws three 4px bars —
+  `soft` track, `accent` fill, capped at 100% — with the value as `used/goal` in
+  11.5px mono. **Screen 06 draws no bars and no ring at all**: the three macros
+  become a plain row of `font:400 22px 'DM Mono'` values under `font:500 11px`
+  labels. Count-only mode is not goal mode with the ring hidden; it is a
+  different layout, and building bars into it is a design deviation.
 - **Count-only mode** — the big total loses its `/ 2400 kcal` suffix and reads
   `kcal geloggt` (→ `kcal logged`) instead.
 - **Result stepper** — ±10 kcal per tap, floored at 0.
@@ -149,13 +180,19 @@ entries is not rendered at all.
   `Identifying ingredients …`, `Estimating amounts …`, `Calculating nutrition …`).
   The progress bar is 120×2 and fills in quarters. These are the four Analysis
   screens 08–11 — one per step, not four different designs.
-- **Provider labels** — `Modell: Claude Sonnet 5` and `Modell: Mistral Large`.
-- **Key placeholders** — `sk-ant-…` and `mist-…`. These are placeholder strings
+- **Provider labels** `[P]` — `Modell: Claude Sonnet 5` and `Modell: Mistral
+  Large`. The screens draw only the Claude label, because Claude is the selected
+  segment in every frame; the Mistral label appears when the segment is switched.
+- **Key placeholders** `[P]` — `sk-ant-…` and `mist-…`. The screens draw the
+  filled-in form `sk-ant-a1b2c3d4e5`. These are placeholder strings
   from the design, not validation rules. Anthropic keys do begin `sk-ant-`;
   Mistral publishes no key prefix, so a prefix check there would reject valid
   keys. Check Mistral keys for shape only, and let the test call decide.
-- **Recognised items** carry a confidence line: `sicher · ca. 150 g` /
-  `unsicher · ca. 90 g` (→ `confident · approx. 150 g` / `unsure · approx. 90 g`).
+- **Recognised items** carry a confidence line. After a photo it reads
+  `sicher · ca. 150 g` / `unsicher · ca. 90 g` (→ `confident · approx. 150 g` /
+  `unsure · approx. 90 g`); after text it reads `Menge erkannt` / `Menge
+  geschätzt` (→ `Amount recognised` / `Amount estimated`), because a typed
+  amount is either given or it is not.
   The list heading is `Erkannt` after a photo and `Aufgeschlüsselt` after text
   (→ `Recognised` / `Broken down`).
 
@@ -163,6 +200,10 @@ entries is not rendered at all.
 
 Only the words change. Geometry, weight, letter-spacing, casing, opacity and
 colour do not.
+
+Rows marked `[P]` belong to states the screens do not draw — a failed key test,
+the Settings note under Light/Dark, the shortcut sentence. They are spec; they
+are simply not greppable in `Screens2c.dc.html`. Everything unmarked is drawn.
 
 | German | English |
 |---|---|
@@ -186,24 +227,29 @@ colour do not.
 | Zuletzt gegessen | Recently eaten |
 | Tippen loggt direkt — Label wird aus der Uhrzeit gesetzt. | Tapping logs it straight away — the label comes from the time. |
 | ABBRECHEN | CANCEL |
-| Neu / Hinzufügen | Discard / Add |
+| Neu / Hinzufügen | New / Add |
 | ☆ Favorit / ★ Favorit | ☆ Favourite / ★ Favourite |
 | Einstellungen | Settings |
 | KI-Modell | AI model |
 | Neu prüfen | Re-check |
 | ✓ Verbindung steht | ✓ Connection works |
-| Key nicht akzeptiert | Key not accepted |
-| Key wurde nicht akzeptiert. | Key was not accepted. |
+| Key nicht akzeptiert `[P]` | Key not accepted |
+| Key wurde nicht akzeptiert. `[P]` | Key was not accepted. |
 | Verbindung wird geprüft. / Alles bereit. | Checking the connection. / All set. |
-| Key ändern | Change key |
+| Key ändern `[P]` | Change key |
 | Darstellung / Light / Dark | Appearance / Light / Dark |
-| Kamera bleibt in beiden Modi dunkel. | The camera stays dark in both. |
+| Kamera bleibt in beiden Modi dunkel. `[P]` | The camera stays dark in both. |
 | Akzentfarbe | Accent colour |
 | Zählweise / Mit Ziel / Nur zählen | Counting / With a goal / Count only |
 | Kalorien | Calories |
 | Automatische Labels | Automatic labels |
-| Einträge werden nach Uhrzeit einsortiert. Im Ergebnis-Screen jederzeit überschreibbar. | Entries are filed by time of day. Always overridable on the result screen. |
-| Alle Daten liegen auf diesem Gerät. Kein Account, keine Sync. Shortcut „Scannen“ öffnet direkt die Kamera. | All data lives on this device. No account, no sync. The "Scan" shortcut opens the camera directly. |
+| Einträge werden nach Uhrzeit einsortiert. Im Ergebnis-Screen jederzeit überschreibbar. `[P]` | Entries are filed by time of day. Always overridable on the result screen. |
+| Alle Daten liegen auf diesem Gerät. Kein Account, keine Sync. | All data lives on this device. No account, no sync. |
+| …Shortcut „Scannen“ öffnet direkt die Kamera. `[P]` | …The "Scan" shortcut opens the camera directly. |
+| Foto-Eintrag / Text-Eintrag | Photo entry / Text entry |
+| AUFGENOMMENES FOTO | CAPTURED PHOTO |
+| Menge erkannt / Menge geschätzt | Amount recognised / Amount estimated |
+| Erkannt / Aufgeschlüsselt | Recognised / Broken down |
 
 ## The seventeen screens
 

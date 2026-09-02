@@ -46,8 +46,8 @@ The estimation is done by a language model, and the model is **yours**. See
 
 ## Design fidelity — the hard rule
 
-`design/` holds the design export, pulled from Claude Design over the design MCP
-and committed here so that every writer and every reviewer reads the same bytes:
+`design/` holds the design export, committed here so that every writer and every
+reviewer reads the same bytes:
 
 - `Screens2c.dc.html` — **the file with the pixels in it.** All seventeen
   screens, light and dark, at 390×844.
@@ -78,9 +78,9 @@ or the first line of a review. No exceptions, including for a one-line change.**
 - **A reviewer who waves through a deviation from the design has not done the
   job.** The deviation is the thing the review is for.
 
-The export is a snapshot, and the owner refreshes it from the MCP before a
-feature starts. The refresh lands as its own commit, so a design change is
-visible as a diff rather than appearing silently inside a feature.
+The export is a snapshot. The owner refreshes it before a feature starts, and
+the refresh lands as its own commit, so a design change is visible as a diff
+rather than appearing silently inside a feature.
 
 ### The seventeen screens
 
@@ -129,9 +129,9 @@ at a glance.
 ```
 dark    bg #111213   surface #1a1b1d   ink #fafafa   camera #090a0a
 light   bg #faf9f8   surface #ffffff   ink #121212   camera #0d0d0e
-accent  mono is the default (ink on bg); blue, green, amber, violet as oklch
-type    Plus Jakarta Sans 400/500/600/700, DM Mono 400/500
-radii   100px (pills), 50% (circles), 16px (cards). Nothing else.
+accent  mono is the default (ink on bg); blue, green, sand, lilac as oklch
+type    Plus Jakarta Sans 300/400/500/600, DM Mono 400
+radii   100px (pills), 50% (circles), 16px (cards), 22px (result thumbnail)
 ```
 
 The 46px radius in the export is the phone mockup's own corner. It is not an
@@ -389,8 +389,8 @@ Ask first, then touch:
 - **Anything that would put a Fuel request on a Levo Studio server**, or a key
   anywhere but the Keychain. There is no version of this that gets approved, but
   ask anyway so the answer is on the record.
-- **Anything in `design/`.** The export is read-only. Refreshing it from the
-  MCP is the owner's job and lands as its own commit.
+- **Anything in `design/`.** The export is read-only. Refreshing it is the
+  owner's job and lands as its own commit.
 - **Adding a dependency.** Fuel has none, and that is a feature.
 - **A second AI provider** beyond Claude and Mistral.
 - **Deleting user data paths** — anything that calls `ModelContext.delete` or
