@@ -20,6 +20,24 @@
 	     goes. Fuel sends it to the user's own provider with the user's own key
 	     and keeps no copy anywhere but the log entry — the permission sheet is
 	     the one place a user asks that question, so it is answered there. -->
+	<!-- The two typefaces the design draws, both bundled so the app never
+	     reaches the network for a face. Plus Jakarta Sans ships as the variable
+	     file because the design uses four of its weights (300/400/500/600) and
+	     one variable font is smaller than four statics; DM Mono ships as the
+	     single static Regular because 400 is the only mono weight drawn.
+
+	     The entries carry no directory component even though the files live in
+	     Resources/Fonts: a synchronized resource folder flattens into the
+	     bundle root, so Fonts/ is not part of the path at runtime.
+
+	     Both families are SIL Open Font License 1.1; the licence text sits
+	     beside each file in Resources/Fonts. -->
+	<key>UIAppFonts</key>
+	<array>
+		<string>PlusJakartaSans[wght].ttf</string>
+		<string>DMMono-Regular.ttf</string>
+	</array>
+
 	<key>NSCameraUsageDescription</key>
 	<string>Fuel uses the camera to photograph a meal. The picture goes straight to the model provider you set up, with your key, and is kept only in the entry it creates.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
