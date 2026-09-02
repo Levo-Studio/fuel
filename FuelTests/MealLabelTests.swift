@@ -163,6 +163,15 @@ struct MealLabelTests {
         #expect(labeler.relabelling(day).map(\.label) == [.lunch, .snack])
     }
 
+    @Test("a hand-set meal holds against an earlier entry too")
+    func handSetLabelClaimsItsMealAgainstAnEarlierEntry() {
+        let day = [
+            entry(at: at(19, 0), label: .dinner, userSet: true),
+            entry(at: at(18, 30)),
+        ]
+        #expect(labeler.relabelling(day).map(\.label) == [.snack, .dinner])
+    }
+
     // MARK: - The label control
 
     @Test("the label control cycles forward and wraps")

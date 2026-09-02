@@ -53,7 +53,7 @@ final class FoodEntry {
         macros: MacroTotals,
         loggedAt: Date,
         source: EntrySource,
-        label: MealLabel,
+        label: MealLabel = .snack,
         isLabelUserSet: Bool = false,
         isFavourite: Bool = false,
         items: [RecognisedItem] = []
@@ -91,8 +91,9 @@ final class FoodEntry {
         set { sourceRawValue = newValue.rawValue }
     }
 
-    /// Snack is the safe fallback for the same reason: it is the label that
-    /// claims nothing.
+    /// Snack is the safe fallback for the same reason, and the same reason it
+    /// is what a new entry starts as before the day is derived: it is the
+    /// label that claims nothing.
     var label: MealLabel {
         get { MealLabel(rawValue: labelRawValue) ?? .snack }
         set { labelRawValue = newValue.rawValue }

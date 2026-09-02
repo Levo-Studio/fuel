@@ -64,8 +64,12 @@ final class FuelStore {
 
     // MARK: - Writing an entry
 
-    /// Logs a meal and derives its label from what the day has already been
-    /// handed.
+    /// Logs a meal, then re-derives the labels of the day it lands in.
+    ///
+    /// The entry is inserted before it has a meaningful label because the
+    /// labeler decides the whole day at once. `loggedAt` is an arbitrary date,
+    /// so an entry can land behind ones already stored; deriving only from
+    /// "the day so far" would hand it a meal a later entry already holds.
     @discardableResult
     func log(
         title: String,
@@ -76,20 +80,37 @@ final class FuelStore {
         isFavourite: Bool = false,
         items: [RecognisedItem] = []
     ) throws -> FoodEntry {
-        let sameDay = try nutritionEntries(on: loggedAt)
         let entry = FoodEntry(
             title: title,
             kilocalories: kilocalories,
             macros: macros,
             loggedAt: loggedAt,
             source: source,
-            label: labeler.label(forEntryAt: loggedAt, existing: sameDay),
             isFavourite: isFavourite,
             items: items
         )
         context.insert(entry)
         try context.save()
+        try relabelDay(containing: loggedAt)
         return entry
+    }
+
+    /// Runs the day through the labeler and writes the result back.
+    ///
+    /// Entries the user labelled by hand are passed through untouched — the
+    /// labeler holds their meal against the others and returns them unchanged,
+    /// and the write below skips them as well, so a correction cannot be lost
+    /// to a rounding of the rule on either side.
+    private func relabelDay(containing date: Date) throws {
+        let rows = try entries(on: date)
+        let labels = labeler
+            .relabelling(rows.map(\.nutritionValue))
+            .reduce(into: [UUID: MealLabel]()) { $0[$1.id] = $1.label }
+        for row in rows where !row.isLabelUserSet {
+            guard let label = labels[row.entryID], label != row.label else { continue }
+            row.label = label
+        }
+        try context.save()
     }
 
     /// Applies the user's own choice from the result screen. The entry is
@@ -98,6 +119,9 @@ final class FuelStore {
         entry.label = label
         entry.isLabelUserSet = true
         try context.save()
+        // The meal the user just claimed may be held twice now, so the rest of
+        // the day is derived again around their choice.
+        try relabelDay(containing: entry.loggedAt)
     }
 
     func setFavourite(_ isFavourite: Bool, on entry: FoodEntry) throws {

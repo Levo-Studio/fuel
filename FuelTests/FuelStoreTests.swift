@@ -15,7 +15,7 @@ struct FuelStoreTests {
         try FuelStore(inMemory: true, calendar: testCalendar)
     }
 
-    @Test("logging derives the label from the day so far")
+    @Test("logging derives the day's labels")
     func derivesLabelsWhileLogging() throws {
         let store = try makeStore()
         try store.log(title: "Porridge", kilocalories: 420, macros: .zero, loggedAt: at(8, 14), source: .photo)
@@ -66,6 +66,38 @@ struct FuelStoreTests {
         #expect(entry.items.count == 1)
     }
 
+    @Test("a back-dated entry takes the meal, and the later one gives it up")
+    func backDatedEntry() throws {
+        let store = try makeStore()
+        try store.log(title: "Late", kilocalories: 400, macros: .zero, loggedAt: at(19, 0), source: .text)
+        try store.log(title: "Earlier", kilocalories: 300, macros: .zero, loggedAt: at(18, 30), source: .text)
+
+        let day = try store.nutritionEntries(on: at(12, 0))
+        #expect(day.map(\.title) == ["Earlier", "Late"])
+        #expect(day.map(\.label) == [.dinner, .snack])
+    }
+
+    @Test("a back-dated entry cannot take a meal the user claimed by hand")
+    func backDatedEntryRespectsAnOverride() throws {
+        let store = try makeStore()
+        let late = try store.log(title: "Late", kilocalories: 400, macros: .zero, loggedAt: at(19, 0), source: .text)
+        try store.overrideLabel(.dinner, on: late)
+        try store.log(title: "Earlier", kilocalories: 300, macros: .zero, loggedAt: at(18, 30), source: .text)
+
+        let day = try store.nutritionEntries(on: at(12, 0))
+        #expect(day.map(\.label) == [.snack, .dinner])
+        #expect(late.isLabelUserSet)
+    }
+
+    @Test("yesterday's meals do not claim today's")
+    func mealsAreClaimedPerDay() throws {
+        let store = try makeStore()
+        try store.log(title: "Yesterday", kilocalories: 400, macros: .zero, loggedAt: at(19, 0, day: 0), source: .text)
+        try store.log(title: "Today", kilocalories: 400, macros: .zero, loggedAt: at(19, 0, day: 1), source: .text)
+
+        #expect(try store.nutritionEntries(on: at(19, 0, day: 1)).map(\.label) == [.dinner])
+    }
+
     @Test("a label the user picks is marked as theirs")
     func overrideLabel() throws {
         let store = try makeStore()
@@ -110,3 +142,4 @@ struct FuelStoreTests {
         #expect(try store.goalSettings().targets == targets)
     }
 }
+
