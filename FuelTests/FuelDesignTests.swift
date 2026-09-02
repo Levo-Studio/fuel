@@ -303,8 +303,17 @@ struct FuelMetricsTests {
         // `border-radius:50%` — a shape, drawn as a Circle, not a number.
         let radii = [FuelMetrics.Radius.pill, FuelMetrics.Radius.card, FuelMetrics.Radius.thumbnail]
         #expect(radii == [100, 16, 22])
-        // 46 is the phone mockup's own corner and must never reach the app.
-        #expect(!radii.contains(46))
+    }
+
+    @Test("the phone mockup's own corner radius appears nowhere in the layer")
+    func mockupCornerNeverReachesTheApp() {
+        // 46px is drawn seventeen times in the export, once per frame, and it
+        // is the picture of the phone rather than anything in the app. Sweeping
+        // every constant rather than only the radii is the point: it is not the
+        // Radius enum that would tempt someone into it, it is a writer looking
+        // at a rounded rectangle in the export and reaching for the nearest
+        // number. Every value below is a real candidate for that mistake.
+        #expect(!FuelMetrics.allDrawnValues.contains(46))
     }
 }
 

@@ -207,6 +207,33 @@ nonisolated enum FuelMetrics {
         }
     }
 
+    // MARK: - Roster
+
+    /// Every constant in this file, in one list.
+    ///
+    /// It exists so a test can assert a value is *absent* — which is the only
+    /// way the mockup's own `46px` corner stays out. A test that checks the
+    /// three radii it just pinned proves nothing; a sweep over the whole layer
+    /// goes red the moment the number appears anywhere in it.
+    static let allDrawnValues: [CGFloat] = [
+        Space.s2, Space.s3, Space.s4, Space.s7, Space.s8, Space.s10, Space.s11, Space.s12,
+        Space.s13, Space.s14, Space.s15, Space.s16, Space.s17, Space.s18, Space.s20, Space.s22,
+        Space.s24, Space.s26, Space.s28, Space.s30, Space.s32, Space.s34, Space.s38, Space.s44,
+        Space.s88, Space.s96,
+        Screen.horizontalPadding, Screen.logFlowHorizontalPadding,
+        Screen.onboardingTopPadding, Screen.keyTestTopPadding,
+        Radius.pill, Radius.card, Radius.thumbnail,
+        Line.hairline, Line.selectionBorder, Line.spinner,
+        Control.circleButton, Control.swatchRing, Control.swatchDot, Control.shutterRing,
+        Control.shutterFill, Control.stepMarkerSlot, Control.stepMarkerDot,
+        Control.macroLabelColumn, Control.macroBarHeight, Control.thumbnailHeight,
+        Control.addButton, Control.addButtonTrailingInset, Control.addButtonBottomInset,
+        Control.selectionDot,
+        Ring.viewBox, Ring.radius, Ring.strokeWidth, Ring.size, Ring.trailingGap,
+        Ring.circumference,
+        Progress.width, Progress.height, Progress.labelGap
+    ]
+
     // MARK: - Progress
 
     /// The analysis progress bar over the frozen frame. It fills in quarters,
