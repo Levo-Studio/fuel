@@ -194,6 +194,18 @@ the code can cite it instead of asserting it.
   different layout, and building bars into it is a design deviation.
 - **Count-only mode** — the big total loses its `/ 2400 kcal` suffix and reads
   `kcal geloggt` (→ `kcal logged`) instead.
+- **The list fade under the add button** `[P]` — a 120pt band across the bottom
+  of the Today screen, `linear-gradient(to top, bg 46%, transparent)`, drawn
+  behind the floating add button and not hit-testable. It exists so the last
+  row does not collide with the button. It is **not** in `Screens2c.dc.html` —
+  the static render has no scrolled list to fade — so grepping the screens for
+  it comes back empty. It is spec nonetheless.
+- **Glyph strokes** `[S]` — the export draws its icons as SVG paths in a
+  20-unit box, each with its own weight: `1.3` the result-screen chevron, `1.6`
+  the add-button plus, `1.7` the key-test check. A symbol font will not
+  reproduce these exactly; where one stands in, the call site should say so.
+- **Ring start angle** `[S]` — `rotate(-90deg)`, so the arc begins at twelve
+  o'clock rather than at SVG's three-o'clock origin.
 - **Result stepper** `[P]` — ±10 kcal per tap, floored at 0.
 - **Key test steps** — four, in order: `Verbindung aufbauen`, `Testdaten senden`,
   `Antwort erhalten`, `Modell bereit` (→ `Opening connection`, `Sending test

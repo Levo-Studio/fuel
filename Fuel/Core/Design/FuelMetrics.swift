@@ -125,6 +125,29 @@ nonisolated enum FuelMetrics {
 
         /// The active step's spinner ring on the key-test screen.
         static let spinner: CGFloat = 2
+
+        /// Stroke weights for the drawn glyphs. The export draws its icons as
+        /// SVG paths inside a 20-unit box rather than as a font, so each one
+        /// carries its own weight and none of them is `hairline`.
+        ///
+        /// SF Symbols will not hit these exactly — a symbol's weight is a
+        /// design of its own, not a stroke width. Where a glyph is drawn as a
+        /// path, use the path and these weights; where a symbol stands in,
+        /// say so at the call site rather than pretending the number applies.
+        enum Glyph {
+
+            /// The result screen's small chevron beside the meal label.
+            static let chevron: CGFloat = 1.3
+
+            /// The plus on the add button, screens 05 and 06.
+            static let plus: CGFloat = 1.6
+
+            /// The check on a completed key-test step.
+            static let check: CGFloat = 1.7
+
+            /// The box the paths are authored in, like `Ring.viewBox`.
+            static let viewBox: CGFloat = 20
+        }
     }
 
     // MARK: - Controls
@@ -190,6 +213,15 @@ nonisolated enum FuelMetrics {
 
         /// Rendered edge length.
         static let size: CGFloat = 104
+
+        /// The ring starts at twelve o'clock, so the painted arc is rotated a
+        /// quarter turn back from SVG's and SwiftUI's shared three-o'clock
+        /// origin. Drawn as `rotate(-90deg)`.
+        ///
+        /// Degrees rather than a SwiftUI `Angle`, because this file is
+        /// geometry and imports CoreGraphics only — the moment it imports
+        /// SwiftUI it stops being usable from anywhere that is not a view.
+        static let startAngleDegrees: CGFloat = -90
 
         /// The gap between the ring and the macro bars beside it.
         static let trailingGap = Space.s16
