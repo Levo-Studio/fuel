@@ -71,11 +71,23 @@ nonisolated enum MainMeal: CaseIterable, Hashable, Sendable {
     /// leave the 15:00–17:59 gap unclaimed and produce a fixed snack band —
     /// exactly the naive mapping the design rejects.
     ///
-    /// Nothing is claimable before breakfast opens or after dinner's window
-    /// closes: an entry at 02:00 or at 23:30 is a snack whatever the day did.
+    /// Two ends of the day the windows alone do not settle, ruled by the owner:
+    ///
+    /// - **Dinner's reach runs to the end of the calendar day.** An entry at
+    ///   23:30 on a day with no dinner is dinner, by the same reasoning as the
+    ///   16:00 case: the window passed unused and no later main meal exists to
+    ///   reach. Cutting the reach at 22:59 would leave a day whose only meal
+    ///   was late showing a Snack group and no Dinner group at all.
+    /// - **The small hours are always a snack.** Reach does not cross midnight,
+    ///   so 00:00–03:59 claims nothing however the day went. Handing dinner to
+    ///   an entry on a day that has barely begun would be absurd, and entries
+    ///   are filed by calendar day, so a reach across midnight would attach
+    ///   dinner to the wrong day.
+    ///
+    /// That leaves lunch (11:00 → 17:59) and dinner (18:00 → 23:59) symmetric
+    /// within the day, with the small hours as the deliberate exception.
     static func claimable(atMinuteOfDay minute: Int) -> MainMeal? {
-        guard let first = inDayOrder.first, let last = inDayOrder.last else { return nil }
-        guard minute >= first.window.lowerBound, minute <= last.window.upperBound else { return nil }
+        guard let first = inDayOrder.first, minute >= first.window.lowerBound else { return nil }
         return inDayOrder.last { minute >= $0.window.lowerBound }
     }
 

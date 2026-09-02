@@ -10,21 +10,26 @@ struct MealLabelTests {
 
     let labeler = MealLabeler(calendar: testCalendar)
 
+    /// The day's history, as the rule sees it: the labels already handed out.
+    private func label(at moment: Date, claimed: Set<MealLabel> = []) -> MealLabel {
+        labeler.label(forEntryAt: moment, claimedLabels: claimed)
+    }
+
     // MARK: - First entry of the day
 
     @Test("the first entry inside the breakfast window is breakfast")
     func firstBreakfast() {
-        #expect(labeler.label(forEntryAt: at(8, 14), existing: []) == .breakfast)
+        #expect(label(at: at(8, 14)) == .breakfast)
     }
 
     @Test("the first entry inside the lunch window is lunch")
     func firstLunch() {
-        #expect(labeler.label(forEntryAt: at(12, 40), existing: []) == .lunch)
+        #expect(label(at: at(12, 40)) == .lunch)
     }
 
     @Test("the first entry inside the dinner window is dinner")
     func firstDinner() {
-        #expect(labeler.label(forEntryAt: at(19, 20), existing: []) == .dinner)
+        #expect(label(at: at(19, 20)) == .dinner)
     }
 
     @Test(
@@ -39,57 +44,66 @@ struct MealLabelTests {
         ]
     )
     func windowBounds(moment: Date, expected: MealLabel) {
-        #expect(labeler.label(forEntryAt: moment, existing: []) == expected)
+        #expect(label(at: moment) == expected)
     }
 
     // MARK: - The two consequences
 
     @Test("a second entry inside the breakfast window is a snack, not a second breakfast")
     func secondBreakfastIsSnack() {
-        let breakfast = entry(at: at(7, 30), label: .breakfast)
-        #expect(labeler.label(forEntryAt: at(9, 45), existing: [breakfast]) == .snack)
+        #expect(label(at: at(9, 45), claimed: [.breakfast]) == .snack)
     }
 
     @Test("an entry at 16:00 on a day with no lunch yet is lunch")
     func lateLunch() {
-        let breakfast = entry(at: at(8, 0), label: .breakfast)
-        #expect(labeler.label(forEntryAt: at(16, 0), existing: [breakfast]) == .lunch)
+        #expect(label(at: at(16, 0), claimed: [.breakfast]) == .lunch)
     }
 
     @Test("an entry at 16:00 after lunch has been handed out is a snack")
     func afternoonSnack() {
-        let lunch = entry(at: at(12, 30), label: .lunch)
-        #expect(labeler.label(forEntryAt: at(16, 0), existing: [lunch]) == .snack)
+        #expect(label(at: at(16, 0), claimed: [.lunch]) == .snack)
     }
 
-    // MARK: - Around the edges of the day
+    // MARK: - The two ends of the day
 
     @Test(
-        "nothing between 23:00 and 03:59 can claim a meal",
-        arguments: [at(23, 0), at(23, 30), at(0, 15), at(2, 0), at(3, 59)]
+        "the small hours claim nothing, whatever the day did",
+        arguments: [at(0, 0), at(0, 15), at(2, 0), at(3, 59)]
     )
-    func outsideEveryWindow(moment: Date) {
-        #expect(labeler.label(forEntryAt: moment, existing: []) == .snack)
+    func smallHoursAreAlwaysSnacks(moment: Date) {
+        #expect(label(at: moment) == .snack)
+        #expect(label(at: moment, claimed: [.breakfast, .lunch]) == .snack)
+        #expect(label(at: moment, claimed: [.breakfast, .lunch, .dinner]) == .snack)
+    }
+
+    @Test(
+        "a late evening entry on a day without a dinner is dinner",
+        arguments: [at(23, 0), at(23, 30), at(23, 59)]
+    )
+    func lateEveningStillClaimsDinner(moment: Date) {
+        #expect(label(at: moment) == .dinner)
+        #expect(label(at: moment, claimed: [.breakfast, .lunch]) == .dinner)
+    }
+
+    @Test(
+        "a late evening entry once dinner is handed out is a snack",
+        arguments: [at(23, 0), at(23, 30), at(23, 59)]
+    )
+    func lateEveningAfterDinnerIsASnack(moment: Date) {
+        #expect(label(at: moment, claimed: [.dinner]) == .snack)
     }
 
     @Test("everything after dinner is a snack")
     func afterDinner() {
-        let dinner = entry(at: at(19, 0), label: .dinner)
-        #expect(labeler.label(forEntryAt: at(21, 30), existing: [dinner]) == .snack)
-        #expect(labeler.label(forEntryAt: at(22, 59), existing: [dinner]) == .snack)
+        #expect(label(at: at(21, 30), claimed: [.dinner]) == .snack)
+        #expect(label(at: at(22, 59), claimed: [.dinner]) == .snack)
     }
 
-    @Test("a day of nothing but snacks stays a day of nothing but snacks")
+    @Test("a day whose main meals are all taken is a day of nothing but snacks")
     func onlySnacks() {
-        let day = [at(0, 30), at(3, 0), at(23, 10), at(23, 59)]
-        let labelled = labeler.relabelling(day.map { entry(at: $0) })
-        #expect(labelled.allSatisfy { $0.label == .snack })
-    }
-
-    @Test("yesterday's meals do not claim today's")
-    func mealsAreClaimedPerDay() {
-        let yesterday = entry(at: at(8, 0, day: 0), label: .breakfast)
-        #expect(labeler.label(forEntryAt: at(8, 0, day: 1), existing: [yesterday]) == .breakfast)
+        let taken: Set<MealLabel> = [.breakfast, .lunch, .dinner]
+        let times = [at(2, 0), at(8, 14), at(12, 40), at(16, 0), at(19, 20), at(23, 30)]
+        #expect(times.allSatisfy { label(at: $0, claimed: taken) == .snack })
     }
 
     // MARK: - Re-deriving a day
@@ -109,11 +123,23 @@ struct MealLabelTests {
         ])
     }
 
+    @Test("a day whose only entry is late still has a dinner")
+    func lateOnlyEntryIsDinner() {
+        let day = [entry(at: at(23, 30))]
+        #expect(labeler.relabelling(day).map(\.label) == [.dinner])
+    }
+
     @Test("re-deriving sorts the day before it reasons about it")
     func relabelIsOrderIndependent() {
         let day = [entry(at: at(19, 20)), entry(at: at(8, 14)), entry(at: at(12, 40))]
         let labelled = labeler.relabelling(day)
         #expect(labelled.map(\.label) == [.breakfast, .lunch, .dinner])
+    }
+
+    @Test("a back-dated entry takes the meal a later one was holding")
+    func backDatedEntryTakesTheMeal() {
+        let day = [entry(at: at(19, 0)), entry(at: at(18, 30))]
+        #expect(labeler.relabelling(day).map(\.label) == [.dinner, .snack])
     }
 
     @Test("a label the user set by hand survives re-deriving")
