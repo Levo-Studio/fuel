@@ -168,7 +168,13 @@ struct SettingsRow<Trailing: View>: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .center) {
+            // Spacing zero, not the default. Every gap inside a row is stated
+            // by the call site — a `Spacer(minLength:)` between a label and its
+            // value, a padding between two actions — and SwiftUI's default
+            // spacing would be added on top of each of them, so a stated 8
+            // would draw as roughly 16 and no call site could say what it had
+            // asked for.
+            HStack(alignment: .center, spacing: 0) {
                 content
             }
             .frame(maxWidth: .infinity)

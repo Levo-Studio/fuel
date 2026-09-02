@@ -121,7 +121,10 @@ struct AIModelSection: View {
     ///
     /// The 8pt gap is the gap between the two provider segments above it, and
     /// is a borrowed neighbour rather than an export value: the export draws no
-    /// row with two actions in it.
+    /// row with two actions in it. It is 8 on screen because `SettingsRow`
+    /// stacks at spacing zero; under SwiftUI's default spacing this padding
+    /// would have been one contribution to a gap of about sixteen, which is
+    /// not a number anything in the design asked for.
     private var billingLink: some View {
         Link(destination: AIError.billingPage(for: preferences.provider)) {
             Text(KeyTestNote.billingActionTitle)
