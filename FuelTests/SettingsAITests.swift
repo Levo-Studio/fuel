@@ -177,9 +177,11 @@ struct SettingsKeyTests {
 @MainActor
 struct SettingsKeyOutcomeTests {
 
-    /// Each outcome drives the note the design draws for it. `noCredit` and
-    /// `retry` land on the empty note because the export has no third and
-    /// fourth note — that gap is reported, not filled in with invented copy.
+    /// Each outcome drives its own note. Three of the four say something:
+    /// `passed` and `notAccepted` are drawn, and `noCredit` is the undrawn
+    /// state the owner ruled must be shown anyway, because a user who cannot
+    /// pay for a scan and is told nothing is stuck. Only `retry` lands on the
+    /// empty note — it concluded nothing, so it claims nothing.
     @Test(
         "An outcome drives its note",
         arguments: [
@@ -412,15 +414,16 @@ struct SettingsKeyLeakTests {
         }
     }
 
-    /// The note is a closed set of three, and none of them carries text of its
-    /// own — a note that could hold a provider message would be one interpolation
-    /// away from carrying a key back to the screen.
+    /// The note is a closed set of four, and none of them carries text or a
+    /// payload of its own — a note that could hold a provider message would be
+    /// one interpolation away from carrying a key back to the screen.
     @Test("A note carries no payload")
     func noteCarriesNoPayload() {
         #expect(KeyTestNote.passed == .passed)
         #expect(KeyTestNote.none.titleKey(for: .claude) == nil)
         #expect(KeyTestNote.passed.titleKey(for: .claude) != nil)
         #expect(KeyTestNote.notAccepted.titleKey(for: .claude) != nil)
+        #expect(KeyTestNote.noCredit.titleKey(for: .claude) != nil)
     }
 }
 
