@@ -23,16 +23,20 @@ struct AppearanceSection: View {
 
             // Spec, but not drawn: screen 16 goes straight from the control to
             // `Accent colour`, because the note only appears once the control
-            // has been used. It therefore has no drawn geometry of its own, and
-            // the two values here are borrowed rather than invented: `monoNote`
-            // in `muted` is the standing explanatory line at the foot of
-            // Settings, and `12` is the gap the export puts between a control
-            // and the note under it on screen 01.
+            // has been used. It has no drawn geometry of its own, so both
+            // values are borrowed from the one comparable note the export does
+            // draw — the privacy line at the foot of screen 17, which is
+            // `monoNote` in `muted` and sits `16` under the rule above it.
+            //
+            // The gap is borrowed; the rule is not. That note closes the screen
+            // and the line above it is what separates it from the last section.
+            // This one sits inside a section that already has its own chrome,
+            // and a second rule in the middle of it would read as a break.
             Text("settings.appearance.cameraNote")
                 .fuelStyle(FuelTypography.monoNote)
                 .foregroundStyle(palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, FuelMetrics.Space.s12)
+                .padding(.top, FuelMetrics.Space.s16)
         }
     }
 }
