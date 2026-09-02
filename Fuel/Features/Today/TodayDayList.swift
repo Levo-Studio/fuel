@@ -69,6 +69,13 @@ private struct TodayEntryRow: View {
     var body: some View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: .zero) {
+                // The title is the one attacker-influenced string that survives
+                // the provider parser: the model wrote it, and the model read a
+                // photo or a sentence the user did not necessarily compose.
+                // `Text(String)` is verbatim, so it renders no markdown and no
+                // attributed markup however the title is punctuated; it still
+                // wants a length cap, which belongs in the parser rather than
+                // here so the stored entry is bounded too.
                 Text(entry.title)
                     .fuelStyle(FuelTypography.entryTitle)
                     .foregroundStyle(palette.ink)
