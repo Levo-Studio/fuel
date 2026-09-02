@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Everything Xcode can derive from build settings stays in the build
+	     settings; GENERATE_INFOPLIST_FILE merges those keys on top of this
+	     file. So this file holds only the keys that have no INFOPLIST_KEY_
+	     counterpart.
+
+	     Export compliance is the counter-example and deliberately not here:
+	     ITSAppUsesNonExemptEncryption does have a counterpart, and it is set to
+	     NO as INFOPLIST_KEY_ITSAppUsesNonExemptEncryption on the Fuel target.
+	     Xcode types that setting as a Boolean, so the generated key is a real
+	     <false/> rather than the string "NO" an unknown key would produce. Fuel
+	     talks to a model provider over HTTPS and adds no encryption of its own,
+	     which is what makes the answer NO; without the key App Store Connect
+	     asks the same question by hand on every upload. -->
+
+	<!-- Both strings are shown by iOS verbatim, so they say where the picture
+	     goes. Fuel sends it to the user's own provider with the user's own key
+	     and keeps no copy anywhere but the log entry — the permission sheet is
+	     the one place a user asks that question, so it is answered there. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Fuel uses the camera to photograph a meal. The picture goes straight to the model provider you set up, with your key, and is kept only in the entry it creates.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Fuel reads a photo you pick so it can estimate the meal. The picture goes straight to the model provider you set up, with your key, and is kept only in the entry it creates.</string>
+</dict>
+</plist>
