@@ -733,8 +733,24 @@ struct RequestShapeTests {
         _ = try await mistral.estimate(photo: tinyPhoto())
         _ = await mistral.checkKey(APIKey(Self.mistralSecret))
 
-        let all = anthropicTransport.requests + mistralTransport.requests
+        let anthropicRequests = anthropicTransport.requests
+        let mistralRequests = mistralTransport.requests
+        let all = anthropicRequests + mistralRequests
         #expect(all.count == 6)
+
+        // The absence assertions below are only half the guarantee: a client
+        // that forgot to authorise at all would pass every one of them. The
+        // estimate paths are covered by the header suite, so the two key
+        // checks — which build their requests on their own paths — are
+        // asserted positively here.
+        let anthropicCheck = try #require(anthropicRequests.last)
+        #expect(anthropicCheck.value(forHTTPHeaderField: "x-api-key") == Self.anthropicSecret)
+
+        let mistralCheck = try #require(mistralRequests.last)
+        #expect(
+            mistralCheck.value(forHTTPHeaderField: "Authorization")
+                == "Bearer \(Self.mistralSecret)"
+        )
 
         for request in all {
             let url = try #require(request.url?.absoluteString)
