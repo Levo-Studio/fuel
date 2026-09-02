@@ -67,19 +67,22 @@ nonisolated enum MealPhotoCompressor {
     ///   10000×10000 px.
     static let longEdge: CGFloat = 1568
 
-    /// The JPEG quality a photo is first encoded at.
+    /// The JPEG qualities a photo is tried at, in order.
     ///
     /// 0.7 is where a downscaled photograph stops shrinking meaningfully and
     /// starts visibly degrading. Anthropic's own guidance warns that heavy
     /// lossy compression costs the model accuracy — the failure mode being
     /// exactly the fine detail that distinguishes one portion from another —
-    /// so this is chosen to be the last quality above that cliff, not the
-    /// smallest file achievable.
-    static let initialQuality: CGFloat = 0.7
-
-    /// The floor the retry ladder stops at rather than trading away any more
-    /// accuracy. A photo that is still too large here is refused.
-    static let minimumQuality: CGFloat = 0.4
+    /// so the first rung is the last quality above that cliff, not the
+    /// smallest file achievable. 0.4 is the floor: below it the ladder would
+    /// be trading away the answer to save bytes that are not the problem.
+    ///
+    /// A written-out list rather than a start, a floor and a step. Stepping a
+    /// `CGFloat` by 0.15 from 0.7 reaches 0.39999999999999997, which is not
+    /// `>= 0.4`, so the ladder silently stopped one rung early and the
+    /// documented floor was never tried. Three literals cannot drift from
+    /// their own description.
+    static let qualities: [CGFloat] = [0.7, 0.55, 0.4]
 
     /// The ceiling a compressed photo has to fit under, in bytes of JPEG.
     ///
@@ -110,19 +113,16 @@ nonisolated enum MealPhotoCompressor {
     static func compress(_ image: UIImage, ceiling: Int = maximumBytes) throws -> MealPhoto {
         let scaled = scaledDown(image)
 
-        // Quality is stepped down rather than searched: three encodes is a
-        // bounded cost, and a binary search over quality would spend more time
-        // on a case that essentially never happens once the long edge is
-        // capped.
-        var quality = initialQuality
-        while quality >= minimumQuality {
+        // Walked in order rather than searched: three encodes is a bounded
+        // cost, and a binary search over quality would spend more time on a
+        // case that essentially never happens once the long edge is capped.
+        for quality in qualities {
             guard let data = scaled.jpegData(compressionQuality: quality) else {
                 throw AIError.imageTooLarge
             }
             if data.count <= ceiling {
                 return MealPhoto(jpegData: data)
             }
-            quality -= 0.15
         }
 
         throw AIError.imageTooLarge
