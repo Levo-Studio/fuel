@@ -251,6 +251,20 @@ struct FuelTypographyTests {
         #expect(FuelTypography.lead.lineSpacing > 0)
         #expect(FuelTypography.body.lineSpacing > 0)
     }
+
+    @Test("headlines scale and the fixed-geometry styles do not")
+    func dynamicTypeOptIn() {
+        // The two headlines own their line and fit at the cap, so they scale.
+        // The four below are pinned by geometry that is not theirs to change:
+        // a 74pt numeral with a suffix beside it, the percentage centred in a
+        // 104pt ring, a name in a 52pt column, a label in a three-column bar.
+        #expect(FuelTypography.display.scalesRelativeTo != nil)
+        #expect(FuelTypography.screenTitle.scalesRelativeTo != nil)
+        #expect(FuelTypography.dayTotal.scalesRelativeTo == nil)
+        #expect(FuelTypography.monoValue.scalesRelativeTo == nil)
+        #expect(FuelTypography.macroLabel.scalesRelativeTo == nil)
+        #expect(FuelTypography.tabLabel.scalesRelativeTo == nil)
+    }
 }
 
 // MARK: - Metrics

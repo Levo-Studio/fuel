@@ -143,6 +143,29 @@ nonisolated enum FuelTypography {
         }
     }
 
+    // MARK: - Dynamic Type
+
+    // A style carries `scalesRelativeTo` when it may grow with the user's text
+    // size, and omits it when it may not. The pinned ones fall into three
+    // groups, and the reason is the same each time — the export draws a fixed
+    // 390×844 frame, and these particular numbers have nowhere to grow into:
+    //
+    // - **Large numerals.** `dayTotal` is 74pt; at the 1.4× cap it is 103.6pt
+    //   and no longer fits on one line beside its `/ 2400 kcal` suffix on a
+    //   390pt screen. The same holds for the result figure and the goal value.
+    // - **Text inside fixed geometry.** The ring's percentage sits centred in a
+    //   104pt circle, the macro names sit in a 52pt column so the three bars
+    //   start on one line, and the tab labels sit in a three-column bar. All of
+    //   them are sized by something other than their own text.
+    // - **Tracked uppercase eyebrows and glyphs.** An eyebrow is 11.5pt with
+    //   `.14em` of tracking on a single line above a headline; growing it wraps
+    //   the line rather than making it more readable. The `+`, `−` and `⚙`
+    //   glyphs are sized to the controls they sit in.
+    //
+    // Everything else — prose, list rows, buttons, captions, field labels and
+    // both headline sizes — scales. A pin that is not covered by one of the
+    // three groups above is a bug, not a default.
+
     // MARK: - Mono styles
 
     /// `400 74px/0.9`, tracking `-.06em`. Today's total, both modes.
@@ -225,14 +248,42 @@ nonisolated enum FuelTypography {
     // MARK: - Sans styles
 
     /// `600 34px/1.14`, tracking `-.03em`. The headline on an onboarding step.
-    static let display = Style(.sans, weight: 600, size: 34, trackingEm: -0.03, lineHeightMultiple: 1.14)
+    ///
+    /// Scales despite being the largest sans size: it owns its line, already
+    /// wraps in the design, and 34 × 1.4 = 47.6pt still sits inside the 334pt
+    /// the screen's 28pt margins leave.
+    static let display = Style(
+        .sans,
+        weight: 600,
+        size: 34,
+        trackingEm: -0.03,
+        lineHeightMultiple: 1.14,
+        scalesRelativeTo: .largeTitle
+    )
 
     /// `600 30px/1.16`, tracking `-.03em`. The headline on a key-test screen,
     /// one step down because that screen carries a step list underneath it.
-    static let displaySmall = Style(.sans, weight: 600, size: 30, trackingEm: -0.03, lineHeightMultiple: 1.16)
+    static let displaySmall = Style(
+        .sans,
+        weight: 600,
+        size: 30,
+        trackingEm: -0.03,
+        lineHeightMultiple: 1.16,
+        scalesRelativeTo: .largeTitle
+    )
 
     /// `600 25px`, tracking `-.025em`. `Today`, `Settings`.
-    static let screenTitle = Style(.sans, weight: 600, size: 25, trackingEm: -0.025)
+    ///
+    /// Scales for the same reason as `display` — it is a full-width heading
+    /// with only a circular button beside it, which is fixed and does not
+    /// compete for the width.
+    static let screenTitle = Style(
+        .sans,
+        weight: 600,
+        size: 25,
+        trackingEm: -0.025,
+        scalesRelativeTo: .title1
+    )
 
     /// `600 22px`, tracking `-.02em`. The title of a sheet over the camera.
     static let sheetTitle = Style(.sans, weight: 600, size: 22, trackingEm: -0.02)
