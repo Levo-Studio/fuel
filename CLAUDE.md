@@ -216,7 +216,8 @@ Fuel/
   Core/AI/         provider clients, request and response shapes
   Models/          FoodEntry and friends — @Model types
   Nutrition/       pure calculation: totals, macros, the meal-label rule
-  Features/        one folder per screen area: Onboarding, Today, LogFlow, Settings
+  Features/        Shell, plus one folder per screen area: Onboarding, Today,
+                   LogFlow, Settings
   Resources/       fonts, Localizable.xcstrings
 FuelTests/         Swift Testing
 ```

@@ -79,8 +79,9 @@ values and cannot be grepped in this folder.
 | `sand` | Sand → Sand | `oklch(0.82 0.11 72)` | `#1a1206` | `oklch(0.58 0.12 62)` | `#ffffff` |
 | `flieder` | Flieder → Lilac | `oklch(0.76 0.12 300)` | `#150a1c` | `oklch(0.53 0.15 300)` | `#ffffff` |
 
-The error colour is a sixth value and is not an accent: `oklch(0.62 0.17 25)`,
-used for the failed-key note in Settings.
+The error colour is a sixth value and is not an accent `[P]`:
+`oklch(0.62 0.17 25)`, used for the failed-key note in Settings. It belongs to a
+state the screens do not draw, so it is not greppable here.
 
 The swatch in Settings is a 26px dot inside a 38px ring; the selected ring is
 `0 0 0 1.5px ink`, the others `0 0 0 1px hair`.
@@ -170,7 +171,7 @@ entries is not rendered at all.
   different layout, and building bars into it is a design deviation.
 - **Count-only mode** — the big total loses its `/ 2400 kcal` suffix and reads
   `kcal geloggt` (→ `kcal logged`) instead.
-- **Result stepper** — ±10 kcal per tap, floored at 0.
+- **Result stepper** `[P]` — ±10 kcal per tap, floored at 0.
 - **Key test steps** — four, in order: `Verbindung aufbauen`, `Testdaten senden`,
   `Antwort erhalten`, `Modell bereit` (→ `Opening connection`, `Sending test
   request`, `Response received`, `Model ready`). Each row is a 20px slot: a check
