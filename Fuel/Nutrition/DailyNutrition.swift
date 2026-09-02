@@ -17,15 +17,4 @@ nonisolated enum DailyNutrition {
     static func kilocalories(of entries: [NutritionEntry]) -> Int {
         entries.reduce(0) { $0 + $1.kilocalories }
     }
-
-    /// The entries of one calendar day, in the order they were logged.
-    static func entries(
-        _ entries: [NutritionEntry],
-        on day: Date,
-        calendar: Calendar = .current
-    ) -> [NutritionEntry] {
-        entries
-            .filter { calendar.isDate($0.loggedAt, inSameDayAs: day) }
-            .sorted { $0.loggedAt < $1.loggedAt }
-    }
 }

@@ -42,18 +42,6 @@ struct DailyTotalsTests {
         ]
         #expect(DailyNutrition.kilocalories(of: group) == 420)
     }
-
-    @Test("only the chosen day counts")
-    func dayFilter() {
-        let day = [
-            entry(at: at(20, 0, day: 0), kilocalories: 500),
-            entry(at: at(8, 0, day: 1), kilocalories: 300),
-            entry(at: at(9, 0, day: 1), kilocalories: 200),
-        ]
-        let today = DailyNutrition.entries(day, on: at(12, 0, day: 1), calendar: testCalendar)
-        #expect(today.count == 2)
-        #expect(DailyNutrition.totals(of: today).kilocalories == 500)
-    }
 }
 
 // MARK: - Goal versus count-only
@@ -109,9 +97,15 @@ struct GoalProgressTests {
         #expect(progress.percentage == 100)
     }
 
-    @Test("a target of zero has no fraction to draw")
+    @Test("a target of zero has no fraction and no percentage to draw")
     func zeroTarget() {
         #expect(GoalProgress.fraction(500, of: 0) == 0)
+        let progress = GoalProgress(
+            totals: DailyTotals(kilocalories: 500, macros: .zero),
+            targets: DailyTargets(kilocalories: 0, protein: 0, carbs: 0, fat: 0)
+        )
+        #expect(progress.percentage == 0)
+        #expect(progress.ringFraction == 0)
     }
 
     @Test("the macro bars each measure their own target")
