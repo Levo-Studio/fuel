@@ -311,7 +311,13 @@ nonisolated struct FuelPalette: Sendable {
         ).color
     }
 
-    /// The stronger line — the unselected accent swatch ring.
+    /// The heavier line, and the export uses it exactly once: the 1.5px border
+    /// of an *unselected* choice-card dot on onboarding.
+    ///
+    /// It is specifically not the accent swatch ring in Settings. Those are
+    /// `0 0 0 1px hair` when unselected and `0 0 0 1.5px ink` when selected —
+    /// `hair`, at 1px, not this. Reaching for `hair2` there would put .30/.25
+    /// alpha at 1.5px on a control drawn five times per theme.
     var hair2: Color {
         pick(
             dark: FuelRGBA(hex: 0xFAFAFA, opacity: 0.3),
