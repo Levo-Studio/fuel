@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="display:flex;gap:24px;align-items:flex-start">
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="width:390px;height:844px;border-radius:46px;overflow:hidden;position:relative;background:var(--bg);box-shadow:0 22px 50px rgba(18,18,18,.18)">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 30px 0;font:600 13px 'Plus Jakarta Sans',sans-serif;color:var(--ink)"><span>9:41</span><span style="opacity:.5">84%</span></div>
+<div style="padding:88px 28px 0">
+<div style="font:400 11.5px 'DM Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Schritt 1 von 2</div>
+<div style="font:600 34px/1.14 'Plus Jakarta Sans',sans-serif;letter-spacing:-.03em;color:var(--ink);margin-top:16px">Dein Modell,<br>dein Key.</div>
+<div style="font:400 13.5px/1.6 'Plus Jakarta Sans',sans-serif;color:var(--muted);margin-top:12px">Die Schätzung läuft über deinen eigenen Zugang. Der Key bleibt auf dem Gerät.</div>
+</div>
+<div style="padding:38px 28px 0">
+<div style="display:flex;gap:8px">
+<div style="flex:1;text-align:center;border-radius:100px;padding:12px;font:600 13px 'Plus Jakarta Sans',sans-serif;border:1px solid var(--accent);background:var(--accent);color:var(--accentOn)">Claude</div>
+<div style="flex:1;text-align:center;border-radius:100px;padding:12px;font:600 13px 'Plus Jakarta Sans',sans-serif;border:1px solid var(--hair);color:var(--ink)">Mistral</div>
+</div>
+<div style="margin-top:30px">
+<div style="font:600 11.5px 'Plus Jakarta Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">API-Key</div>
+<div style="padding:14px 0 12px;font:400 17px 'DM Mono',monospace;color:var(--ink)">sk-ant-a1b2c3d4e5</div>
+<div style="height:1px;background:var(--hair)"></div>
+<div style="font:400 11.5px 'DM Mono',monospace;color:var(--muted);margin-top:12px">Modell: Claude Sonnet 5</div>
+</div>
+</div>
+<div style="position:absolute;left:28px;right:28px;bottom:34px">
+<div style="text-align:center;font:400 12px 'Plus Jakarta Sans',sans-serif;color:var(--muted);margin-bottom:14px">Später in den Einstellungen änderbar.</div>
+<div style="border-radius:100px;text-align:center;padding:18px;font:600 15px 'Plus Jakarta Sans',sans-serif;background:var(--accent);color:var(--accentOn)">Weiter</div>
+</div>
+</div>
+<div style="font:400 10.5px 'DM Mono',monospace;color:var(--capInk);letter-spacing:.04em">01 · API-Key · Modell und Key</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="width:390px;height:844px;border-radius:46px;overflow:hidden;position:relative;background:var(--bg);box-shadow:0 22px 50px rgba(18,18,18,.18)">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 30px 0;font:600 13px 'Plus Jakarta Sans',sans-serif;color:var(--ink)"><span>9:41</span><span style="opacity:.5">84%</span></div>
+<div style="padding:96px 28px 0">
+<div style="font:400 11.5px 'DM Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Claude Sonnet 5</div>
+<div style="font:600 30px/1.16 'Plus Jakarta Sans',sans-serif;letter-spacing:-.03em;color:var(--ink);margin-top:14px">Verbindung wird<br>geprüft.</div>
+</div>
+<div style="padding:44px 28px 0;display:flex;flex-direction:column">
+<div style="display:flex;align-items:center;gap:14px;padding:15px 0;border-bottom:1px solid var(--hairSoft)"><svg width="20" height="20" viewBox="0 0 20 20" style="display:block;flex:none;color:var(--ink)"><path d="M4 10.5l4 4L16 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font:500 15px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Verbindung aufbauen</span></div>
+<div style="display:flex;align-items:center;gap:14px;padding:15px 0;border-bottom:1px solid var(--hairSoft)"><div style="width:20px;height:20px;flex:none;border-radius:50%;border:2px solid var(--soft);border-top-color:var(--ink);transform:rotate(120deg)"></div><span style="font:500 15px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Testdaten senden</span></div>
+<div style="display:flex;align-items:center;gap:14px;padding:15px 0;border-bottom:1px solid var(--hairSoft)"><div style="width:20px;height:20px;flex:none;display:flex;align-items:center;justify-content:center"><div style="width:6px;height:6px;border-radius:50%;background:var(--soft)"></div></div><span style="font:400 15px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">Antwort erhalten</span></div>
+<div style="display:flex;align-items:center;gap:14px;padding:15px 0;border-bottom:1px solid var(--hairSoft)"><div style="width:20px;height:20px;flex:none;display:flex;align-items:center;justify-content:center"><div style="width:6px;height:6px;border-radius:50%;background:var(--soft)"></div></div><span style="font:400 15px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">Modell bereit</span></div>
+</div>
+<div style="position:absolute;left:28px;right:28px;bottom:34px">
+<div style="border-radius:100px;text-align:center;padding:17px;font:600 15px 'Plus Jakarta Sans',sans-serif;border:1px solid var(--hair);color:var(--ink)">Abbrechen</div>
+</div>
+</div>
+<div style="font:400 10.5px 'DM Mono',monospace;color:var(--capInk);letter-spacing:.04em">02 · Key-Test läuft automatisch</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="width:390px;height:844px;border-radius:46px;overflow:hidden;position:relative;background:var(--bg);box-shadow:0 22px 50px rgba(18,18,18,.18)">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 30px 0;font:600 13px 'Plus Jakarta Sans',sans-serif;color:var(--ink)"><span>9:41</span><span style="opacity:.5">84%</span></div>
+<div style="padding:96px 28px 0">
+<div style="font:400 11.5px 'DM Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Claude Sonnet 5</div>
+<div style="font:600 30px/1.16 'Plus Jakarta Sans',sans-serif;letter-spacing:-.03em;color:var(--ink);margin-top:14px">Alles bereit.</div>
+</div>
+<div style="padding:44px 28px 0;display:flex;flex-direction:column">
+<div style="display:flex;align-items:center;gap:14px;padding:15px 0;border-bottom:1px solid var(--hairSoft)"><svg width="20" height="20" viewBox="0 0 20 20" style="display:block;flex:none;color:var(--ink)"><path d="M4 10.5l4 4L16 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font:500 15px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Verbindung aufbauen</span></div>
+<div style="display:flex;align-items:center;gap:14px;padding:15px 0;border-bottom:1px solid var(--hairSoft)"><svg width="20" height="20" viewBox="0 0 20 20" style="display:block;flex:none;color:var(--ink)"><path d="M4 10.5l4 4L16 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font:500 15px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Testdaten senden</span></div>
+<div style="display:flex;align-items:center;gap:14px;padding:15px 0;border-bottom:1px solid var(--hairSoft)"><svg width="20" height="20" viewBox="0 0 20 20" style="display:block;flex:none;color:var(--ink)"><path d="M4 10.5l4 4L16 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font:500 15px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Antwort erhalten</span></div>
+<div style="display:flex;align-items:center;gap:14px;padding:15px 0;border-bottom:1px solid var(--hairSoft)"><svg width="20" height="20" viewBox="0 0 20 20" style="display:block;flex:none;color:var(--ink)"><path d="M4 10.5l4 4L16 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font:500 15px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Modell bereit</span></div>
+</div>
+<div style="position:absolute;left:28px;right:28px;bottom:34px">
+<div style="border-radius:100px;text-align:center;padding:18px;font:600 15px 'Plus Jakarta Sans',sans-serif;background:var(--accent);color:var(--accentOn)">Weiter</div>
+</div>
+</div>
+<div style="font:400 10.5px 'DM Mono',monospace;color:var(--capInk);letter-spacing:.04em">03 · Key-Test bestanden</div>
+</div>
+
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="width:390px;height:844px;border-radius:46px;overflow:hidden;position:relative;background:var(--bg);box-shadow:0 22px 50px rgba(18,18,18,.18)">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 30px 0;font:600 13px 'Plus Jakarta Sans',sans-serif;color:var(--ink)"><span>9:41</span><span style="opacity:.5">84%</span></div>
+<div style="padding:88px 28px 0">
+<div style="font:400 11.5px 'DM Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Schritt 2 von 2</div>
+<div style="font:600 34px/1.14 'Plus Jakarta Sans',sans-serif;letter-spacing:-.03em;color:var(--ink);margin-top:16px">Mit Ziel oder<br>ohne.</div>
+</div>
+<div style="padding:44px 28px 0">
+<div style="padding-bottom:24px;border-bottom:1px solid var(--hair)">
+<div style="display:flex;justify-content:space-between;align-items:center"><span style="font:600 17px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Kalorienziel festlegen</span><div style="width:18px;height:18px;border-radius:50%;background:var(--accent)"></div></div>
+<div style="display:flex;align-items:baseline;gap:8px;margin-top:20px"><span style="font:400 50px 'DM Mono',monospace;letter-spacing:-.055em;color:var(--ink)">2400</span><span style="font:400 12px 'DM Mono',monospace;color:var(--muted)">kcal</span></div>
+<div style="display:flex;gap:10px;margin-top:22px">
+<div style="flex:1;border:1px solid var(--hair);border-radius:16px;padding:12px 13px"><div style="font:500 10.5px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">Protein</div><div style="font:400 21px 'DM Mono',monospace;color:var(--ink);margin-top:4px">160</div></div>
+<div style="flex:1;border:1px solid var(--hair);border-radius:16px;padding:12px 13px"><div style="font:500 10.5px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">Carbs</div><div style="font:400 21px 'DM Mono',monospace;color:var(--ink);margin-top:4px">240</div></div>
+<div style="flex:1;border:1px solid var(--hair);border-radius:16px;padding:12px 13px"><div style="font:500 10.5px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">Fett</div><div style="font:400 21px 'DM Mono',monospace;color:var(--ink);margin-top:4px">70</div></div>
+</div>
+</div>
+<div style="padding:22px 0;display:flex;justify-content:space-between;align-items:center">
+<div><div style="font:600 17px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Einfach nur zählen</div><div style="font:400 13px 'Plus Jakarta Sans',sans-serif;color:var(--muted);margin-top:3px">Nur die Summe des Tages</div></div>
+<div style="width:18px;height:18px;border-radius:50%;border:1.5px solid var(--hair2)"></div>
+</div>
+</div>
+<div style="position:absolute;left:28px;right:28px;bottom:34px">
+<div style="text-align:center;font:400 12px 'Plus Jakarta Sans',sans-serif;color:var(--muted);margin-bottom:14px">Lokal. Kein Account.</div>
+<div style="background:var(--accent);color:var(--accentOn);border-radius:100px;text-align:center;padding:18px;font:600 15px 'Plus Jakarta Sans',sans-serif">Weiter</div>
+</div>
+</div>
+<div style="font:400 10.5px 'DM Mono',monospace;color:var(--capInk);letter-spacing:.04em">04 · Onboarding · Ziel oder nur zählen</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="width:390px;height:844px;border-radius:46px;overflow:hidden;position:relative;background:var(--bg);box-shadow:0 22px 50px rgba(18,18,18,.18)">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 30px 0;font:600 13px 'Plus Jakarta Sans',sans-serif;color:var(--ink)"><span>9:41</span><span style="opacity:.5">84%</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:26px 28px 0">
+<div><div style="font:400 11.5px 'DM Mono',monospace;color:var(--muted)">Mi, 2. September</div><div style="font:600 25px 'Plus Jakarta Sans',sans-serif;letter-spacing:-.025em;color:var(--ink)">Heute</div></div>
+<div style="width:34px;height:34px;border-radius:50%;border:1px solid var(--hair);display:flex;align-items:center;justify-content:center;font:400 14px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">⚙</div>
+</div>
+<div style="padding:34px 28px 0">
+<div style="display:flex;align-items:flex-end;gap:10px"><span style="font:400 74px/0.9 'DM Mono',monospace;letter-spacing:-.06em;color:var(--ink)">1640</span><span style="font:400 13px 'DM Mono',monospace;color:var(--muted);padding-bottom:8px">/ 2400 kcal</span></div>
+<div style="display:flex;align-items:center;gap:16px;margin-top:24px">
+<div style="position:relative;width:104px;height:104px;flex:none">
+<svg viewBox="0 0 120 120" style="width:104px;height:104px;transform:rotate(-90deg)"><circle cx="60" cy="60" r="54" fill="none" stroke="var(--soft)" stroke-width="7"></circle><circle cx="60" cy="60" r="54" fill="none" stroke="var(--accent)" stroke-width="7" stroke-linecap="round" stroke-dasharray="339.3" stroke-dashoffset="107"></circle></svg>
+<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:400 17px 'DM Mono',monospace;color:var(--ink)">68%</div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:13px">
+<div style="display:flex;align-items:center;gap:10px"><span style="width:52px;font:500 11px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">Protein</span><div style="flex:1;height:4px;background:var(--soft)"><div style="height:100%;width:74%;background:var(--accent)"></div></div><span style="font:400 11.5px 'DM Mono',monospace;color:var(--ink)">118/160</span></div>
+<div style="display:flex;align-items:center;gap:10px"><span style="width:52px;font:500 11px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">Carbs</span><div style="flex:1;height:4px;background:var(--soft)"><div style="height:100%;width:72%;background:var(--accent)"></div></div><span style="font:400 11.5px 'DM Mono',monospace;color:var(--ink)">172/240</span></div>
+<div style="display:flex;align-items:center;gap:10px"><span style="width:52px;font:500 11px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">Fett</span><div style="flex:1;height:4px;background:var(--soft)"><div style="height:100%;width:69%;background:var(--accent)"></div></div><span style="font:400 11.5px 'DM Mono',monospace;color:var(--ink)">48/70</span></div>
+</div>
+</div>
+</div>
+<div style="padding:32px 28px 0">
+<div style="margin-bottom:20px">
+<div style="display:flex;justify-content:space-between;align-items:baseline;padding-bottom:10px;border-bottom:1px solid var(--hair)"><span style="font:600 11.5px 'Plus Jakarta Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Frühstück</span><span style="font:400 11.5px 'DM Mono',monospace;color:var(--muted)">420 kcal</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--hairSoft)"><div><div style="font:500 14.5px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Haferflocken mit Skyr</div><div style="font:400 11px 'DM Mono',monospace;color:var(--muted);margin-top:3px">08:14 · Foto</div></div><span style="font:400 15px 'DM Mono',monospace;color:var(--ink)">420</span></div>
+</div>
+<div style="margin-bottom:20px">
+<div style="display:flex;justify-content:space-between;align-items:baseline;padding-bottom:10px;border-bottom:1px solid var(--hair)"><span style="font:600 11.5px 'Plus Jakarta Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Mittagessen</span><span style="font:400 11.5px 'DM Mono',monospace;color:var(--muted)">680 kcal</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--hairSoft)"><div><div style="font:500 14.5px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Hühnchen-Bowl, Reis</div><div style="font:400 11px 'DM Mono',monospace;color:var(--muted);margin-top:3px">12:40 · Text</div></div><span style="font:400 15px 'DM Mono',monospace;color:var(--ink)">680</span></div>
+</div>
+<div>
+<div style="display:flex;justify-content:space-between;align-items:baseline;padding-bottom:10px;border-bottom:1px solid var(--hair)"><span style="font:600 11.5px 'Plus Jakarta Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Snack</span><span style="font:400 11.5px 'DM Mono',monospace;color:var(--muted)">110 kcal</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--hairSoft)"><div><div style="font:500 14.5px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Espresso, Banane</div><div style="font:400 11px 'DM Mono',monospace;color:var(--muted);margin-top:3px">15:05 · Recent</div></div><span style="font:400 15px 'DM Mono',monospace;color:var(--ink)">110</span></div>
+</div>
+</div>
+<div style="position:absolute;right:26px;bottom:32px;width:58px;height:58px;border-radius:50%;background:var(--accent);color:var(--accentOn);display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 20 20" style="display:block"><path d="M10 3v14M3 10h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></div>
+</div>
+<div style="font:400 10.5px 'DM Mono',monospace;color:var(--capInk);letter-spacing:.04em">05 · Today · Ziel-Modus, Auto-Labels</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="width:390px;height:844px;border-radius:46px;overflow:hidden;position:relative;background:var(--bg);box-shadow:0 22px 50px rgba(18,18,18,.18)">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 30px 0;font:600 13px 'Plus Jakarta Sans',sans-serif;color:var(--ink)"><span>9:41</span><span style="opacity:.5">84%</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:26px 28px 0">
+<div><div style="font:400 11.5px 'DM Mono',monospace;color:var(--muted)">Mi, 2. September</div><div style="font:600 25px 'Plus Jakarta Sans',sans-serif;letter-spacing:-.025em;color:var(--ink)">Heute</div></div>
+<div style="width:34px;height:34px;border-radius:50%;border:1px solid var(--hair);display:flex;align-items:center;justify-content:center;font:400 14px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">⚙</div>
+</div>
+<div style="padding:34px 28px 0">
+<div style="display:flex;align-items:flex-end;gap:10px"><span style="font:400 74px/0.9 'DM Mono',monospace;letter-spacing:-.06em;color:var(--ink)">1640</span><span style="font:400 13px 'DM Mono',monospace;color:var(--muted);padding-bottom:8px">kcal geloggt</span></div>
+<div style="display:flex;gap:26px;margin-top:26px">
+<div><div style="font:500 11px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">Protein</div><div style="font:400 22px 'DM Mono',monospace;color:var(--ink);margin-top:2px">118 g</div></div>
+<div><div style="font:500 11px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">Carbs</div><div style="font:400 22px 'DM Mono',monospace;color:var(--ink);margin-top:2px">172 g</div></div>
+<div><div style="font:500 11px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">Fett</div><div style="font:400 22px 'DM Mono',monospace;color:var(--ink);margin-top:2px">48 g</div></div>
+</div>
+</div>
+<div style="padding:34px 28px 0">
+<div style="margin-bottom:20px">
+<div style="display:flex;justify-content:space-between;align-items:baseline;padding-bottom:10px;border-bottom:1px solid var(--hair)"><span style="font:600 11.5px 'Plus Jakarta Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Frühstück</span><span style="font:400 11.5px 'DM Mono',monospace;color:var(--muted)">420 kcal</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--hairSoft)"><div><div style="font:500 14.5px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Haferflocken mit Skyr</div><div style="font:400 11px 'DM Mono',monospace;color:var(--muted);margin-top:3px">08:14 · Foto</div></div><span style="font:400 15px 'DM Mono',monospace;color:var(--ink)">420</span></div>
+</div>
+<div style="margin-bottom:20px">
+<div style="display:flex;justify-content:space-between;align-items:baseline;padding-bottom:10px;border-bottom:1px solid var(--hair)"><span style="font:600 11.5px 'Plus Jakarta Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Mittagessen</span><span style="font:400 11.5px 'DM Mono',monospace;color:var(--muted)">680 kcal</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--hairSoft)"><div><div style="font:500 14.5px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Hühnchen-Bowl, Reis</div><div style="font:400 11px 'DM Mono',monospace;color:var(--muted);margin-top:3px">12:40 · Text</div></div><span style="font:400 15px 'DM Mono',monospace;color:var(--ink)">680</span></div>
+</div>
+<div>
+<div style="display:flex;justify-content:space-between;align-items:baseline;padding-bottom:10px;border-bottom:1px solid var(--hair)"><span style="font:600 11.5px 'Plus Jakarta Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Abendessen</span><span style="font:400 11.5px 'DM Mono',monospace;color:var(--muted)">430 kcal</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--hairSoft)"><div><div style="font:500 14.5px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Lachs mit Polenta</div><div style="font:400 11px 'DM Mono',monospace;color:var(--muted);margin-top:3px">19:20 · Foto</div></div><span style="font:400 15px 'DM Mono',monospace;color:var(--ink)">430</span></div>
+</div>
+</div>
+<div style="position:absolute;right:26px;bottom:32px;width:58px;height:58px;border-radius:50%;background:var(--accent);color:var(--accentOn);display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 20 20" style="display:block"><path d="M10 3v14M3 10h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></div>
+</div>
+<div style="font:400 10.5px 'DM Mono',monospace;color:var(--capInk);letter-spacing:.04em">06 · Today · Nur-zählen-Modus, kein Ring</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="width:390px;height:844px;border-radius:46px;overflow:hidden;position:relative;background:var(--cam);display:flex;flex-direction:column;box-shadow:0 22px 50px rgba(18,18,18,.18)">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 30px 0;font:600 13px 'Plus Jakarta Sans',sans-serif;color:#fafafa;flex:none"><span>9:41</span><span style="opacity:.5">84%</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:22px 26px 0;flex:none">
+<div style="font:400 11.5px 'DM Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:rgba(250,250,250,.5)">✕ Abbrechen</div>
+<div style="width:34px;height:34px;border-radius:50%;border:1px solid rgba(250,250,250,.24);display:flex;align-items:center;justify-content:center;font:400 14px 'Plus Jakarta Sans',sans-serif;color:#fafafa">▣</div>
+</div>
+<div style="margin:20px 0 0;flex:1;position:relative;overflow:hidden;background:repeating-linear-gradient(135deg,#17181a 0 10px,#111213 10px 20px)"></div>
+<div style="display:flex;justify-content:center;padding:22px 0 18px;flex:none"><div style="width:70px;height:70px;border-radius:50%;border:1px solid rgba(250,250,250,.4);display:flex;align-items:center;justify-content:center"><div style="width:56px;height:56px;border-radius:50%;background:#fafafa"></div></div></div>
+<div style="flex:none;padding:14px 24px 30px;display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid rgba(250,250,250,.1)">
+<div style="text-align:center;font:600 11.5px 'Plus Jakarta Sans',sans-serif;color:#fafafa">Kamera</div>
+<div style="text-align:center;font:600 11.5px 'Plus Jakarta Sans',sans-serif;color:rgba(250,250,250,.38)">Text</div>
+<div style="text-align:center;font:600 11.5px 'Plus Jakarta Sans',sans-serif;color:rgba(250,250,250,.38)">Recent</div>
+</div>
+</div>
+<div style="font:400 10.5px 'DM Mono',monospace;color:var(--capInk);letter-spacing:.04em">07 · Log · Kamera (Standard)</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="width:390px;height:844px;border-radius:46px;overflow:hidden;position:relative;background:#090a0a;display:flex;flex-direction:column;box-shadow:0 22px 50px rgba(18,18,18,.18)">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 30px 0;font:600 13px 'Plus Jakarta Sans',sans-serif;color:#fafafa;flex:none"><span>9:41</span><span style="opacity:.5">84%</span></div>
+<div style="flex:1;position:relative;overflow:hidden;background:repeating-linear-gradient(135deg,#17181a 0 10px,#111213 10px 20px)">
+<div style="position:absolute;inset:0;background:rgba(9,10,10,.72)"></div>
+<div style="position:absolute;left:0;right:0;top:330px;display:flex;flex-direction:column;align-items:center;gap:20px">
+<div style="width:120px;height:2px;background:rgba(250,250,250,.14)"><div style="width:25%;height:100%;background:#fafafa"></div></div>
+<div style="font:600 18px 'Plus Jakarta Sans',sans-serif;color:#fafafa">Analysiere Mahlzeit …</div>
+</div>
+</div>
+<div style="flex:none;padding:20px 26px 34px;text-align:center;font:400 11px 'DM Mono',monospace;letter-spacing:.1em;color:rgba(250,250,250,.4)">ABBRECHEN</div>
+</div>
+<div style="font:400 10.5px 'DM Mono',monospace;color:var(--capInk);letter-spacing:.04em">08 · Analyse · Zustand 1</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="width:390px;height:844px;border-radius:46px;overflow:hidden;position:relative;background:#090a0a;display:flex;flex-direction:column;box-shadow:0 22px 50px rgba(18,18,18,.18)">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 30px 0;font:600 13px 'Plus Jakarta Sans',sans-serif;color:#fafafa;flex:none"><span>9:41</span><span style="opacity:.5">84%</span></div>
+<div style="flex:1;position:relative;overflow:hidden;background:repeating-linear-gradient(135deg,#17181a 0 10px,#111213 10px 20px)">
+<div style="position:absolute;inset:0;background:rgba(9,10,10,.72)"></div>
+<div style="position:absolute;left:0;right:0;top:330px;display:flex;flex-direction:column;align-items:center;gap:20px">
+<div style="width:120px;height:2px;background:rgba(250,250,250,.14)"><div style="width:50%;height:100%;background:#fafafa"></div></div>
+<div style="font:600 18px 'Plus Jakarta Sans',sans-serif;color:#fafafa">Erkenne Zutaten …</div>
+</div>
+</div>
+<div style="flex:none;padding:20px 26px 34px;text-align:center;font:400 11px 'DM Mono',monospace;letter-spacing:.1em;color:rgba(250,250,250,.4)">ABBRECHEN</div>
+</div>
+<div style="font:400 10.5px 'DM Mono',monospace;color:var(--capInk);letter-spacing:.04em">09 · Analyse · Zustand 2</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="width:390px;height:844px;border-radius:46px;overflow:hidden;position:relative;background:#090a0a;display:flex;flex-direction:column;box-shadow:0 22px 50px rgba(18,18,18,.18)">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 30px 0;font:600 13px 'Plus Jakarta Sans',sans-serif;color:#fafafa;flex:none"><span>9:41</span><span style="opacity:.5">84%</span></div>
+<div style="flex:1;position:relative;overflow:hidden;background:repeating-linear-gradient(135deg,#17181a 0 10px,#111213 10px 20px)">
+<div style="position:absolute;inset:0;background:rgba(9,10,10,.72)"></div>
+<div style="position:absolute;left:0;right:0;top:330px;display:flex;flex-direction:column;align-items:center;gap:20px">
+<div style="width:120px;height:2px;background:rgba(250,250,250,.14)"><div style="width:75%;height:100%;background:#fafafa"></div></div>
+<div style="font:600 18px 'Plus Jakarta Sans',sans-serif;color:#fafafa">Schätze Mengen …</div>
+</div>
+</div>
+<div style="flex:none;padding:20px 26px 34px;text-align:center;font:400 11px 'DM Mono',monospace;letter-spacing:.1em;color:rgba(250,250,250,.4)">ABBRECHEN</div>
+</div>
+<div style="font:400 10.5px 'DM Mono',monospace;color:var(--capInk);letter-spacing:.04em">10 · Analyse · Zustand 3</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="width:390px;height:844px;border-radius:46px;overflow:hidden;position:relative;background:#090a0a;display:flex;flex-direction:column;box-shadow:0 22px 50px rgba(18,18,18,.18)">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 30px 0;font:600 13px 'Plus Jakarta Sans',sans-serif;color:#fafafa;flex:none"><span>9:41</span><span style="opacity:.5">84%</span></div>
+<div style="flex:1;position:relative;overflow:hidden;background:repeating-linear-gradient(135deg,#17181a 0 10px,#111213 10px 20px)">
+<div style="position:absolute;inset:0;background:rgba(9,10,10,.72)"></div>
+<div style="position:absolute;left:0;right:0;top:330px;display:flex;flex-direction:column;align-items:center;gap:20px">
+<div style="width:120px;height:2px;background:rgba(250,250,250,.14)"><div style="width:100%;height:100%;background:#fafafa"></div></div>
+<div style="font:600 18px 'Plus Jakarta Sans',sans-serif;color:#fafafa">Berechne Nährwerte …</div>
+</div>
+</div>
+<div style="flex:none;padding:20px 26px 34px;text-align:center;font:400 11px 'DM Mono',monospace;letter-spacing:.1em;color:rgba(250,250,250,.4)">ABBRECHEN</div>
+</div>
+<div style="font:400 10.5px 'DM Mono',monospace;color:var(--capInk);letter-spacing:.04em">11 · Analyse · Zustand 4</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="width:390px;height:844px;border-radius:46px;overflow:hidden;position:relative;background:var(--cam);display:flex;flex-direction:column;box-shadow:0 22px 50px rgba(18,18,18,.18)">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 30px 0;font:600 13px 'Plus Jakarta Sans',sans-serif;color:#fafafa;flex:none"><span>9:41</span><span style="opacity:.5">84%</span></div>
+<div style="padding:22px 26px 0;flex:none;font:400 11.5px 'DM Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:rgba(250,250,250,.5)">✕ Abbrechen</div>
+<div style="flex:1;display:flex;flex-direction:column;padding:34px 26px 0">
+<div style="font:600 22px 'Plus Jakarta Sans',sans-serif;letter-spacing:-.02em;color:#fafafa">Beschreib die Mahlzeit</div>
+<div style="font:400 12.5px/1.55 'Plus Jakarta Sans',sans-serif;color:rgba(250,250,250,.45);margin-top:8px">Je genauer die Mengen, desto genauer die Schätzung.</div>
+<div style="margin-top:24px;font:400 19px/1.5 'Plus Jakarta Sans',sans-serif;color:#fafafa">2 Eier mit 200g Hüttenkäse und Polenta</div>
+<div style="margin-top:auto;padding-bottom:18px">
+<div style="background:#fafafa;color:#111213;border-radius:100px;text-align:center;padding:17px;font:600 15px 'Plus Jakarta Sans',sans-serif">Analysieren</div>
+</div>
+</div>
+<div style="flex:none;padding:14px 24px 30px;display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid rgba(250,250,250,.1)">
+<div style="text-align:center;font:600 11.5px 'Plus Jakarta Sans',sans-serif;color:rgba(250,250,250,.38)">Kamera</div>
+<div style="text-align:center;font:600 11.5px 'Plus Jakarta Sans',sans-serif;color:#fafafa">Text</div>
+<div style="text-align:center;font:600 11.5px 'Plus Jakarta Sans',sans-serif;color:rgba(250,250,250,.38)">Recent</div>
+</div>
+</div>
+<div style="font:400 10.5px 'DM Mono',monospace;color:var(--capInk);letter-spacing:.04em">12 · Log · Text-Eingabe</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="width:390px;height:844px;border-radius:46px;overflow:hidden;position:relative;background:var(--cam);display:flex;flex-direction:column;box-shadow:0 22px 50px rgba(18,18,18,.18)">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 30px 0;font:600 13px 'Plus Jakarta Sans',sans-serif;color:#fafafa;flex:none"><span>9:41</span><span style="opacity:.5">84%</span></div>
+<div style="padding:22px 26px 0;flex:none;font:400 11.5px 'DM Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:rgba(250,250,250,.5)">✕ Abbrechen</div>
+<div style="flex:1;padding:34px 26px 0">
+<div style="font:600 22px 'Plus Jakarta Sans',sans-serif;letter-spacing:-.02em;color:#fafafa">Zuletzt gegessen</div>
+<div style="font:400 12.5px 'Plus Jakarta Sans',sans-serif;color:rgba(250,250,250,.45);margin-top:8px">Tippen loggt direkt — Label wird aus der Uhrzeit gesetzt.</div>
+<div style="margin-top:24px">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:16px 0;border-bottom:1px solid rgba(250,250,250,.1)"><div><div style="font:500 15px 'Plus Jakarta Sans',sans-serif;color:#fafafa">Haferflocken mit Skyr</div><div style="font:400 11px 'DM Mono',monospace;color:rgba(250,250,250,.4);margin-top:3px">P 32 · C 48 · F 9</div></div><div style="display:flex;align-items:center;gap:14px"><span style="font:400 15px 'DM Mono',monospace;color:#fafafa">420</span><span style="font:300 22px 'Plus Jakarta Sans',sans-serif;color:rgba(250,250,250,.5)">+</span></div></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:16px 0;border-bottom:1px solid rgba(250,250,250,.1)"><div><div style="font:500 15px 'Plus Jakarta Sans',sans-serif;color:#fafafa">Hühnchen-Bowl, Reis</div><div style="font:400 11px 'DM Mono',monospace;color:rgba(250,250,250,.4);margin-top:3px">P 52 · C 74 · F 16</div></div><div style="display:flex;align-items:center;gap:14px"><span style="font:400 15px 'DM Mono',monospace;color:#fafafa">680</span><span style="font:300 22px 'Plus Jakarta Sans',sans-serif;color:rgba(250,250,250,.5)">+</span></div></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:16px 0;border-bottom:1px solid rgba(250,250,250,.1)"><div><div style="font:500 15px 'Plus Jakarta Sans',sans-serif;color:#fafafa">Lachs mit Polenta</div><div style="font:400 11px 'DM Mono',monospace;color:rgba(250,250,250,.4);margin-top:3px">P 32 · C 26 · F 22</div></div><div style="display:flex;align-items:center;gap:14px"><span style="font:400 15px 'DM Mono',monospace;color:#fafafa">430</span><span style="font:300 22px 'Plus Jakarta Sans',sans-serif;color:rgba(250,250,250,.5)">+</span></div></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:16px 0;border-bottom:1px solid rgba(250,250,250,.1)"><div><div style="font:500 15px 'Plus Jakarta Sans',sans-serif;color:#fafafa">Protein-Shake, Banane</div><div style="font:400 11px 'DM Mono',monospace;color:rgba(250,250,250,.4);margin-top:3px">P 30 · C 32 · F 3</div></div><div style="display:flex;align-items:center;gap:14px"><span style="font:400 15px 'DM Mono',monospace;color:#fafafa">280</span><span style="font:300 22px 'Plus Jakarta Sans',sans-serif;color:rgba(250,250,250,.5)">+</span></div></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:16px 0;border-bottom:1px solid rgba(250,250,250,.1)"><div><div style="font:500 15px 'Plus Jakarta Sans',sans-serif;color:#fafafa">Vollkornbrot, Avocado</div><div style="font:400 11px 'DM Mono',monospace;color:rgba(250,250,250,.4);margin-top:3px">P 11 · C 34 · F 18</div></div><div style="display:flex;align-items:center;gap:14px"><span style="font:400 15px 'DM Mono',monospace;color:#fafafa">340</span><span style="font:300 22px 'Plus Jakarta Sans',sans-serif;color:rgba(250,250,250,.5)">+</span></div></div>
+</div>
+</div>
+<div style="flex:none;padding:14px 24px 30px;display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid rgba(250,250,250,.1)">
+<div style="text-align:center;font:600 11.5px 'Plus Jakarta Sans',sans-serif;color:rgba(250,250,250,.38)">Kamera</div>
+<div style="text-align:center;font:600 11.5px 'Plus Jakarta Sans',sans-serif;color:rgba(250,250,250,.38)">Text</div>
+<div style="text-align:center;font:600 11.5px 'Plus Jakarta Sans',sans-serif;color:#fafafa">Recent</div>
+</div>
+</div>
+<div style="font:400 10.5px 'DM Mono',monospace;color:var(--capInk);letter-spacing:.04em">13 · Log · Recent Meals</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="width:390px;height:844px;border-radius:46px;overflow:hidden;position:relative;background:var(--bg);box-shadow:0 22px 50px rgba(18,18,18,.18)">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 30px 0;font:600 13px 'Plus Jakarta Sans',sans-serif;color:var(--ink)"><span>9:41</span><span style="opacity:.5">84%</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:22px 26px 0">
+<div style="font:400 11.5px 'DM Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">‹ Zurück</div>
+<div style="font:400 11.5px 'DM Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Foto-Eintrag</div>
+</div>
+<div style="padding:26px 28px 0">
+<div style="height:150px;border-radius:22px;position:relative;background:repeating-linear-gradient(135deg,var(--soft) 0 10px,transparent 10px 20px);border:1px solid var(--hair)">
+<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:400 10.5px 'DM Mono',monospace;letter-spacing:.1em;color:var(--muted)">AUFGENOMMENES FOTO</div>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;margin-top:24px">
+<div style="display:flex;align-items:center;gap:7px;border:1px solid var(--hair);border-radius:100px;padding:8px 14px"><span style="font:600 11.5px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Abendessen</span><svg width="9" height="6" viewBox="0 0 9 6" style="display:block;color:var(--ink)"><path d="M1 1l3.5 3.5L8 1" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+<div style="border:1px solid var(--hair);border-radius:100px;padding:8px 13px;font:600 11.5px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">☆ Favorit</div>
+</div>
+<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:22px">
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font:400 58px/0.9 'DM Mono',monospace;letter-spacing:-.06em;color:var(--ink)">460</span><span style="font:400 12px 'DM Mono',monospace;color:var(--muted)">kcal</span></div>
+<div style="display:flex;gap:8px">
+<div style="width:34px;height:34px;border-radius:50%;border:1px solid var(--hair);display:flex;align-items:center;justify-content:center;font:400 17px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">−</div>
+<div style="width:34px;height:34px;border-radius:50%;border:1px solid var(--hair);display:flex;align-items:center;justify-content:center;font:400 17px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">+</div>
+</div>
+</div>
+<div style="display:flex;gap:24px;margin-top:20px;padding-bottom:20px;border-bottom:1px solid var(--hair)">
+<div><div style="font:500 10.5px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">Protein</div><div style="font:400 20px 'DM Mono',monospace;color:var(--ink)">34 g</div></div>
+<div><div style="font:500 10.5px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">Carbs</div><div style="font:400 20px 'DM Mono',monospace;color:var(--ink)">28 g</div></div>
+<div><div style="font:500 10.5px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">Fett</div><div style="font:400 20px 'DM Mono',monospace;color:var(--ink)">23 g</div></div>
+</div>
+<div style="padding-top:18px">
+<div style="font:600 11.5px 'Plus Jakarta Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Erkannt</div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--hairSoft)"><div><div style="font:500 14px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Lachsfilet, gebraten</div><div style="font:400 10.5px 'DM Mono',monospace;color:var(--muted);margin-top:2px">sicher · ca. 150 g</div></div><span style="font:400 14px 'DM Mono',monospace;color:var(--ink)">240</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--hairSoft)"><div><div style="font:500 14px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Polenta</div><div style="font:400 10.5px 'DM Mono',monospace;color:var(--muted);margin-top:2px">sicher · ca. 180 g</div></div><span style="font:400 14px 'DM Mono',monospace;color:var(--ink)">150</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--hairSoft)"><div><div style="font:500 14px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Blattspinat</div><div style="font:400 10.5px 'DM Mono',monospace;color:var(--muted);margin-top:2px">unsicher · ca. 90 g</div></div><span style="font:400 14px 'DM Mono',monospace;color:var(--ink)">70</span></div>
+</div>
+</div>
+<div style="position:absolute;left:28px;right:28px;bottom:34px;display:flex;gap:10px">
+<div style="flex:none;border:1px solid var(--hair);border-radius:100px;padding:17px 20px;font:600 14px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Neu</div>
+<div style="flex:1;background:var(--accent);color:var(--accentOn);border-radius:100px;text-align:center;padding:17px;font:600 15px 'Plus Jakarta Sans',sans-serif">Hinzufügen</div>
+</div>
+</div>
+<div style="font:400 10.5px 'DM Mono',monospace;color:var(--capInk);letter-spacing:.04em">14 · Ergebnis nach Foto-Scan</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="width:390px;height:844px;border-radius:46px;overflow:hidden;position:relative;background:var(--bg);box-shadow:0 22px 50px rgba(18,18,18,.18)">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 30px 0;font:600 13px 'Plus Jakarta Sans',sans-serif;color:var(--ink)"><span>9:41</span><span style="opacity:.5">84%</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:22px 26px 0">
+<div style="font:400 11.5px 'DM Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">‹ Zurück</div>
+<div style="font:400 11.5px 'DM Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Text-Eintrag</div>
+</div>
+<div style="padding:26px 28px 0">
+<div style="border-left:2px solid var(--accent);padding:2px 0 2px 14px;font:400 15px/1.5 'Plus Jakarta Sans',sans-serif;color:var(--ink)">2 Eier mit 200g Hüttenkäse und Polenta</div>
+<div style="display:flex;align-items:center;justify-content:space-between;margin-top:24px">
+<div style="display:flex;align-items:center;gap:7px;border:1px solid var(--hair);border-radius:100px;padding:8px 14px"><span style="font:600 11.5px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Frühstück</span><svg width="9" height="6" viewBox="0 0 9 6" style="display:block;color:var(--ink)"><path d="M1 1l3.5 3.5L8 1" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+<div style="border:1px solid var(--accent);background:var(--accent);border-radius:100px;padding:8px 13px;font:600 11.5px 'Plus Jakarta Sans',sans-serif;color:var(--accentOn)">★ Favorit</div>
+</div>
+<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:22px">
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font:400 58px/0.9 'DM Mono',monospace;letter-spacing:-.06em;color:var(--ink)">628</span><span style="font:400 12px 'DM Mono',monospace;color:var(--muted)">kcal</span></div>
+<div style="display:flex;gap:8px">
+<div style="width:34px;height:34px;border-radius:50%;border:1px solid var(--hair);display:flex;align-items:center;justify-content:center;font:400 17px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">−</div>
+<div style="width:34px;height:34px;border-radius:50%;border:1px solid var(--hair);display:flex;align-items:center;justify-content:center;font:400 17px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">+</div>
+</div>
+</div>
+<div style="display:flex;gap:24px;margin-top:20px;padding-bottom:20px;border-bottom:1px solid var(--hair)">
+<div><div style="font:500 10.5px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">Protein</div><div style="font:400 20px 'DM Mono',monospace;color:var(--ink)">47 g</div></div>
+<div><div style="font:500 10.5px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">Carbs</div><div style="font:400 20px 'DM Mono',monospace;color:var(--ink)">63 g</div></div>
+<div><div style="font:500 10.5px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">Fett</div><div style="font:400 20px 'DM Mono',monospace;color:var(--ink)">25 g</div></div>
+</div>
+<div style="padding-top:18px">
+<div style="font:600 11.5px 'Plus Jakarta Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Aufgeschlüsselt</div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--hairSoft)"><div><div style="font:500 14px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">2 Eier</div><div style="font:400 10.5px 'DM Mono',monospace;color:var(--muted);margin-top:2px">Menge erkannt</div></div><span style="font:400 14px 'DM Mono',monospace;color:var(--ink)">158</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--hairSoft)"><div><div style="font:500 14px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">200g Hüttenkäse</div><div style="font:400 10.5px 'DM Mono',monospace;color:var(--muted);margin-top:2px">Menge erkannt</div></div><span style="font:400 14px 'DM Mono',monospace;color:var(--ink)">320</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--hairSoft)"><div><div style="font:500 14px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Polenta</div><div style="font:400 10.5px 'DM Mono',monospace;color:var(--muted);margin-top:2px">Menge geschätzt</div></div><span style="font:400 14px 'DM Mono',monospace;color:var(--ink)">150</span></div>
+</div>
+</div>
+<div style="position:absolute;left:28px;right:28px;bottom:34px;display:flex;gap:10px">
+<div style="flex:none;border:1px solid var(--hair);border-radius:100px;padding:17px 20px;font:600 14px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Neu</div>
+<div style="flex:1;background:var(--accent);color:var(--accentOn);border-radius:100px;text-align:center;padding:17px;font:600 15px 'Plus Jakarta Sans',sans-serif">Hinzufügen</div>
+</div>
+</div>
+<div style="font:400 10.5px 'DM Mono',monospace;color:var(--capInk);letter-spacing:.04em">15 · Ergebnis nach Text-Eingabe</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="width:390px;height:844px;border-radius:46px;overflow:hidden;position:relative;background:var(--bg);box-shadow:0 22px 50px rgba(18,18,18,.18)">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 30px 0;font:600 13px 'Plus Jakarta Sans',sans-serif;color:var(--ink)"><span>9:41</span><span style="opacity:.5">84%</span></div>
+<div style="padding:0 28px">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:26px 0 0"><div style="font:600 25px 'Plus Jakarta Sans',sans-serif;letter-spacing:-.025em;color:var(--ink)">Einstellungen</div><div style="font:400 11.5px 'DM Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Fertig</div></div>
+<div style="margin-top:22px">
+<div style="font:600 11.5px 'Plus Jakarta Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-bottom:12px;border-bottom:1px solid var(--hair)">KI-Modell</div>
+<div style="display:flex;gap:8px;margin-top:14px">
+<div style="flex:1;text-align:center;border-radius:100px;padding:11px;font:600 13px 'Plus Jakarta Sans',sans-serif;border:1px solid var(--accent);background:var(--accent);color:var(--accentOn)">Claude</div>
+<div style="flex:1;text-align:center;border-radius:100px;padding:11px;font:600 13px 'Plus Jakarta Sans',sans-serif;border:1px solid var(--hair);color:var(--ink)">Mistral</div>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0 10px;border-bottom:1px solid var(--hairSoft)"><span style="font:500 14px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">API-Key</span><span style="font:400 14px 'DM Mono',monospace;color:var(--ink)">sk-ant-a1b2…</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0"><span style="font:400 11.5px 'DM Mono',monospace;color:var(--muted)">✓ Verbindung steht</span><span style="font:600 12px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Neu prüfen</span></div>
+</div>
+
+<div style="margin-top:20px">
+<div style="font:600 11.5px 'Plus Jakarta Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-bottom:12px;border-bottom:1px solid var(--hair)">Darstellung</div>
+<div style="display:flex;gap:8px;margin-top:16px">
+<div style="flex:1;text-align:center;border-radius:100px;padding:12px;font:600 13px 'Plus Jakarta Sans',sans-serif;border:1px solid var(--hair);color:var(--ink)" data-seg="light">Light</div>
+<div style="flex:1;text-align:center;border-radius:100px;padding:12px;font:600 13px 'Plus Jakarta Sans',sans-serif;border:1px solid var(--accent);background:var(--accent);color:var(--accentOn)" data-seg="dark">Dark</div>
+</div>
+</div>
+<div style="margin-top:20px">
+<div style="font:600 11.5px 'Plus Jakarta Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-bottom:12px;border-bottom:1px solid var(--hair)">Akzentfarbe</div>
+<div style="display:flex;gap:14px;margin-top:18px">
+<div style="display:flex;flex-direction:column;align-items:center;gap:7px"><div style="width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1.5px var(--ink)"><div style="width:26px;height:26px;border-radius:50%;background:var(--accent)"></div></div><div style="font:500 10px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">Mono</div></div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:7px"><div style="width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1px var(--hair)"><div style="width:26px;height:26px;border-radius:50%;background:var(--sw1)"></div></div><div style="font:500 10px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">Blau</div></div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:7px"><div style="width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1px var(--hair)"><div style="width:26px;height:26px;border-radius:50%;background:var(--sw2)"></div></div><div style="font:500 10px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">Grün</div></div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:7px"><div style="width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1px var(--hair)"><div style="width:26px;height:26px;border-radius:50%;background:var(--sw3)"></div></div><div style="font:500 10px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">Sand</div></div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:7px"><div style="width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1px var(--hair)"><div style="width:26px;height:26px;border-radius:50%;background:var(--sw4)"></div></div><div style="font:500 10px 'Plus Jakarta Sans',sans-serif;color:var(--muted)">Flieder</div></div>
+</div>
+</div>
+</div>
+</div>
+<div style="font:400 10.5px 'DM Mono',monospace;color:var(--capInk);letter-spacing:.04em">16 · Settings · KI-Modell, Theme, Akzent</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="width:390px;height:844px;border-radius:46px;overflow:hidden;position:relative;background:var(--bg);box-shadow:0 22px 50px rgba(18,18,18,.18)">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 30px 0;font:600 13px 'Plus Jakarta Sans',sans-serif;color:var(--ink)"><span>9:41</span><span style="opacity:.5">84%</span></div>
+<div style="padding:0 28px">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:26px 0 0"><div style="font:600 25px 'Plus Jakarta Sans',sans-serif;letter-spacing:-.025em;color:var(--ink)">Einstellungen</div><div style="font:400 11.5px 'DM Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Fertig</div></div>
+<div style="margin-top:20px">
+<div style="font:600 11.5px 'Plus Jakarta Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-bottom:12px;border-bottom:1px solid var(--hair)">Zählweise</div>
+<div style="display:flex;gap:8px;margin-top:16px">
+<div style="flex:1;text-align:center;border-radius:100px;padding:12px;font:600 13px 'Plus Jakarta Sans',sans-serif;border:1px solid var(--accent);background:var(--accent);color:var(--accentOn)">Mit Ziel</div>
+<div style="flex:1;text-align:center;border-radius:100px;padding:12px;font:600 13px 'Plus Jakarta Sans',sans-serif;border:1px solid var(--hair);color:var(--ink)">Nur zählen</div>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0 10px;border-bottom:1px solid var(--hairSoft)"><span style="font:500 14px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Kalorien</span><span style="font:400 18px 'DM Mono',monospace;color:var(--ink)">2400</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--hairSoft)"><span style="font:500 14px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Protein</span><span style="font:400 18px 'DM Mono',monospace;color:var(--ink)">160</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--hairSoft)"><span style="font:500 14px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Carbs</span><span style="font:400 18px 'DM Mono',monospace;color:var(--ink)">240</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0"><span style="font:500 14px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Fett</span><span style="font:400 18px 'DM Mono',monospace;color:var(--ink)">70</span></div>
+</div>
+<div style="margin-top:20px">
+<div style="font:600 11.5px 'Plus Jakarta Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-bottom:10px;border-bottom:1px solid var(--hair)">Automatische Labels</div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--hairSoft)"><span style="font:500 13.5px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Frühstück</span><span style="font:400 12px 'DM Mono',monospace;color:var(--muted)">04:00 – 10:59</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--hairSoft)"><span style="font:500 13.5px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Mittagessen</span><span style="font:400 12px 'DM Mono',monospace;color:var(--muted)">11:00 – 14:59</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--hairSoft)"><span style="font:500 13.5px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Snack</span><span style="font:400 12px 'DM Mono',monospace;color:var(--muted)">15:00 – 17:59</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 0"><span style="font:500 13.5px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">Abendessen</span><span style="font:400 12px 'DM Mono',monospace;color:var(--muted)">18:00 – 22:59</span></div>
+</div>
+<div style="margin-top:22px;padding-top:16px;border-top:1px solid var(--hair);font:400 11.5px/1.6 'DM Mono',monospace;color:var(--muted)">Alle Daten liegen auf diesem Gerät. Kein Account, keine Sync.</div>
+</div>
+</div>
+<div style="font:400 10.5px 'DM Mono',monospace;color:var(--capInk);letter-spacing:.04em">17 · Settings · Zählweise, Ziele, Labels</div>
+</div>
+
+
+</div>
+</x-dc>
+</body>
+</html>

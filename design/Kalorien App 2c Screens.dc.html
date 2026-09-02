@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#e6e5e3;font-family:'Plus Jakarta Sans',system-ui,sans-serif}a{color:#3a6ed8}a:hover{color:#2a54ab}</style></helmet>
+
+<div style="display:flex;flex-direction:column;gap:0;padding:0 0 40px">
+
+<div style="padding:52px 48px 0;display:flex;justify-content:center">
+<div style="max-width:820px;background:#fff;border:1px solid rgba(18,18,18,.1);border-radius:14px;padding:28px 32px">
+<div style="font:600 10px 'DM Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:rgba(18,18,18,.45)">Anmerkung · Logik, nicht UI</div>
+<div style="font:600 17px 'Plus Jakarta Sans',sans-serif;color:#121212;margin-top:12px">Wie „Snack“ vergeben wird</div>
+<div style="font:400 14px/1.65 'Plus Jakarta Sans',sans-serif;color:rgba(18,18,18,.66);margin-top:10px;text-wrap:pretty">Snack ist nicht an ein festes Zeitfenster gebunden, sondern an die Lücke zwischen den Hauptmahlzeiten: Frühstück, Mittagessen und Abendessen werden je einmal pro Tag vergeben, sobald ein Eintrag in ihr Fenster fällt. Kommt danach ein weiterer Eintrag, bevor das nächste Hauptmahlzeit-Fenster erreicht ist — also Frühstück ist gesetzt, aber es ist noch keine Mittagszeit, oder Mittag ist gesetzt und es ist noch keine Abendzeit —, wird er als Snack gelabelt. Dasselbe gilt für alles nach dem Abendessen. Das Label ist also individuell aus dem Tagesverlauf abgeleitet, nicht aus starren Uhrzeiten. In der UI erscheint diese Regel nirgends; sichtbar ist nur das Ergebnis-Label, das der Nutzer im Ergebnis-Screen überschreiben kann.</div>
+</div>
+</div>
+
+
+<div style="padding:44px 48px 40px;--bg:#111213;--surface:#1a1b1d;--ink:#fafafa;--muted:rgba(250,250,250,.45);--hair:rgba(250,250,250,.14);--hair2:rgba(250,250,250,.3);--hairSoft:rgba(250,250,250,.07);--soft:rgba(250,250,250,.12);--cam:#090a0a;--accent:#fafafa;--accentOn:#111213;--capInk:rgba(18,18,18,.45);--sw1:oklch(0.72 0.13 250);--sw2:oklch(0.76 0.13 160);--sw3:oklch(0.82 0.11 72);--sw4:oklch(0.76 0.12 300)">
+<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:22px"><span style="font:600 10px 'DM Mono',monospace;letter-spacing:.14em;text-transform:uppercase;background:#1a1a1a;color:#fff;padding:4px 8px;border-radius:4px">Dark</span><span style="font:600 13px 'Plus Jakarta Sans',sans-serif;color:#1a1a1a">Alle Screens · Akzent Mono (Default)</span></div>
+<dc-import name="Screens2c" hint-size="3800px,900px"></dc-import>
+</div>
+
+<div style="padding:44px 48px 40px;--bg:#faf9f8;--surface:#ffffff;--ink:#121212;--muted:rgba(18,18,18,.45);--hair:rgba(18,18,18,.12);--hair2:rgba(18,18,18,.25);--hairSoft:rgba(18,18,18,.07);--soft:rgba(18,18,18,.09);--cam:#0d0d0e;--accent:#121212;--accentOn:#faf9f8;--capInk:rgba(18,18,18,.45);--sw1:oklch(0.52 0.15 256);--sw2:oklch(0.52 0.13 160);--sw3:oklch(0.58 0.12 62);--sw4:oklch(0.53 0.15 300)">
+<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:22px"><span style="font:600 10px 'DM Mono',monospace;letter-spacing:.14em;text-transform:uppercase;background:#1a1a1a;color:#fff;padding:4px 8px;border-radius:4px">Light</span><span style="font:600 13px 'Plus Jakarta Sans',sans-serif;color:#1a1a1a">Dieselben Screens · Akzent Mono (Default)</span></div>
+<dc-import name="Screens2c" hint-size="3800px,900px"></dc-import>
+</div>
+
+<div style="padding:44px 48px 40px;--bg:#111213;--surface:#1a1b1d;--ink:#fafafa;--muted:rgba(250,250,250,.45);--hair:rgba(250,250,250,.14);--hair2:rgba(250,250,250,.3);--hairSoft:rgba(250,250,250,.07);--soft:rgba(250,250,250,.12);--cam:#090a0a;--accent:oklch(0.72 0.13 250);--accentOn:#0a1220;--capInk:rgba(18,18,18,.45);--sw1:oklch(0.72 0.13 250);--sw2:oklch(0.76 0.13 160);--sw3:oklch(0.82 0.11 72);--sw4:oklch(0.76 0.12 300)">
+<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:22px"><span style="font:600 10px 'DM Mono',monospace;letter-spacing:.14em;text-transform:uppercase;background:#1a1a1a;color:#fff;padding:4px 8px;border-radius:4px">Dark · Blau</span><span style="font:600 13px 'Plus Jakarta Sans',sans-serif;color:#1a1a1a">Akzentfarbe wirkt auf Ring, Bars, Buttons, Auswahl</span></div>
+<dc-import name="Screens2c" hint-size="3800px,900px"></dc-import>
+</div>
+
+<div style="padding:44px 48px 40px;--bg:#faf9f8;--surface:#ffffff;--ink:#121212;--muted:rgba(18,18,18,.45);--hair:rgba(18,18,18,.12);--hair2:rgba(18,18,18,.25);--hairSoft:rgba(18,18,18,.07);--soft:rgba(18,18,18,.09);--cam:#0d0d0e;--accent:oklch(0.52 0.13 160);--accentOn:#ffffff;--capInk:rgba(18,18,18,.45);--sw1:oklch(0.52 0.15 256);--sw2:oklch(0.52 0.13 160);--sw3:oklch(0.58 0.12 62);--sw4:oklch(0.53 0.15 300)">
+<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:22px"><span style="font:600 10px 'DM Mono',monospace;letter-spacing:.14em;text-transform:uppercase;background:#1a1a1a;color:#fff;padding:4px 8px;border-radius:4px">Light · Grün</span><span style="font:600 13px 'Plus Jakarta Sans',sans-serif;color:#1a1a1a">Dunklere Akzentwerte für hellen Hintergrund</span></div>
+<dc-import name="Screens2c" hint-size="3800px,900px"></dc-import>
+</div>
+
+</div>
+</x-dc>
+</body>
+</html>
