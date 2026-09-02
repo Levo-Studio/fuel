@@ -46,3 +46,68 @@ struct SettingsScreen: View {
         .fuelAnimation(FuelMotion.standard, value: palette.theme)
     }
 }
+
+// MARK: - Previews
+
+#Preview("Dark · connection works") {
+    SettingsPreview(theme: .dark, accent: .mono, note: .passed)
+}
+
+#Preview("Light · no credit") {
+    SettingsPreview(theme: .light, accent: .green, note: .noCredit)
+}
+
+/// Renders the whole screen, both themes, with a note showing.
+///
+/// A design export cannot be checked against source, only against a frame, and
+/// until this existed there was no frame: nothing in the app presented
+/// `SettingsScreen`, so every fidelity claim about screen 16 — the swatch
+/// rings, the section gaps, the note in the error colour — was read off code.
+/// The second preview picks a light theme and a non-mono accent on purpose,
+/// because that is where a wrong ring colour or a wrong on-colour shows.
+///
+/// It writes nothing anywhere: the note is seeded, the defaults are a suite of
+/// the preview's own, and no Keychain item is created unless someone types into
+/// the field in the canvas.
+private struct SettingsPreview: View {
+
+    @State private var preferences: SettingsPreferences
+    @State private var model: APIKeySettingsModel
+
+    init(theme: FuelTheme, accent: FuelAccent, note: KeyTestNote) {
+        let preferences = SettingsPreferences(defaults: Self.previewDefaults())
+        preferences.theme = theme
+        preferences.accent = accent
+        _preferences = State(initialValue: preferences)
+        _model = State(
+            initialValue: APIKeySettingsModel(
+                keychain: KeychainStore(service: Self.previewService),
+                validator: PreviewValidator(),
+                showing: note
+            )
+        )
+    }
+
+    var body: some View {
+        SettingsScreen(preferences: preferences, keyModel: model, done: {})
+    }
+
+    /// A suite of the preview's own, so a canvas render cannot change the
+    /// appearance of the app on the same machine.
+    private static func previewDefaults() -> UserDefaults {
+        UserDefaults(suiteName: "apps.levo-studio.Fuel.previews.settings") ?? .standard
+    }
+
+    /// Never written to by these previews, and off the production service if a
+    /// canvas is typed into.
+    private static let previewService = "apps.levo-studio.Fuel.previews.provider-keys"
+}
+
+/// The canvas has no network and must not acquire one. Tapping `Re-check` in a
+/// preview concludes nothing, which is the honest answer offline.
+private struct PreviewValidator: KeyValidating {
+
+    func validate(_ key: APIKey, for provider: AIProvider) async -> KeyValidationOutcome {
+        .retry
+    }
+}

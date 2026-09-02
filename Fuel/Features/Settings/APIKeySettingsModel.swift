@@ -88,6 +88,24 @@ final class APIKeySettingsModel {
         self.validator = validator
     }
 
+    /// A model already showing a note.
+    ///
+    /// It exists for the previews, and it is the reason they are worth having:
+    /// reaching a note the ordinary way costs a provider call and a Keychain
+    /// write, and a preview canvas is guaranteed neither, so a screen seeded
+    /// through the ordinary path would render without the note two thirds of
+    /// the time and the frame nobody has checked would still be unchecked. This
+    /// seeds the state and nothing else — the validator is still required, and
+    /// every path a running app takes to a note goes through `check`.
+    convenience init(
+        keychain: KeychainStore = KeychainStore(),
+        validator: any KeyValidating,
+        showing note: KeyTestNote
+    ) {
+        self.init(keychain: keychain, validator: validator)
+        self.note = note
+    }
+
     // MARK: - Provider
 
     /// Called when the provider segment changes.
