@@ -14,15 +14,30 @@ nonisolated enum KeyValidationOutcome: Equatable, Sendable {
     /// The provider answered and the model is reachable with this key.
     case passed
 
-    /// `401`. The key is wrong, revoked, or belongs to the other provider.
+    /// `401` or `403`. The key is wrong, revoked, belongs to the other
+    /// provider, or is not permitted to reach the model. Both statuses land
+    /// here because they are the same thing to the user and have the same
+    /// remedy: a different key.
     case invalidKey
 
-    /// `429` or `insufficient_quota`. The key is real; the account cannot pay
-    /// for the request.
+    /// The account cannot pay for the request.
+    ///
+    /// Matched on an **explicit credit signal in the response body** — Mistral's
+    /// `insufficient_quota`, Anthropic's `credit balance is too low` — at
+    /// whatever status it arrives under. Emphatically **not** a bare `429`:
+    /// both providers document that as rate limiting, and telling a throttled
+    /// user to go top up is wrong.
+    ///
+    /// Mistral publishes no distinct out-of-credit signal, so an exhausted
+    /// Mistral balance may surface as `retry` instead. That is the honest
+    /// answer; a conformer must not invent a signal to make this case
+    /// reachable on both providers.
     case noCredit
 
-    /// The request never completed — offline, timeout, DNS. Nothing is known
-    /// about the key, so this is not a verdict on it.
+    /// Nothing is known about the key, so this is not a verdict on it.
+    ///
+    /// A bare `429`, any status the two cases above do not claim, and every
+    /// transport failure — offline, timeout, DNS.
     case retry
 }
 

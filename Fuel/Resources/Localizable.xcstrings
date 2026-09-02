@@ -293,7 +293,7 @@
       }
     },
     "onboarding.keyTest.note.noCredit" : {
-      "comment" : "429 or insufficient_quota. Not in the export.",
+      "comment" : "Shown when the provider signals an exhausted balance. Not in the export.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
