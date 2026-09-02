@@ -15,6 +15,12 @@ struct GoalScreen: View {
 
     @Bindable var model: OnboardingModel
 
+    /// What is in the calorie field. Parsed into the model on every keystroke;
+    /// see `goalValue` for why it is not bound to the `Int` directly.
+    @State private var goalDraft = ""
+
+    @FocusState private var isEditingGoal: Bool
+
     var body: some View {
         OnboardingScreen(topPadding: FuelMetrics.Screen.onboardingTopPadding) {
             OnboardingEyebrow(text: "onboarding.step2")
@@ -30,6 +36,7 @@ struct GoalScreen: View {
         } footer: {
             OnboardingFootnote(text: "onboarding.goal.footnote")
             OnboardingButton(title: "onboarding.continue") {
+                isEditingGoal = false
                 model.complete()
             }
         }
@@ -80,24 +87,46 @@ struct GoalScreen: View {
     /// The three macro values are shown but not edited here: the export draws
     /// them as read-only cards, and Settings is where they are changed. A field
     /// that looks like a card is worse than a card.
+    ///
+    /// It binds to a `String` and commits on every keystroke rather than to the
+    /// `Int` through a format style. `TextField(value:format:)` writes back
+    /// when editing *ends*, and a number pad has no return key, so the only way
+    /// off this field is the footer button — which saves. A goal typed and then
+    /// confirmed would have been stored as the value it replaced, with nothing
+    /// on screen to say so. A `String` also draws the figure the way the export
+    /// does: `2400`, with no group separator.
     private var goalValue: some View {
         HStack(alignment: .firstTextBaseline, spacing: FuelMetrics.Space.s8) {
-            TextField(
-                "onboarding.goal.option",
-                value: $model.targets.kilocalories,
-                format: .number
-            )
-            .labelsHidden()
-            .fixedSize()
-            .keyboardType(.numberPad)
-            .fuelStyle(FuelTypography.goalValue)
-            .foregroundStyle(palette.ink)
-            .tint(palette.accentColor)
+            TextField("onboarding.goal.option", text: $goalDraft)
+                .labelsHidden()
+                .fixedSize()
+                .focused($isEditingGoal)
+                .keyboardType(.numberPad)
+                .fuelStyle(FuelTypography.goalValue)
+                .foregroundStyle(palette.ink)
+                .tint(palette.accentColor)
+                .onChange(of: goalDraft) { _, typed in
+                    let digits = GoalFieldInput.digits(in: typed)
+                    if digits != typed { goalDraft = digits }
+                    model.targets.kilocalories = GoalFieldInput.kilocalories(
+                        from: digits,
+                        previous: model.targets.kilocalories
+                    )
+                }
 
             Text("onboarding.goal.unit")
                 .fuelStyle(FuelTypography.unit)
                 .foregroundStyle(palette.muted)
+
+            Spacer(minLength: 0)
         }
+        // The field keeps its intrinsic width so `kcal` sits against the
+        // digits, as drawn; the row is what takes the tap. Without this the
+        // only target is the glyphs themselves, and a cleared field would have
+        // no target at all.
+        .contentShape(Rectangle())
+        .onTapGesture { isEditingGoal = true }
+        .onAppear { goalDraft = String(model.targets.kilocalories) }
     }
 
     private var macroCards: some View {
@@ -146,5 +175,31 @@ struct GoalScreen: View {
             }
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Calorie field input
+
+/// What the calorie field does with what is typed into it.
+///
+/// It is a type of its own rather than two closures inside the view because it
+/// is the rule that replaced a lost edit, and a rule that fixed a bug has to be
+/// testable. A test that sets `targets.kilocalories` directly — which is what
+/// the first one did — cannot see this go wrong.
+nonisolated enum GoalFieldInput {
+
+    /// Anything that is not a digit is dropped as it is typed. A number pad
+    /// does not offer much else, but a hardware keyboard and a paste both do.
+    static func digits(in typed: String) -> String {
+        String(typed.filter(\.isNumber))
+    }
+
+    /// The goal the field now means.
+    ///
+    /// An empty field keeps `previous` rather than becoming zero: clearing the
+    /// field to retype it must not, for those few keystrokes, mean a goal of no
+    /// calories, and the export draws no state for one.
+    static func kilocalories(from typed: String, previous: Int) -> Int {
+        Int(digits(in: typed)) ?? previous
     }
 }

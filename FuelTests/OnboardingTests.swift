@@ -345,6 +345,51 @@ struct OnboardingTests {
         #expect(model.targets == .default)
     }
 
+    // MARK: - The calorie field
+
+    /// The counter-check for the lost edit: a goal typed and then confirmed
+    /// with the footer button used to be saved as the value it replaced,
+    /// because `TextField(value:format:)` writes back on end-editing and a
+    /// number pad has no return key. The field commits on every keystroke now,
+    /// and this is the rule it commits by.
+    @Test("what is typed into the calorie field is the goal that is saved")
+    func typedGoalIsCommitted() {
+        #expect(GoalFieldInput.kilocalories(from: "2100", previous: 2400) == 2100)
+    }
+
+    @Test("a cleared field keeps the goal it had rather than becoming zero")
+    func clearedGoalFieldKeepsItsValue() {
+        #expect(GoalFieldInput.kilocalories(from: "", previous: 2400) == 2400)
+    }
+
+    @Test(
+        "the field takes digits and nothing else",
+        arguments: [
+            ("2100", "2100"),
+            ("2 100", "2100"),
+            ("2,400 kcal", "2400"),
+            ("-50", "50"),
+            ("", "")
+        ]
+    )
+    func fieldKeepsOnlyDigits(typed: String, expected: String) {
+        #expect(GoalFieldInput.digits(in: typed) == expected)
+    }
+
+    @Test("a typed goal reaches the settings row")
+    func typedGoalIsWritten() throws {
+        let keychain = makeKeychain()
+        defer { clear(keychain) }
+        let store = try makeStore()
+        let model = makeModel(keychain: keychain, validator: StubValidator(), store: store)
+
+        model.targets.kilocalories = GoalFieldInput.kilocalories(from: "1800", previous: model.targets.kilocalories)
+        #expect(model.complete())
+
+        let settings = try #require(try store.existingGoalSettings())
+        #expect(settings.kilocalorieGoal == 1800)
+    }
+
     // MARK: - The key cannot leak
 
     /// The guarantee `APIKey` makes about itself, held against the one type in
