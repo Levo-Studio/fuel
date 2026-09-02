@@ -608,6 +608,93 @@ struct ReplyParsingTests {
         #expect(estimate.items.count == 1)
     }
 
+    @Test("an overlong title is truncated, not thrown away")
+    func longTitleTruncated() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let long = String(repeating: "a", count: 500)
+        let reply = """
+            {"title":"\(long)","kilocalories":420,"protein_g":14,\
+            "carbs_g":62,"fat_g":11,"items":[]}
+            """
+        let client = AnthropicClient(
+            transport: RecordingTransport(status: 200, body: Reply.anthropic(reply)),
+            keys: keys.source
+        )
+
+        let estimate = try await client.estimate(text: "porridge")
+
+        #expect(estimate.title.count == EstimateContract.maximumNameLength)
+        // Truncated, not rejected: the user already paid for this estimate,
+        // and the calories are the part they asked for.
+        #expect(estimate.kilocalories == 420)
+    }
+
+    @Test("an overlong item name is truncated and the row survives")
+    func longItemNameTruncated() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let long = String(repeating: "b", count: 400)
+        let reply = """
+            {"title":"Porridge","kilocalories":420,"protein_g":14,"carbs_g":62,\
+            "fat_g":11,"items":[{"name":"\(long)","kilocalories":300,\
+            "grams":250,"confidence":"confident"}]}
+            """
+        let client = AnthropicClient(
+            transport: RecordingTransport(status: 200, body: Reply.anthropic(reply)),
+            keys: keys.source
+        )
+
+        let estimate = try await client.estimate(photo: tinyPhoto())
+
+        #expect(estimate.items.count == 1)
+        #expect(estimate.items[0].name.count == EstimateContract.maximumNameLength)
+    }
+
+    @Test("a name at or under the cap is untouched")
+    func shortNameUntouched() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let client = AnthropicClient(
+            transport: RecordingTransport(
+                status: 200,
+                body: Reply.anthropic(Reply.goodEstimate)
+            ),
+            keys: keys.source
+        )
+
+        let estimate = try await client.estimate(text: "porridge")
+        #expect(estimate.title == "Porridge with berries")
+    }
+
+    @Test("truncation cuts between glyphs, never through one")
+    func truncationIsGraphemeSafe() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        // Each of these is one Character and four UTF-8 bytes. Cutting by byte
+        // offset would split one and leave a replacement character — a
+        // corruption Fuel would have introduced itself.
+        let long = String(repeating: "🍜", count: 300)
+        let reply = """
+            {"title":"\(long)","kilocalories":420,"protein_g":14,\
+            "carbs_g":62,"fat_g":11,"items":[]}
+            """
+        let client = AnthropicClient(
+            transport: RecordingTransport(status: 200, body: Reply.anthropic(reply)),
+            keys: keys.source
+        )
+
+        let estimate = try await client.estimate(text: "ramen")
+
+        #expect(estimate.title.count == EstimateContract.maximumNameLength)
+        #expect(!estimate.title.unicodeScalars.contains("\u{FFFD}"))
+        #expect(estimate.title.allSatisfy { $0 == "🍜" })
+    }
+
     @Test("a code fence around the object is tolerated")
     func codeFence() async throws {
         let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")

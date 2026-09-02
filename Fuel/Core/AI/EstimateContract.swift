@@ -75,6 +75,55 @@ nonisolated enum EstimateContract {
         """
     }
 
+    // MARK: - Bounds
+
+    /// The longest a model-written name may be by the time it leaves this
+    /// file — the meal `title`, and every line item's `name`.
+    ///
+    /// **A boundary invariant, not a design value.** Nothing in `design/`
+    /// specifies it; the export draws real meal names and says nothing about
+    /// a limit, because a designer has no reason to imagine one. It is here
+    /// because these two strings are the only free text a provider fully
+    /// controls that survives parsing, and they are written to SwiftData and
+    /// drawn on screens 05, 14 and 15. An unbounded string on that path is a
+    /// layout the design never drew and a row in the store nobody sized.
+    ///
+    /// 120 is far past any real meal name and short enough that the worst case
+    /// is a wrapped line rather than a screen. It is deliberately generous:
+    /// the cap exists to have *a* bound, not to enforce brevity.
+    ///
+    /// Truncated rather than rejected. Throwing away a whole estimate — which
+    /// the user has already paid for — because the model was verbose in one
+    /// field is a worse outcome than a shortened title, and the calories are
+    /// the part they asked for.
+    ///
+    /// Applied here, at the parse boundary, so every consumer is covered
+    /// including the ones not written yet. `TodayDayList` says the same thing
+    /// from the other side: it renders with `Text(String)` so nothing is
+    /// interpreted as markup, and defers the length to this file so the stored
+    /// entry is bounded too, not just the drawn one.
+    static let maximumNameLength = 120
+
+    /// Trims `raw`, and caps it at `maximumNameLength`.
+    ///
+    /// Returns `nil` for a name that is empty once trimmed, which is the
+    /// caller's signal that there is nothing to draw.
+    ///
+    /// Counted and cut in `Character`s, so a name of emoji or of a script that
+    /// composes is cut between glyphs rather than through one. Cutting a
+    /// `String` by `utf8` offset can split a grapheme and produce a replacement
+    /// character, which is a corruption Fuel would have introduced itself.
+    static func boundedName(_ raw: String?) -> String? {
+        let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !trimmed.isEmpty else {
+            return nil
+        }
+        guard trimmed.count > maximumNameLength else {
+            return trimmed
+        }
+        return String(trimmed.prefix(maximumNameLength))
+    }
+
     // MARK: - Parsing
 
     /// Reads the model's reply into a `MealEstimate`.
@@ -113,8 +162,7 @@ nonisolated enum EstimateContract {
             throw AIError.malformedResponse
         }
 
-        let title = payload.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard !title.isEmpty else {
+        guard let title = boundedName(payload.title) else {
             throw AIError.malformedResponse
         }
 
@@ -238,8 +286,10 @@ private nonisolated struct EstimatePayload: Decodable {
         /// Overstating what the model was sure of is the worse failure, and
         /// `unsure` claims nothing the model did not say.
         func recognisedItem(mode: AILogMode) -> RecognisedItem? {
-            let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            guard !trimmed.isEmpty, let kilocalories = kilocalories?.value else {
+            guard
+                let trimmed = EstimateContract.boundedName(name),
+                let kilocalories = kilocalories?.value
+            else {
                 return nil
             }
 
