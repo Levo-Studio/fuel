@@ -66,9 +66,12 @@ struct SettingsScreen: View {
 /// The second preview picks a light theme and a non-mono accent on purpose,
 /// because that is where a wrong ring colour or a wrong on-colour shows.
 ///
-/// It writes nothing anywhere: the note is seeded, the defaults are a suite of
-/// the preview's own, and no Keychain item is created unless someone types into
-/// the field in the canvas.
+/// What it writes, it writes somewhere harmless. Setting the theme and the
+/// accent goes through the same `didSet` the screen uses, so both land in a
+/// plist — but in a suite of the preview's own, never the app's, so a canvas
+/// render cannot change the appearance of Fuel on the same machine. The note is
+/// seeded rather than earned, so no provider call is made, and no Keychain item
+/// is created unless someone types into the field in the canvas.
 private struct SettingsPreview: View {
 
     @State private var preferences: SettingsPreferences
