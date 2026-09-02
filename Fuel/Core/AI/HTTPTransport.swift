@@ -64,9 +64,15 @@ extension URLSession: HTTPTransport {
 
 // MARK: - Shared session
 
-extension HTTPTransport where Self == URLSession {
+extension URLSession {
 
-    /// The session the app's clients run on.
+    /// The session the app's clients run on — one, shared.
+    ///
+    /// `static let`, not a computed property. Computed, every client
+    /// construction built its own `URLSession`, each with its own delegate
+    /// queue and connection pool, and no two scans could reuse a TLS
+    /// connection. One session is also what the paragraph below assumes when
+    /// it says the caches are off.
     ///
     /// Ephemeral on purpose: **nothing touches disk.** A default
     /// `URLSession` writes its URL cache and its cookies into the app
@@ -75,7 +81,7 @@ extension HTTPTransport where Self == URLSession {
     /// request is over. The only place a meal's content is written down is its
     /// SwiftData entry. The caches below are belt and braces on top of the
     /// ephemeral configuration, which already keeps everything in memory.
-    nonisolated static var fuel: URLSession {
+    nonisolated static let fuel: URLSession = {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.urlCache = nil
         configuration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
@@ -85,5 +91,5 @@ extension HTTPTransport where Self == URLSession {
         // be told about, not something to keep waiting on behind a spinner.
         configuration.timeoutIntervalForRequest = 60
         return URLSession(configuration: configuration)
-    }
+    }()
 }
