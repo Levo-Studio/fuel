@@ -54,18 +54,23 @@ nonisolated struct MistralClient: AIClient {
 
     /// Tests a key with `GET /v1/models`.
     ///
-    /// **Why this and not a one-token completion.** Mistral bills nothing for
-    /// listing models, and — unlike a bare authentication check — it still
-    /// answers the question the design's key test is asking. An account whose
-    /// balance is exhausted is answered `429` here, so the free call surfaces
-    /// both failures the interface distinguishes: a rejected key and a rejected
-    /// bill. When a provider hands you a free call that fails for the right
-    /// reasons, spending the user's money to learn the same thing is not
-    /// caution, it is waste.
+    /// **Why this and not a one-token completion.** It is free, and it
+    /// authenticates: a key Mistral rejects, and a key Mistral will not permit,
+    /// both fail here, and those are the same screen.
     ///
-    /// `AnthropicClient` chooses the other way for the mirror-image reason:
-    /// Anthropic's free `/v1/models` passes for a key with no credit left, so
-    /// there the cheapest *useful* call is a one-token message.
+    /// What it cannot tell us is whether the balance is spent. **Mistral
+    /// publishes no distinct out-of-credit signal at all** — the OpenAPI spec
+    /// declares only `200` and `422` for this path, `429` is documented as
+    /// rate limiting with a `Retry-After` header, and entitlement problems map
+    /// to `403`. So an exhausted Mistral balance may reach the user as the
+    /// retry state rather than as the billing link. That is the honest
+    /// outcome, and it is why a paid completion here would buy nothing:
+    /// spending the user's money to learn something Fuel cannot reliably learn
+    /// anyway is waste, not caution.
+    ///
+    /// `AnthropicClient` chooses the other way because Anthropic *does* say it
+    /// in words — `credit balance is too low` — so there a one-token message
+    /// buys an answer this call cannot give.
     func checkKey(_ key: APIKey) async -> KeyCheckResult {
         var request = URLRequest(url: Self.baseURL.appendingPathComponent("v1/models"))
         request.httpMethod = "GET"

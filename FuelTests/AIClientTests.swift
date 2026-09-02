@@ -297,24 +297,58 @@ struct AIErrorMappingTests {
         }
     }
 
-    @Test("429 is no credit, carrying Anthropic's billing page")
-    func rateLimitedAnthropic() async throws {
+    @Test("403 is a key not accepted, the same as 401")
+    func forbiddenAnthropic() async throws {
         let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
         defer { keys.tearDown(provider: .claude) }
 
-        let transport = RecordingTransport(status: 429, body: "{}")
+        // Rejected and not-permitted are the same thing to a user, with the
+        // same remedy.
+        let transport = RecordingTransport(
+            status: 403,
+            body: #"{"error":{"type":"permission_error"}}"#
+        )
         let client = AnthropicClient(transport: transport, keys: keys.source)
 
-        let expected = AIError.noCredit(
-            provider: .claude,
-            billingPage: URL(string: "https://console.anthropic.com/settings/billing")!
-        )
-        await #expect(throws: expected) {
+        await #expect(throws: AIError.invalidKey) {
             _ = try await client.estimate(text: "an apple")
         }
     }
 
-    @Test("429 is no credit, carrying Mistral's billing page")
+    @Test("Mistral's 403 for an unpermitted key is a key not accepted")
+    func forbiddenMistral() async throws {
+        let keys = try KeyFixture(provider: .mistral, secret: "0123456789abcdefghij")
+        defer { keys.tearDown(provider: .mistral) }
+
+        // Mistral maps entitlement problems to 403. Landing that on the retry
+        // state would leave the user tapping a button that can never work.
+        let transport = RecordingTransport(status: 403, body: "{}")
+        let client = MistralClient(transport: transport, keys: keys.source)
+
+        await #expect(throws: AIError.invalidKey) {
+            _ = try await client.estimate(text: "an apple")
+        }
+    }
+
+    @Test("a bare 429 is a retry, not a billing page")
+    func rateLimitedAnthropic() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        // Both providers document 429 as rate limiting. Telling a merely
+        // throttled user to go top up is wrong; waiting is the right advice.
+        let transport = RecordingTransport(
+            status: 429,
+            body: #"{"error":{"type":"rate_limit_error"}}"#
+        )
+        let client = AnthropicClient(transport: transport, keys: keys.source)
+
+        await #expect(throws: AIError.network) {
+            _ = try await client.estimate(text: "an apple")
+        }
+    }
+
+    @Test("a bare 429 is a retry at Mistral too")
     func rateLimitedMistral() async throws {
         let keys = try KeyFixture(provider: .mistral, secret: "0123456789abcdefghij")
         defer { keys.tearDown(provider: .mistral) }
@@ -322,23 +356,37 @@ struct AIErrorMappingTests {
         let transport = RecordingTransport(status: 429, body: "{}")
         let client = MistralClient(transport: transport, keys: keys.source)
 
-        let expected = AIError.noCredit(
-            provider: .mistral,
-            billingPage: URL(string: "https://console.mistral.ai/billing/")!
-        )
-        await #expect(throws: expected) {
+        await #expect(throws: AIError.network) {
             _ = try await client.estimate(text: "an apple")
         }
     }
 
-    @Test("insufficient_quota is no credit even without a 429")
+    @Test("a credit signal wins over the status it arrives with")
+    func creditSignalBeatsStatus() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        // 401 would otherwise be a rejected key. When the provider has said in
+        // words what is wrong, the words win — otherwise a user with an empty
+        // balance is told to re-enter a key that is perfectly valid.
+        let transport = RecordingTransport(
+            status: 401,
+            body: #"{"error":{"message":"Your credit balance is too low"}}"#
+        )
+        let client = AnthropicClient(transport: transport, keys: keys.source)
+
+        await #expect(throws: AIError.noCredit(for: .claude)) {
+            _ = try await client.estimate(text: "an apple")
+        }
+    }
+
+    @Test("insufficient_quota is no credit whatever the status")
     func insufficientQuota() async throws {
         let keys = try KeyFixture(provider: .mistral, secret: "0123456789abcdefghij")
         defer { keys.tearDown(provider: .mistral) }
 
-        // Both providers can report an exhausted balance behind a status that
-        // is not 429. Mapping on the status alone would send a user with an
-        // empty balance to re-enter a key that is perfectly valid.
+        // Credit is matched on an explicit signal in the body, at any
+        // status. There is no status that means "no credit" on its own.
         let transport = RecordingTransport(
             status: 400,
             body: #"{"error":{"code":"insufficient_quota","message":"You exceeded your quota"}}"#
@@ -354,7 +402,7 @@ struct AIErrorMappingTests {
         }
     }
 
-    @Test("Anthropic's credit-balance message is no credit, not an invalid key")
+    @Test("Anthropic's credit-balance message carries the canonical billing host")
     func creditBalanceTooLow() async throws {
         let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
         defer { keys.tearDown(provider: .claude) }
@@ -688,7 +736,7 @@ struct KeyCheckTests {
         #expect(json["system"] == nil)
     }
 
-    @Test("Mistral lists models, because that call is free and still sees credit")
+    @Test("Mistral lists models, because that call is free and authenticates")
     func mistralUsesModelList() async throws {
         let transport = RecordingTransport(status: 200, body: #"{"data":[]}"#)
         let client = MistralClient(
@@ -720,8 +768,47 @@ struct KeyCheckTests {
         #expect(await client.checkKey(APIKey("sk-ant-abcdefghijklmnop")) == .failed(.invalidKey))
     }
 
-    @Test("an empty balance fails the check with the billing link")
+    @Test("an unpermitted key fails the check as a key not accepted")
+    func forbiddenKeyCheck() async {
+        let client = MistralClient(
+            transport: RecordingTransport(status: 403, body: "{}"),
+            keys: ProviderKeySource(
+                store: KeychainStore(service: "unused.\(UUID().uuidString)"),
+                provider: .mistral
+            )
+        )
+
+        // Mistral's entitlement failure. The design has one screen for "this
+        // key will not work", and this is it.
+        #expect(await client.checkKey(APIKey("0123456789abcdefghij")) == .failed(.invalidKey))
+    }
+
+    @Test("an empty Anthropic balance fails the check with the billing link")
     func exhaustedBalance() async {
+        let client = AnthropicClient(
+            transport: RecordingTransport(
+                status: 400,
+                body: #"{"error":{"message":"Your credit balance is too low"}}"#
+            ),
+            keys: ProviderKeySource(
+                store: KeychainStore(service: "unused.\(UUID().uuidString)"),
+                provider: .claude
+            )
+        )
+
+        // This is the reason Anthropic's key test spends a token: the free
+        // /v1/models would have passed here.
+        let expected = KeyCheckResult.failed(
+            .noCredit(
+                provider: .claude,
+                billingPage: URL(string: "https://console.anthropic.com/settings/billing")!
+            )
+        )
+        #expect(await client.checkKey(APIKey("sk-ant-abcdefghijklmnop")) == expected)
+    }
+
+    @Test("a throttled key check is a retry, not a verdict on the key")
+    func throttledKeyCheck() async {
         let client = MistralClient(
             transport: RecordingTransport(status: 429, body: "{}"),
             keys: ProviderKeySource(
@@ -730,13 +817,7 @@ struct KeyCheckTests {
             )
         )
 
-        let expected = KeyCheckResult.failed(
-            .noCredit(
-                provider: .mistral,
-                billingPage: URL(string: "https://console.mistral.ai/billing/")!
-            )
-        )
-        #expect(await client.checkKey(APIKey("0123456789abcdefghij")) == expected)
+        #expect(await client.checkKey(APIKey("0123456789abcdefghij")) == .failed(.network))
     }
 
     @Test("a lost connection fails the check as a retry, not as a verdict")

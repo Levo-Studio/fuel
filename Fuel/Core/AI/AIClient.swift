@@ -99,22 +99,30 @@ extension AIError {
     /// Maps an HTTP status and the response body onto the three states the
     /// design draws.
     ///
-    /// The body is read, and it is read for exactly one thing: whether an
-    /// error is about credit. Both providers can report an exhausted balance
-    /// as something other than `429` — Anthropic answers `400` with a
-    /// `credit balance is too low` message, and `insufficient_quota` shows up
-    /// in the OpenAI-shaped error envelope Mistral serves — so a status-only
-    /// mapping would send a user with an empty balance to re-enter a key that
-    /// is perfectly valid.
+    /// The mapping is by **what the provider means**, not by status code
+    /// alone, and the order below is the rule rather than an accident:
+    ///
+    /// 1. An explicit credit signal in the body wins **at any status**. That
+    ///    is why this check runs before the `401`/`403` one and not after: a
+    ///    provider is free to wrap an exhausted balance in whatever status it
+    ///    likes — Anthropic answers `400` with `credit balance is too low` —
+    ///    and a status-first mapping would read that as a bad key and tell the
+    ///    user to re-enter one that is perfectly valid. When a provider has
+    ///    said in words what is wrong, the words win.
+    /// 2. `401` and `403` are both "key not accepted". Rejected and not
+    ///    permitted are the same thing to a user, with the same remedy: enter
+    ///    a different key. Mistral maps entitlement problems to `403`, and
+    ///    splitting the two would mean a state the design does not draw.
+    /// 3. Everything else is a retry — including a bare `429`. Both providers
+    ///    document `429` as rate limiting: Anthropic names it
+    ///    `rate_limit_error`, Mistral ships a `Retry-After` header. Sending a
+    ///    merely throttled user to a billing page is wrong, and waiting is the
+    ///    correct advice.
     ///
     /// **Nothing read here leaves this function.** The body is matched against
     /// two fixed substrings and discarded; no fragment of it, and no status
     /// line, is carried into the returned error.
     static func from(status: Int, body: Data, provider: AIProvider) -> AIError {
-        if status == 429 {
-            return .noCredit(for: provider)
-        }
-
         if mentionsExhaustedCredit(body) {
             return .noCredit(for: provider)
         }
@@ -123,10 +131,10 @@ extension AIError {
             return .invalidKey
         }
 
-        // Everything else — a 400 that is not about credit, a 500, a gateway
-        // timeout — is a retry. The design draws no fourth state, and
-        // inventing one for "the provider is having a bad day" would be a
-        // deviation; a plain retry is also the correct advice.
+        // A 400 that is not about credit, a 429, a 500, a gateway timeout.
+        // The design draws no fourth state, and inventing one for "the
+        // provider is having a bad day" would be a deviation; a plain retry is
+        // also the correct advice.
         return .network
     }
 

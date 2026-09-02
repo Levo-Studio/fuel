@@ -24,8 +24,18 @@ nonisolated enum AIError: Error, Equatable {
     /// Drawn as "Key was not accepted."
     case invalidKey
 
-    /// `429`, or an `insufficient_quota` / credit-exhausted body. The key is
-    /// fine; the account behind it cannot pay for the request.
+    /// The provider said in words that the balance is gone — `insufficient_quota`,
+    /// or Anthropic's `credit balance is too low`. The key is fine; the account
+    /// behind it cannot pay for the request.
+    ///
+    /// Matched on the body at any status, never on `429` alone: both providers
+    /// document `429` as rate limiting, and a throttled user needs to wait, not
+    /// to top up.
+    ///
+    /// Mistral publishes no distinct out-of-credit signal, so an exhausted
+    /// Mistral balance may surface as `network` instead. That is the honest
+    /// outcome of what Mistral documents, and it is better than inventing a
+    /// signal to make this case reachable on both providers.
     ///
     /// Carries the provider's own billing page so the interface can offer the
     /// link the design asks for. The URL is a constant in this file, never
@@ -33,8 +43,10 @@ nonisolated enum AIError: Error, Equatable {
     /// response body is a link an attacker could choose.
     case noCredit(provider: AIProvider, billingPage: URL)
 
-    /// The request never reached the provider, or the response never came
-    /// back. The design's plain retry state.
+    /// The request never reached the provider, the response never came back,
+    /// or the provider answered with something Fuel cannot act on — a `429`,
+    /// a `500`, a `400` that is not about credit. The design's plain retry
+    /// state, and in every one of those cases the correct advice.
     case network
 
     /// The provider answered, but not with the JSON that was asked for —
