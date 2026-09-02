@@ -76,7 +76,13 @@ nonisolated enum FuelMetrics {
 
     // MARK: - Radii
 
-    /// Four radii, and there are no others in the export.
+    /// Every radius the export draws, minus one.
+    ///
+    /// The export also uses `border-radius:50%` twenty-six times — the ring,
+    /// the swatches, the shutter, the circular buttons, the selection dot. That
+    /// is a shape rather than a radius, and it is expressed in SwiftUI as
+    /// `Circle()` on a square frame, so it has no constant here. The three
+    /// below are the only fixed radii in the app.
     enum Radius {
 
         /// Pills: buttons, segments, chips. Drawn as `100px`, which is any
@@ -99,8 +105,12 @@ nonisolated enum FuelMetrics {
         /// The ordinary border and divider.
         static let hairline: CGFloat = 1
 
-        /// The selected accent swatch's ring.
-        static let swatchSelected: CGFloat = 1.5
+        /// The heavier of the two line weights, and the export uses it in
+        /// exactly two places: the selected accent swatch's ring in Settings,
+        /// and the border of an *un*selected choice-card dot on onboarding.
+        /// Both are "this control is a selection", which is why they share a
+        /// weight rather than each having their own.
+        static let selectionBorder: CGFloat = 1.5
 
         /// The active step's spinner ring on the key-test screen.
         static let spinner: CGFloat = 2
@@ -137,6 +147,21 @@ nonisolated enum FuelMetrics {
 
         /// The result screen's photo thumbnail.
         static let thumbnailHeight: CGFloat = 150
+
+        /// The accent-filled add button floating over the day list, drawn on
+        /// both Today screens — the one place either mode offers to log
+        /// something.
+        static let addButton: CGFloat = 58
+
+        /// Its inset from the trailing and bottom edges of the screen. Larger
+        /// at the bottom than at the side because the button clears the home
+        /// indicator, not just the margin.
+        static let addButtonTrailingInset = Space.s26
+        static let addButtonBottomInset = Space.s32
+
+        /// The radio dot on an onboarding choice card: accent-filled when the
+        /// option is chosen, a `Line.selectionBorder` ring when it is not.
+        static let selectionDot: CGFloat = 18
     }
 
     // MARK: - Ring

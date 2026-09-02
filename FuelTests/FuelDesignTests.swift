@@ -267,13 +267,25 @@ struct FuelMetricsTests {
         #expect(abs(FuelMetrics.Ring.strokeOffset(total: 1200, goal: 2400) - 169.65) < 0.001)
     }
 
+    @Test("the two drawn control sizes the mockup could hide are present")
+    func drawnControlsArePresent() {
+        // Both are app UI drawn as bare pixel values on screens 04, 05 and 06,
+        // and both are the kind a feature writer would otherwise invent.
+        #expect(FuelMetrics.Control.addButton == 58)
+        #expect(FuelMetrics.Control.selectionDot == 18)
+        #expect(FuelMetrics.Control.addButtonTrailingInset == 26)
+        #expect(FuelMetrics.Control.addButtonBottomInset == 32)
+    }
+
     @Test("a goal of zero leaves the ring empty instead of dividing by it")
     func ringSurvivesAZeroGoal() {
         #expect(FuelMetrics.Ring.strokeOffset(total: 500, goal: 0) == FuelMetrics.Ring.circumference)
     }
 
-    @Test("the four radii are the ones drawn, and the mockup's corner is not among them")
+    @Test("the fixed radii are the ones drawn, and the mockup's corner is not among them")
     func radii() {
+        // Three constants, because the export's fourth radius is
+        // `border-radius:50%` — a shape, drawn as a Circle, not a number.
         let radii = [FuelMetrics.Radius.pill, FuelMetrics.Radius.card, FuelMetrics.Radius.thumbnail]
         #expect(radii == [100, 16, 22])
         // 46 is the phone mockup's own corner and must never reach the app.
