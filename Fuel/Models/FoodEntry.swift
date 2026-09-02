@@ -37,8 +37,7 @@ final class FoodEntry {
     /// then on the label is theirs and re-deriving the day leaves it alone.
     var isLabelUserSet: Bool
 
-    /// Drawn as the ☆ / ★ control on the result screen; the Recent list reads
-    /// it back.
+    /// Drawn as the ☆ / ★ control on the result screen.
     var isFavourite: Bool
 
     /// The breakdown shown under `Recognised` / `Broken down`. Empty for an
