@@ -15,6 +15,15 @@ extension AIProvider {
         }
     }
 
+    /// The no-credit note names the account that has run out, which for Claude
+    /// is Anthropic's rather than Claude's.
+    var settingsNoCreditTitle: LocalizedStringKey {
+        switch self {
+        case .claude: "settings.keyTest.noCredit.claude"
+        case .mistral: "settings.keyTest.noCredit.mistral"
+        }
+    }
+
     /// The placeholder in the key field.
     ///
     /// A design placeholder, not a validation rule: Anthropic keys really do
@@ -61,11 +70,19 @@ extension FuelAccent {
 extension KeyTestNote {
 
     /// `nil` where the design draws no note at all.
-    var titleKey: LocalizedStringKey? {
+    ///
+    /// The provider is passed in rather than carried by the note: the no-credit
+    /// line names the account the user has to top up, and Claude's is
+    /// Anthropic's. Everything else ignores it.
+    func titleKey(for provider: AIProvider) -> LocalizedStringKey? {
         switch self {
         case .none: nil
         case .passed: "settings.keyTest.passed"
         case .notAccepted: "settings.keyTest.notAccepted"
+        case .noCredit: provider.settingsNoCreditTitle
         }
     }
+
+    /// The action beside a no-credit note.
+    static let billingActionTitle: LocalizedStringKey = "settings.keyTest.topUp"
 }

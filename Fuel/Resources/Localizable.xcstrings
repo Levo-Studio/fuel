@@ -607,6 +607,30 @@
         }
       }
     },
+    "settings.keyTest.noCredit.claude" : {
+      "comment" : "Not in the export. Note beside Re-check when the key works but the account has no credit. Drawn in the error colour, in the slot the rejected-key note uses. Names Anthropic, because that is the account being topped up.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No credit with Anthropic"
+          }
+        }
+      }
+    },
+    "settings.keyTest.noCredit.mistral" : {
+      "comment" : "Not in the export. The same note for Mistral. It may be unreachable: Mistral publishes no distinct out-of-credit signal, so an exhausted balance can surface as a retry instead.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No credit with Mistral"
+          }
+        }
+      }
+    },
     "settings.keyTest.notAccepted" : {
       "comment" : "Note beside Re-check after a key was rejected. Drawn in the error colour.",
       "extractionState" : "manual",
@@ -639,6 +663,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Re-check"
+          }
+        }
+      }
+    },
+    "settings.keyTest.topUp" : {
+      "comment" : "Not in the export. Action beside a no-credit note, linking to that provider's billing page. Uses the same style as Re-check in the same row.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Top up"
           }
         }
       }

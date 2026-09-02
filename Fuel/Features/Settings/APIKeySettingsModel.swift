@@ -2,15 +2,20 @@ import Foundation
 
 // MARK: - Test note
 
-/// The three states of the note beside `Re-check`.
+/// The states of the note beside `Re-check`.
 ///
-/// There are exactly three because the design draws exactly three: nothing at
-/// all, `Connection works`, and `Key not accepted` in the error colour. There
-/// is no drawn state for "checking right now", for "no key stored yet", for
-/// "the key is fine but the account has no credit", or for "the network did not
-/// answer" — every one of those falls back to `none`, which is the empty note.
-/// Copy for them would have to be invented, and inventing copy is a design
-/// deviation, so the gaps are reported to the owner rather than filled in here.
+/// The export draws three: nothing at all, `Connection works`, and `Key not
+/// accepted` in the error colour. `noCredit` is a fourth, added on an owner
+/// ruling, and it is the one undrawn state that could not stay empty: a user
+/// who cannot pay for a scan and is shown nothing has no way to work out what
+/// happened or what to do. It is built out of drawn parts rather than invented
+/// — the same slot and the same error colour as `notAccepted`, and a second
+/// action in the same style the `Re-check` beside it already uses.
+///
+/// Everything else with no drawn state stays `none`: no key stored yet, a check
+/// in flight, a network call that concluded nothing, and a Keychain write that
+/// failed. Copy for those would have to be invented, and an in-flight check
+/// already shows itself by disabling the button.
 nonisolated enum KeyTestNote: Equatable, Sendable {
 
     /// Nothing is drawn.
@@ -21,6 +26,19 @@ nonisolated enum KeyTestNote: Equatable, Sendable {
 
     /// `Key not accepted`, in the error colour.
     case notAccepted
+
+    /// `No credit with <provider>`, in the error colour, with a link to that
+    /// provider's billing page.
+    ///
+    /// The provider is not carried here. The note always belongs to the
+    /// selected provider — switching the segment clears it — so the row reads
+    /// the provider it is already drawing rather than the note holding a second
+    /// copy that could disagree with it.
+    case noCredit
+
+    /// Whether the row draws the billing link beside the note. True for exactly
+    /// one state, and the view asks rather than matching the case itself.
+    var showsBillingLink: Bool { self == .noCredit }
 }
 
 // MARK: - Model
@@ -138,11 +156,10 @@ final class APIKeySettingsModel {
             note = store(key, for: provider) ? .passed : .none
         case .noCredit:
             // The key authenticated — the account simply has nothing left on
-            // it — so it is worth keeping. The design draws no note for it,
-            // and `Connection works` would be a lie about a key that cannot
+            // it — so it is worth keeping. The note says so and offers the way
+            // out; `Connection works` would be a lie about a key that cannot
             // pay for a request.
-            _ = store(key, for: provider)
-            note = .none
+            note = store(key, for: provider) ? .noCredit : .none
         case .invalidKey:
             // Deliberately not stored. Overwriting a key that works with one
             // the provider has just rejected would take a working app away

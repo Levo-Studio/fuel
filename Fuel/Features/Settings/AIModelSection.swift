@@ -86,10 +86,14 @@ struct AIModelSection: View {
             bottomPadding: FuelMetrics.Space.s10,
             showsHairline: false
         ) {
-            if let noteKey = model.note.titleKey {
+            if let noteKey = model.note.titleKey(for: preferences.provider) {
                 Text(noteKey)
                     .fuelStyle(FuelTypography.meta)
                     .foregroundStyle(noteColor)
+            }
+
+            if model.note.showsBillingLink {
+                billingLink
             }
 
             Spacer(minLength: FuelMetrics.Space.s12)
@@ -107,13 +111,33 @@ struct AIModelSection: View {
         .fuelAnimation(FuelMotion.standard, value: model.note)
     }
 
-    /// The failed note is the one place the error colour is used, and it does
-    /// not follow the accent — an error that changes colour with a preference
-    /// stops reading as an error.
+    /// The way out of a no-credit account, and the only link in Settings.
+    ///
+    /// It sits beside the note it explains rather than out on the right, so the
+    /// drawn row keeps its shape: a left-hand note and `Re-check` on the right,
+    /// exactly where the export puts them. The style is `inlineAction` — the
+    /// one `Re-check` already uses in this row — so a second action here is a
+    /// drawn treatment applied twice rather than a new control.
+    ///
+    /// The 8pt gap is the gap between the two provider segments above it, and
+    /// is a borrowed neighbour rather than an export value: the export draws no
+    /// row with two actions in it.
+    private var billingLink: some View {
+        Link(destination: ProviderBilling.url(for: preferences.provider)) {
+            Text(KeyTestNote.billingActionTitle)
+                .fuelStyle(FuelTypography.inlineAction)
+                .foregroundStyle(palette.ink)
+        }
+        .padding(.leading, FuelMetrics.Space.s8)
+    }
+
+    /// The failure notes are the only place the error colour is used, and it
+    /// does not follow the accent — an error that changes colour with a
+    /// preference stops reading as an error.
     private var noteColor: Color {
         switch model.note {
         case .none, .passed: palette.muted
-        case .notAccepted: palette.error
+        case .notAccepted, .noCredit: palette.error
         }
     }
 }
