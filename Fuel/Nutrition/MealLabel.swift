@@ -71,7 +71,10 @@ nonisolated enum MainMeal: CaseIterable, Hashable, Sendable {
     /// leave the 15:00–17:59 gap unclaimed and produce a fixed snack band —
     /// exactly the naive mapping the design rejects.
     ///
-    /// Two ends of the day the windows alone do not settle, ruled by the owner:
+    /// Two ends of the day the windows alone do not settle. Both are owner
+    /// rulings, written down in `design/Fuel Design Notes.md` under
+    /// "Owner ruling: the late hours" so this comment can cite them rather
+    /// than assert a rule the export does not contain:
     ///
     /// - **Dinner's reach runs to the end of the calendar day.** An entry at
     ///   23:30 on a day with no dinner is dinner, by the same reasoning as the
