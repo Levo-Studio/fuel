@@ -126,7 +126,7 @@ struct FuelStoreTests {
         #expect(try store.existingGoalSettings() == nil)
         #expect(try store.countingMode() == .goal(.default))
 
-        let settings = try store.goalSettings()
+        let settings = try store.goalSettingsCreatingIfNeeded()
         #expect(settings.mode == .goal(.default))
         #expect(try store.existingGoalSettings() != nil)
     }
@@ -139,7 +139,7 @@ struct FuelStoreTests {
         try store.setCountingMode(.countOnly)
 
         #expect(try store.countingMode() == .countOnly)
-        #expect(try store.goalSettings().targets == targets)
+        #expect(try store.goalSettingsCreatingIfNeeded().targets == targets)
     }
 }
 

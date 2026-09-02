@@ -139,8 +139,12 @@ final class FuelStore {
     }
 
     /// The settings row, created with the defaults if it is not there yet.
+    ///
+    /// The name says "creating" because the create is not an implementation
+    /// detail: the row existing is what marks onboarding as answered, so a
+    /// screen that only wanted to read the goal would end onboarding by asking.
     @discardableResult
-    func goalSettings() throws -> GoalSettings {
+    func goalSettingsCreatingIfNeeded() throws -> GoalSettings {
         if let existing = try existingGoalSettings() { return existing }
         let settings = GoalSettings()
         context.insert(settings)
@@ -155,7 +159,7 @@ final class FuelStore {
     }
 
     func setCountingMode(_ mode: CountingMode) throws {
-        let settings = try goalSettings()
+        let settings = try goalSettingsCreatingIfNeeded()
         settings.mode = mode
         try context.save()
     }
