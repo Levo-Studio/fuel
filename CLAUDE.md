@@ -178,9 +178,18 @@ Concretely, for anyone touching AI code:
     Anthropic's `credit balance is too low` — → no credit, with a link to that
     provider's billing page. This is matched on the body, at any status.
   - `429` on its own → **retry**, not no-credit. Both providers document `429`
-    as rate limiting; Anthropic names it `rate_limit_error` and Mistral ships a
-    `Retry-After` header. Telling a merely throttled user to go top up is
-    wrong, and it was wrong in an earlier version of this file.
+    as rate limiting; Anthropic names it `rate_limit_error`, and Mistral's own
+    rate-limit article puts every limit behind it — including the monthly token
+    cap, which is the closest thing they have to running out of credit. Telling
+    a merely throttled user to go top up is wrong, and it was wrong in an
+    earlier version of this file.
+    (Two details often repeated about Mistral could not be confirmed from
+    Mistral's own pages: a `Retry-After` header, which is absent from their
+    OpenAPI spec and their rate-limit article and attested only by third-party
+    clients, and `403` for entitlement, which no reachable Mistral page
+    mentions. `403` is still grouped with `401` above because that grouping is
+    right on its own terms — a key that is refused and a key that is not
+    permitted have the same remedy — not because Mistral documents it.)
   - Anything else, and any transport failure → retry.
   Mistral publishes no distinct out-of-credit signal, so an exhausted Mistral
   balance may surface as retry rather than as no-credit. That is the honest
