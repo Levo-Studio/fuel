@@ -348,6 +348,29 @@ struct ShellTests {
         #expect(providers.providers.last == .mistral)
     }
 
+    /// The session outliving the cover is the bug this closes: the flow stops
+    /// it when the tab changes, and a dismissal is not a tab change.
+    @Test("Dismissing the flow stops the capture session")
+    func dismissingStopsTheCamera() throws {
+        let (store, _) = try makeTodayModel()
+        let camera = StubCamera()
+        let model = makeModel(store: store) { store, provider in
+            CameraLogModel(
+                store: store,
+                client: UnusedEstimator(),
+                camera: camera,
+                keys: StubKeys(hasKey: true),
+                provider: provider
+            )
+        }
+
+        model.openLogFlow()
+        #expect(camera.stopCount == 0)
+
+        model.dismissDestination()
+        #expect(camera.stopCount == 1)
+    }
+
     @Test("The gear opens Settings")
     func gearOpensSettings() throws {
         let (_, model) = try makeTodayModel()

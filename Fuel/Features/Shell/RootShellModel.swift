@@ -237,6 +237,20 @@ final class RootShellModel {
     /// worked out from a fetch, not a live query, so an entry written inside
     /// the flow reaches the totals and its meal section only when this runs.
     func dismissDestination() {
+        // The flow starts the session when the camera tab appears and stops it
+        // when another tab does, through a `.task(id:)` keyed on the selected
+        // tab. Cancelling that task does not stop the session, so nothing
+        // stopped it when the whole cover went away — the camera and its
+        // indicator would keep running behind Today. It was unreachable while
+        // nothing presented the flow; presenting it is what this branch does.
+        //
+        // Stopping belongs here rather than in the flow because this is what
+        // owns the model's lifetime: it builds the camera half when the flow
+        // opens and releases it here.
+        if destination == .logFlow {
+            cameraLog.camera.stop()
+        }
+
         today = Self.presentation(for: store)
         destination = nil
     }
