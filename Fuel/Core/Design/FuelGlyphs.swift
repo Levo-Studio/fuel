@@ -2,8 +2,9 @@ import SwiftUI
 
 // MARK: - Check
 
-/// The check the export draws on a completed key-test step:
-/// `d="M4 10.5l4 4L16 6"` in the twenty-unit glyph box.
+/// The check the export draws on screen 03, on a completed key-test step:
+/// `d="M4 10.5l4 4L16 6"` in the twenty-unit glyph box. It is also the mark a
+/// done row of Today's get-started checklist carries.
 ///
 /// It lives in the design layer rather than beside one of its call sites
 /// because two screens now draw it — the key test on screen 03, and the
