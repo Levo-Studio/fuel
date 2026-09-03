@@ -117,14 +117,16 @@ struct ShellTests {
         store: FuelStore,
         preferences: SettingsPreferences? = nil,
         makeCameraLog: @escaping RootShellModel.CameraLogFactory = ShellTests.stubCameraLog,
-        makeTextLog: @escaping RootShellModel.TextLogFactory = ShellTests.stubTextLog
+        makeTextLog: @escaping RootShellModel.TextLogFactory = ShellTests.stubTextLog,
+        makeMealDetail: @escaping RootShellModel.MealDetailFactory = ShellTests.stubMealDetail
     ) -> RootShellModel {
         RootShellModel(
             store: store,
             validator: UnusedValidator(),
             preferences: preferences ?? makePreferences(),
             makeCameraLog: makeCameraLog,
-            makeTextLog: makeTextLog
+            makeTextLog: makeTextLog,
+            makeMealDetail: makeMealDetail
         )
     }
 
@@ -145,6 +147,21 @@ struct ShellTests {
     /// which stage a reopened flow is on, not how long the bar takes.
     private static let stubTextLog: RootShellModel.TextLogFactory = { store, provider in
         TextLogModel(
+            store: store,
+            client: UnusedEstimator(),
+            keys: StubKeys(),
+            provider: provider,
+            pace: {}
+        )
+    }
+
+    /// The screen a logged meal opens on, with nothing behind it that could
+    /// reach a provider or a keychain. What this suite asks it is whether a tap
+    /// gets there and what a deletion leaves on Today, never what an estimate
+    /// comes back as.
+    private static let stubMealDetail: RootShellModel.MealDetailFactory = { store, provider, entryID in
+        MealDetailModel(
+            entryID: entryID,
             store: store,
             client: UnusedEstimator(),
             keys: StubKeys(),
@@ -563,6 +580,95 @@ struct ShellTests {
 
         model.dismissDestination()
         #expect(camera.stopCount == 1)
+    }
+
+    // MARK: - Opening a logged meal
+
+    /// A meal to open the detail screen on, written through the store because
+    /// the screen is opened on a row rather than on a value.
+    @discardableResult
+    private func logMeal(in store: FuelStore, title: String = "Oats with skyr") throws -> FoodEntry {
+        try store.log(
+            title: title,
+            kilocalories: 420,
+            macros: MacroTotals(protein: 30, carbs: 55, fat: 9),
+            loggedAt: Date(),
+            source: .photo
+        )
+    }
+
+    @Test("Tapping a meal on Today opens it")
+    func tappingAMealOpensIt() throws {
+        let (store, model) = try makeTodayModel()
+        let entry = try logMeal(in: store)
+
+        model.openMealDetail(entry.entryID)
+
+        #expect(model.destination == .mealDetail(entry.entryID))
+        #expect(model.mealDetail?.draft.title == "Oats with skyr")
+    }
+
+    /// A row for a meal that is no longer there leaves the tap unanswered
+    /// rather than presenting a screen with nothing on it.
+    @Test("A meal that is not in the store opens nothing")
+    func tappingAMissingMealOpensNothing() throws {
+        let (_, model) = try makeTodayModel()
+
+        model.openMealDetail(UUID())
+
+        #expect(model.destination == nil)
+        #expect(model.mealDetail == nil)
+    }
+
+    /// The screen carries a draft the user may have edited without asking for
+    /// it to be priced, so it is released with the presentation.
+    @Test("Closing a meal releases the screen it was on")
+    func closingAMealReleasesTheScreen() throws {
+        let (store, model) = try makeTodayModel()
+        let entry = try logMeal(in: store)
+
+        model.openMealDetail(entry.entryID)
+        model.mealDetail?.addItem("Olive oil, 1 tbsp")
+        model.dismissDestination()
+
+        #expect(model.destination == nil)
+        #expect(model.mealDetail == nil)
+
+        model.openMealDetail(entry.entryID)
+        #expect(model.mealDetail?.draft.hasItemEdits == false)
+    }
+
+    /// The refresh the day list needs: `today` is worked out from a fetch and
+    /// not a live query, so without the re-read on dismissal a deleted meal is
+    /// gone from the store and still on the screen.
+    @Test("A meal deleted on its own screen is off Today when the screen closes")
+    func deletingRefreshesToday() throws {
+        let (store, model) = try makeTodayModel()
+        let entry = try logMeal(in: store)
+        model.dismissDestination()
+        #expect(model.today.totals.kilocalories == 420)
+
+        model.openMealDetail(entry.entryID)
+        #expect(model.mealDetail?.delete() == true)
+        model.dismissDestination()
+
+        #expect(model.today.totals.kilocalories == 0)
+        #expect(model.today.groups.isEmpty)
+    }
+
+    /// Only one cover can be presented, so the shortcut has to leave the meal
+    /// the way its own `‹ Back` does before the flow can open.
+    @Test("A scan request from a meal lands on the camera")
+    func scanRequestFromAMeal() throws {
+        let (store, model) = try makeTodayModel()
+        let entry = try logMeal(in: store)
+
+        model.openMealDetail(entry.entryID)
+        model.requestScan()
+
+        #expect(model.destination == .logFlow)
+        #expect(model.mealDetail == nil)
+        #expect(model.logFlow.selectedTab == .camera)
     }
 
     @Test("The gear opens Settings")

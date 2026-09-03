@@ -12,10 +12,14 @@ struct TodayDayList: View {
 
     let groups: [MealGroup]
 
+    /// A row was tapped: open that meal. The identity is the entry's own, the
+    /// one that survives the boundary out of SwiftData.
+    let onSelect: (UUID) -> Void
+
     var body: some View {
         VStack(alignment: .leading, spacing: FuelMetrics.Space.s20) {
             ForEach(groups) { group in
-                TodayMealGroupView(group: group)
+                TodayMealGroupView(group: group, onSelect: onSelect)
             }
         }
         .fuelAnimation(FuelMotion.emphasised, value: groups)
@@ -27,6 +31,8 @@ struct TodayDayList: View {
 private struct TodayMealGroupView: View {
 
     let group: MealGroup
+
+    let onSelect: (UUID) -> Void
 
     @Environment(\.fuelPalette) private var palette
 
@@ -49,8 +55,7 @@ private struct TodayMealGroupView: View {
             TodayHairline(color: palette.hair)
 
             ForEach(group.entries) { entry in
-                TodayEntryRow(entry: entry)
-                    .padding(.vertical, FuelMetrics.Space.s14)
+                TodayEntryRow(entry: entry, onSelect: onSelect)
 
                 TodayHairline(color: palette.hairSoft)
             }
@@ -60,13 +65,35 @@ private struct TodayMealGroupView: View {
 
 // MARK: - Entry
 
+/// One meal in the list, and the way into it.
+///
+/// **The export draws no control on this row**, and nothing here is added to
+/// it: the two lines, the figure, their type, their colour and the `s14` bands
+/// above and below are the drawn ones. What changed is that the drawn row is
+/// now the button rather than sitting inside one — the padding moved in with
+/// it, so the region that answers to a finger is the whole row and not the
+/// height of the title. At the drawn `s14` either side of two lines of text
+/// that is already past a fingertip, so no minimum has to be imposed on top.
 private struct TodayEntryRow: View {
 
     let entry: NutritionEntry
 
+    let onSelect: (UUID) -> Void
+
     @Environment(\.fuelPalette) private var palette
 
     var body: some View {
+        Button {
+            onSelect(entry.id)
+        } label: {
+            row
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(Text(TodayCopy.entryHint))
+    }
+
+    private var row: some View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: .zero) {
                 // The title is the one attacker-influenced string that survives
@@ -92,7 +119,8 @@ private struct TodayEntryRow: View {
                 .fuelStyle(FuelTypography.listValue)
                 .foregroundStyle(palette.ink)
         }
-        .accessibilityElement(children: .combine)
+        .padding(.vertical, FuelMetrics.Space.s14)
+        .contentShape(.rect)
     }
 }
 

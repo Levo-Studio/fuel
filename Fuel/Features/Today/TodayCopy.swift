@@ -97,6 +97,13 @@ nonisolated enum TodayCopy {
         String(format: String(localized: "today.entry.meta"), time, sourceName(source))
     }
 
+    /// What a row of the day list does when it is tapped, for VoiceOver. The
+    /// export draws no control on the row, so there is nothing to name — only
+    /// what it leads to.
+    static var entryHint: String {
+        String(localized: "today.entry.hint")
+    }
+
     // MARK: - Empty day
 
     // None of the copy below is in the export, which draws no empty state on

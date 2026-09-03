@@ -66,13 +66,18 @@ nonisolated struct MealResultDraft: Equatable, Sendable {
 
     /// Throws out a line the model got wrong.
     ///
+    /// **Refused on the last remaining row** — see `canRemoveItems` for why, and
+    /// for why a list that arrived empty is not the same case.
+    ///
     /// **Nothing is recalculated.** The total and the macros above the list are
     /// what the model said about the meal it was shown, and subtracting a row's
     /// calories from them would invent the macro split that no row carries. The
     /// figures stand, wrong, until the user asks for them again — which is
     /// exactly what `hasItemEdits` puts in front of them.
     mutating func removeItem(_ id: RecognisedItem.ID) {
-        guard items.contains(where: { $0.id == id }) else { return }
+        // The refusal comes first, and it marks nothing: a removal that did not
+        // happen must not leave the estimate reading as stale.
+        guard canRemoveItems, items.contains(where: { $0.id == id }) else { return }
         items.removeAll { $0.id == id }
         userWrittenItems.remove(id)
         hasItemEdits = true
@@ -130,6 +135,55 @@ nonisolated struct MealResultDraft: Equatable, Sendable {
         items = estimate.items
         userWrittenItems = []
         hasItemEdits = false
+    }
+
+    /// Whether the remove mark is drawn on a row at all.
+    ///
+    /// **The last row cannot be thrown out.** A breakdown the user has emptied
+    /// says they rejected every line the estimate was made of, while the figures
+    /// above it still describe those lines — and `Add` over that would log a
+    /// total for a breakdown its owner disowned. Correcting a whole meal is
+    /// already possible without emptying it: the last row is a sentence, and
+    /// rewriting it is what the field is for.
+    ///
+    /// A meal that arrived without a breakdown is a different thing and is left
+    /// alone. `MealEstimate.items` may be empty — a model that priced a meal
+    /// without splitting it gave a usable answer — and a meal repeated from the
+    /// Recent list never had one. Those figures are the model's for the whole
+    /// meal and nobody has disowned them; there is simply no row here to remove.
+    var canRemoveItems: Bool {
+        items.count > 1
+    }
+
+    /// Whether `Re-analyse` is a thing the footer can honestly offer.
+    ///
+    /// **Two conditions, and the second one is not pedantry.** The list has to
+    /// have been changed — an unchanged breakdown would spend the user's credit
+    /// on the answer they are already looking at — *and* it has to still have
+    /// something in it. A user who removes every row has changed the list and
+    /// left nothing to send, and a request built from that list would be a
+    /// request about nothing.
+    ///
+    /// Before this existed the two halves lived apart: the footer swapped on
+    /// `hasItemEdits` alone while every re-analysis refused an empty sentence,
+    /// so emptying the list produced a button reading `Re-analyse` that did
+    /// nothing at all — and took the caller's own action off the screen with
+    /// it. On a stored meal that hid `Delete`, which is the one thing that
+    /// screen is for. It is one rule now, read by the footer and by the models,
+    /// so the drawing and the refusal cannot disagree again.
+    ///
+    /// The empty half of that is now also prevented upstream: `canRemoveItems`
+    /// refuses the last row, so no sequence of edits reaches an empty list. It
+    /// is kept here anyway, and deliberately — it is the statement of what the
+    /// footer means, and it is what holds if a future path ever empties a list
+    /// by some other route. The two are a pair, not one propping up the other.
+    ///
+    /// A list that was empty when it arrived stays the caller's own action:
+    /// `MealEstimate.items` may arrive empty, and a meal repeated from the
+    /// Recent list has never had a breakdown, so `Add` and `Delete` are already
+    /// what those screens offer over an empty heading.
+    var canReanalyse: Bool {
+        hasItemEdits && !items.isEmpty
     }
 
     /// The edited list as one line of text, which is what a re-analysis is

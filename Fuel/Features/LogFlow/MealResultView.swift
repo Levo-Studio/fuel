@@ -19,6 +19,32 @@ struct MealResultAction {
     let perform: () -> Void
 }
 
+// MARK: - Footer confirmation
+
+/// The words on the dialog that stands in front of throwing the user's work
+/// away.
+///
+/// A parameter for the same reason `MealResultAction`'s title is one: the
+/// mechanism is identical on every errand and the sentence is not. After an
+/// estimate, what is at stake is the estimate — nothing has been written down
+/// yet, and `Discard` is literally what happens to it. On a meal that is
+/// already in the store, nothing is discarded and the meal survives either way;
+/// what is at stake is the breakdown edits the user has just made.
+///
+/// One value rather than two, because one dialog stands in front of both
+/// controls that can reach it — the trash mark and `‹ Back` — and on any screen
+/// that draws both, both risk the same thing.
+nonisolated struct MealResultConfirmation {
+
+    let title: String
+
+    /// The destructive verb.
+    let confirm: String
+
+    /// The way out, which changes nothing.
+    let cancel: String
+}
+
 // MARK: - Meal result
 
 /// Screens 14 and 15: what the model came back with, before any of it is
@@ -84,6 +110,10 @@ struct MealResultView<Lede: View>: View {
     /// nothing to discard, and draws no leading control at all.
     let onDiscard: (() -> Void)?
 
+    /// What the confirmation in front of both of those says. Handed in the way
+    /// `flowLabel` is: the screen draws it, the caller knows what is at stake.
+    let discardConfirmation: MealResultConfirmation
+
     /// The filled footer button as this caller means it.
     let commit: MealResultAction
 
@@ -124,6 +154,7 @@ struct MealResultView<Lede: View>: View {
         onAddItem: @escaping (String) -> Void,
         onReanalyse: @escaping () -> Void,
         onDiscard: (() -> Void)?,
+        discardConfirmation: MealResultConfirmation,
         commit: MealResultAction,
         @ViewBuilder lede: @escaping () -> Lede
     ) {
@@ -138,6 +169,7 @@ struct MealResultView<Lede: View>: View {
         self.onAddItem = onAddItem
         self.onReanalyse = onReanalyse
         self.onDiscard = onDiscard
+        self.discardConfirmation = discardConfirmation
         self.commit = commit
         self.lede = lede
     }
@@ -191,13 +223,13 @@ struct MealResultView<Lede: View>: View {
         // subject, and it puts the destructive verb where the platform's users
         // look for it.
         .confirmationDialog(
-            MealResultCopy.discardTitle,
+            discardConfirmation.title,
             isPresented: $isConfirmingDiscard,
             titleVisibility: .visible
         ) {
-            Button(MealResultCopy.discardConfirm, role: .destructive) { pendingDiscard?() }
+            Button(discardConfirmation.confirm, role: .destructive) { pendingDiscard?() }
 
-            Button(MealResultCopy.discardCancel, role: .cancel) { pendingDiscard = nil }
+            Button(discardConfirmation.cancel, role: .cancel) { pendingDiscard = nil }
         }
     }
 
@@ -486,7 +518,17 @@ struct MealResultView<Lede: View>: View {
             .accessibilityValue(Text(MealResultCopy.kilocaloriesValue(item.kilocalories)))
             .accessibilityHint(Text(MealResultCopy.itemEditHint))
 
-            removeControl(item)
+            // Not drawn on the last remaining row, because there it cannot do
+            // anything — see `MealResultDraft.canRemoveItems`. **Hidden rather
+            // than inert**, and the choice is the one this screen has just been
+            // through: a control that is drawn and does nothing is the dead
+            // `Re-analyse` again, and the export gives no dimmed state to draw
+            // instead. Hiding it needs no value the design does not carry — the
+            // mark is an addition to a drawn row, so a row without it is the row
+            // the export actually draws, name and figure and nothing else.
+            if draft.canRemoveItems {
+                removeControl(item)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(alignment: .bottom) {
@@ -629,6 +671,13 @@ struct MealResultView<Lede: View>: View {
     /// a breakdown that no longer exists, and logging them would write down a
     /// meal nobody estimated. So the button asks the model again instead.
     ///
+    /// **Unless the list is empty**, in which case there is nothing to ask
+    /// about and the caller's own action comes back. See
+    /// `MealResultDraft.canReanalyse`, which holds both halves of that rule so
+    /// this button and the request it fires cannot disagree — they used to, and
+    /// a footer reading `Re-analyse` over an emptied list did nothing at all
+    /// while hiding the action it had replaced.
+    ///
     /// It is the one thing this screen decides rather than takes as a
     /// parameter, and deliberately: the rule is the same for every caller, and
     /// a caller that forgot it would be a caller that logs a stale figure.
@@ -638,7 +687,7 @@ struct MealResultView<Lede: View>: View {
     /// something has actually changed and never as a second button standing
     /// permanently on the screen. Nothing re-analyses on its own.
     private var primaryAction: MealResultAction {
-        guard draft.hasItemEdits else { return commit }
+        guard draft.canReanalyse else { return commit }
         return MealResultAction(title: MealResultCopy.reanalyse, perform: onReanalyse)
     }
 }

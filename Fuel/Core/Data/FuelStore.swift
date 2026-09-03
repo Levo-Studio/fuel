@@ -77,6 +77,18 @@ final class FuelStore {
         return try context.fetch(descriptor)
     }
 
+    /// One stored meal, by the identity that survives the boundary.
+    ///
+    /// `entryID` rather than `persistentModelID`, because the identity a screen
+    /// is opened on came out of a `NutritionEntry` — the only shape of an entry
+    /// anything outside this file has — and `persistentModelID` is a SwiftData
+    /// type that deliberately never travels that far.
+    func entry(withID id: UUID) throws -> FoodEntry? {
+        var descriptor = FetchDescriptor<FoodEntry>(predicate: #Predicate { $0.entryID == id })
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
     // MARK: - Writing an entry
 
     /// Logs a meal, then re-derives the labels of the day it lands in.
@@ -142,6 +154,49 @@ final class FuelStore {
     func setFavourite(_ isFavourite: Bool, on entry: FoodEntry) throws {
         entry.isFavourite = isFavourite
         try context.save()
+    }
+
+    /// Puts a fresh estimate over a meal that is already stored.
+    ///
+    /// **In place, rather than a delete and a new row.** The identity is what
+    /// the screen showing the meal was opened on and what anything holding the
+    /// meal refers to, so replacing the row would leave that screen pointed at
+    /// nothing. It would also cost the entry its place in the day: `log`
+    /// re-derives the whole day's labels around a new arrival, and a meal that
+    /// held breakfast could come back as a snack because the row it lost was
+    /// the one holding the meal.
+    ///
+    /// **`loggedAt` and `source` are deliberately not arguments.** A meal was
+    /// eaten when it was eaten, and re-pricing it is not a second meal; the day
+    /// it belongs to and its `08:14 · Photo` line are the same as before. That
+    /// is also why nothing is relabelled here — the label is derived from the
+    /// time, and the time has not moved.
+    func update(
+        _ entry: FoodEntry,
+        title: String,
+        kilocalories: Int,
+        macros: MacroTotals,
+        items: [RecognisedItem]
+    ) throws {
+        entry.title = title
+        entry.kilocalories = kilocalories
+        entry.macros = macros
+        entry.items = items
+        try context.save()
+    }
+
+    /// Throws a meal away, then re-derives the labels of the day it left.
+    ///
+    /// The relabelling is not housekeeping. Breakfast, lunch and dinner are
+    /// each handed out once a day, so a day whose only breakfast is deleted has
+    /// the meal free again — and the entry that was a snack because breakfast
+    /// was taken is a breakfast now. Leaving the day underived would show a
+    /// morning with no breakfast group and a snack in its place.
+    func delete(_ entry: FoodEntry) throws {
+        let day = entry.loggedAt
+        context.delete(entry)
+        try context.save()
+        try relabelDay(containing: day)
     }
 
     // MARK: - Goal and counting mode

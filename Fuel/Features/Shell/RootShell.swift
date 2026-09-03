@@ -83,7 +83,8 @@ struct RootShell: View {
                     presentation: model.today,
                     gettingStarted: model.gettingStarted,
                     onOpenSettings: model.openSettings,
-                    onAddEntry: model.openLogFlow
+                    onAddEntry: model.openLogFlow,
+                    onOpenMeal: model.openMealDetail
                 )
             }
         }
@@ -132,6 +133,10 @@ struct RootShell: View {
                         theme: preferences.theme
                     )
                 )
+            case .mealDetail:
+                if let detail = model.mealDetail {
+                    MealDetailView(model: detail, onClose: model.dismissDestination)
+                }
             case .settings:
                 if let counting = model.settingsCounting {
                     SettingsScreen(

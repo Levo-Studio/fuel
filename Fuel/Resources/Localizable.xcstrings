@@ -73,6 +73,114 @@
         }
       }
     },
+    "detail.delete" : {
+      "comment" : "The filled footer action on a logged meal, in the place screens 14 and 15 draw Hinzufügen. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete"
+          }
+        }
+      }
+    },
+    "detail.delete.cancel" : {
+      "comment" : "Backs out of the delete confirmation, leaving the meal and any edits alone. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep meal"
+          }
+        }
+      }
+    },
+    "detail.delete.confirm" : {
+      "comment" : "The destructive action in the delete confirmation. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete"
+          }
+        }
+      }
+    },
+    "detail.delete.title" : {
+      "comment" : "The delete confirmation's own title. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete this meal?"
+          }
+        }
+      }
+    },
+    "detail.discardEdits.cancel" : {
+      "comment" : "Backs out of that confirmation, leaving the edits alone. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep editing"
+          }
+        }
+      }
+    },
+    "detail.discardEdits.confirm" : {
+      "comment" : "The destructive action in that confirmation. Names the changes, not the meal, because the meal survives. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard changes"
+          }
+        }
+      }
+    },
+    "detail.discardEdits.title" : {
+      "comment" : "The confirmation in front of ‹ Back on a logged meal whose breakdown was edited. Nothing is discarded but the edits — the meal is in the store either way. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard your changes?"
+          }
+        }
+      }
+    },
+    "detail.flow" : {
+      "comment" : "The label top right on a meal that is already logged, where screens 14 and 15 draw Foto-Eintrag / Text-Eintrag; the style uppercases it. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Logged meal"
+          }
+        }
+      }
+    },
+    "detail.items.heading" : {
+      "comment" : "The heading over the breakdown on a logged meal. Takes screen 15's drawn word, because a stored list is a breakdown rather than a fresh recognition; the style uppercases it. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Broken down"
+          }
+        }
+      }
+    },
     "intent.scan.description" : {
       "comment" : "The Scan shortcut, under its title in the Shortcuts app. Not in the export.",
       "extractionState" : "manual",
@@ -1971,6 +2079,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Add"
+          }
+        }
+      }
+    },
+    "today.entry.hint" : {
+      "comment" : "VoiceOver hint on a row of the day list, which opens the meal. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens this meal"
           }
         }
       }

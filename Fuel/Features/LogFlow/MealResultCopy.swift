@@ -122,16 +122,14 @@ nonisolated enum MealResultCopy {
         String(localized: "result.discard.label")
     }
 
-    static var discardTitle: String {
-        String(localized: "result.discard.title")
-    }
-
-    static var discardConfirm: String {
-        String(localized: "result.discard.confirm")
-    }
-
-    static var discardCancel: String {
-        String(localized: "result.discard.cancel")
+    /// What the confirmation says on the two screens where the estimate has
+    /// not been written down yet, so discarding it is literally what happens.
+    static var discardConfirmation: MealResultConfirmation {
+        MealResultConfirmation(
+            title: String(localized: "result.discard.title"),
+            confirm: String(localized: "result.discard.confirm"),
+            cancel: String(localized: "result.discard.cancel")
+        )
     }
 
     static var add: String {

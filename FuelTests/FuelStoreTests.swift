@@ -138,6 +138,82 @@ struct FuelStoreTests {
         #expect(try store.hasAnyEntry())
     }
 
+    // MARK: - A meal already in the store
+
+    @Test("an entry comes back by the identity the hand-off carries")
+    func fetchesOneEntryByID() throws {
+        let store = try makeStore()
+        let wanted = try store.log(title: "Bowl", kilocalories: 680, macros: .zero, loggedAt: at(12, 40), source: .text)
+        try store.log(title: "Porridge", kilocalories: 420, macros: .zero, loggedAt: at(8, 14), source: .photo)
+
+        #expect(try store.entry(withID: wanted.entryID)?.title == "Bowl")
+        #expect(try store.entry(withID: UUID()) == nil)
+    }
+
+    /// The one the write-back exists for: a re-analysis replaces what the model
+    /// said and touches nothing the user did not ask it to.
+    @Test("updating a meal replaces the estimate and leaves its place in the day alone")
+    func updateReplacesTheEstimateInPlace() throws {
+        let store = try makeStore()
+        let entry = try store.log(
+            title: "Salmon with polenta",
+            kilocalories: 460,
+            macros: MacroTotals(protein: 34, carbs: 28, fat: 23),
+            loggedAt: at(19, 20),
+            source: .photo,
+            items: [RecognisedItem(name: "Polenta", kilocalories: 150, note: .text(amount: .estimated))]
+        )
+        let identity = entry.entryID
+
+        try store.update(
+            entry,
+            title: "Salmon with polenta, raw 50 g",
+            kilocalories: 390,
+            macros: MacroTotals(protein: 34, carbs: 15, fat: 21),
+            items: [RecognisedItem(name: "Polenta, raw 50 g", kilocalories: 80, note: .text(amount: .recognised))]
+        )
+
+        let day = try store.entries(on: at(19, 20))
+        #expect(day.count == 1)
+        let stored = try #require(day.first)
+        // Updated in place: the same row, not a second one beside it.
+        #expect(stored.entryID == identity)
+        #expect(stored.kilocalories == 390)
+        #expect(stored.macros == MacroTotals(protein: 34, carbs: 15, fat: 21))
+        #expect(stored.items.map(\.name) == ["Polenta, raw 50 g"])
+        // The meal was eaten when it was eaten, and it is still the photo entry
+        // the day list draws.
+        #expect(stored.loggedAt == at(19, 20))
+        #expect(stored.source == .photo)
+        #expect(stored.label == .dinner)
+    }
+
+    @Test("deleting a meal takes it out of its day")
+    func deleteRemovesTheEntry() throws {
+        let store = try makeStore()
+        let entry = try store.log(title: "Bowl", kilocalories: 680, macros: .zero, loggedAt: at(12, 40), source: .text)
+        try store.log(title: "Porridge", kilocalories: 420, macros: .zero, loggedAt: at(8, 14), source: .photo)
+
+        try store.delete(entry)
+
+        #expect(try store.entries(on: at(12, 40)).map(\.title) == ["Porridge"])
+        #expect(try store.entry(withID: entry.entryID) == nil)
+    }
+
+    /// Breakfast is handed out once a day, so deleting the entry holding it
+    /// gives the meal back to the one that had to settle for a snack.
+    @Test("deleting a meal frees its label for the rest of the day")
+    func deleteRelabelsTheDay() throws {
+        let store = try makeStore()
+        let first = try store.log(title: "Porridge", kilocalories: 420, macros: .zero, loggedAt: at(8, 14), source: .photo)
+        try store.log(title: "Toast", kilocalories: 200, macros: .zero, loggedAt: at(9, 45), source: .text)
+        #expect(try store.nutritionEntries(on: at(9, 0)).map(\.label) == [.breakfast, .snack])
+
+        try store.delete(first)
+
+        #expect(try store.nutritionEntries(on: at(9, 0)).map(\.label) == [.breakfast])
+    }
+
     @Test("there are no goal settings until onboarding answers")
     func goalSettingsAreCreatedOnDemand() throws {
         let store = try makeStore()
