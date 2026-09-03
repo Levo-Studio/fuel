@@ -76,7 +76,7 @@ nonisolated struct MistralClient: AIClient {
         Self.authorise(&request, with: key)
 
         do {
-            let response = try await transport.send(request)
+            let response = try await transport.sendRetryingALostConnection(request)
             guard (200..<300).contains(response.statusCode) else {
                 return .failed(
                     AIError.from(status: response.statusCode, body: response.body, provider: provider)
@@ -148,7 +148,7 @@ nonisolated struct MistralClient: AIClient {
 
         let response: HTTPResponse
         do {
-            response = try await transport.send(request)
+            response = try await transport.sendRetryingALostConnection(request)
         } catch {
             throw AIError.transportFailure(error)
         }

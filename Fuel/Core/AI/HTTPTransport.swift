@@ -26,6 +26,49 @@ nonisolated protocol HTTPTransport: Sendable {
     func send(_ request: URLRequest) async throws -> HTTPResponse
 }
 
+// MARK: - A connection the system had already dropped
+
+extension HTTPTransport {
+
+    /// Sends `request`, and sends it once more if the first attempt died with
+    /// `NSURLErrorNetworkConnectionLost`.
+    ///
+    /// **The one transport failure worth a second go, and it is worth one
+    /// because of how `URLSession` keeps connections.** A session pools its
+    /// HTTP/2 connections and reuses them; a connection that the far end,
+    /// or a carrier NAT, has quietly closed while it sat idle still looks
+    /// usable, so the next request is written into a socket that is already
+    /// gone and comes back as `-1005` without having been delivered. The
+    /// symptom is a failure that arrives in seconds, on a device with a
+    /// perfectly good connection, roughly whenever a request follows a pause
+    /// — which is the shape of a scan-then-scan-again session.
+    ///
+    /// Nothing else is retried. A refused status is the provider's answer and
+    /// repeating it would only cost a second request; a timeout means the
+    /// request was very likely delivered; and no route to host will not become
+    /// one on a second try.
+    ///
+    /// **What it costs if the guess is wrong.** `-1005` can in principle
+    /// arrive after the provider has already accepted and billed the request,
+    /// and then this pays for a second one. That is exactly what the user does
+    /// when they tap `Try again` on the failure screen, which is where they
+    /// would otherwise be — so the worst case is the cost they were going to
+    /// pay anyway, and the best case is that they never see the screen. It is
+    /// bounded at one extra attempt, deliberately: an automatic ladder on
+    /// someone else's credit is not a decision an app gets to make.
+    ///
+    /// The cancellation check between the two is not decoration. A request the
+    /// user has already backed out of must not buy a second one.
+    func sendRetryingALostConnection(_ request: URLRequest) async throws -> HTTPResponse {
+        do {
+            return try await send(request)
+        } catch let error as URLError where error.code == .networkConnectionLost {
+            try Task.checkCancellation()
+            return try await send(request)
+        }
+    }
+}
+
 // MARK: - Response
 
 /// A provider's answer, reduced to the two things a client reads.

@@ -540,6 +540,46 @@ struct AIErrorMappingTests {
         }
     }
 
+    /// The strongest candidate for an intermittent failure on a real device:
+    /// `URLSession` pools its connections, and a pooled connection the far end
+    /// closed while it sat idle still looks usable, so the next request is
+    /// written into a socket that is already gone. It comes back as `-1005`
+    /// without ever having been delivered.
+    @Test("a connection the system had already dropped is tried once more")
+    func lostConnectionIsRetriedOnce() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let transport = RecordingTransport([
+            .failure(URLError(.networkConnectionLost)),
+            .success(HTTPResponse(statusCode: 200, body: Data(Reply.anthropic(Reply.goodEstimate).utf8))),
+        ])
+        let client = AnthropicClient(transport: transport, keys: keys.source)
+
+        let estimate = try await client.estimate(text: "porridge with berries")
+
+        #expect(estimate.kilocalories == 420)
+        #expect(transport.requests.count == 2)
+    }
+
+    /// The bound on the paragraph above. Everything else is answered once and
+    /// reported, because a second attempt would spend the user's credit on a
+    /// failure that is not going to change its mind.
+    @Test("no other transport failure buys a second request")
+    func otherFailuresAreNotRetried() async throws {
+        let keys = try KeyFixture(provider: .mistral, secret: "0123456789abcdefghij")
+        defer { keys.tearDown(provider: .mistral) }
+
+        let transport = RecordingTransport.offline()
+        let client = MistralClient(transport: transport, keys: keys.source)
+
+        await #expect(throws: AIError.network) {
+            _ = try await client.estimate(text: "an apple")
+        }
+
+        #expect(transport.requests.count == 1)
+    }
+
     @Test("a cancelled scan is cancelled, not a retry")
     func cancelledScan() async throws {
         let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
