@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 import UIKit
 
@@ -467,5 +468,140 @@ private func pixel() -> UIImage {
     format.opaque = true
     return UIGraphicsImageRenderer(size: size, format: format).image { context in
         context.fill(CGRect(origin: .zero, size: size))
+    }
+}
+
+// MARK: - Hatch
+
+/// The direction the hatch's bands run.
+///
+/// It has its own suite because it is the one thing about `PhotoHatch` a reader
+/// cannot check by eye in a diff: the angle, the band and the two tones are all
+/// correct transcriptions of the export whichever way the bands are stacked,
+/// and stacking them the wrong way turns the whole hatch a quarter turn while
+/// leaving every number in the file right. That is a mistake a review cannot
+/// see, so it is pinned here instead.
+@Suite("Hatch")
+@MainActor
+struct PhotoHatchTests {
+
+    /// Edge of every rendering below. Several band periods across, so a
+    /// direction has something to be measured against.
+    private static let edge: CGFloat = 80
+
+    /// How far a sample is taken from its neighbour, on both axes at once.
+    ///
+    /// `band / √2` on each axis is one whole band width along the hatch's
+    /// normal, which is the shift that lands squarely in the neighbouring
+    /// stripe. Rounded to whole pixels so no sample needs interpolating.
+    private static var step: Int {
+        Int((FuelMetrics.Hatch.band / 2.0.squareRoot()).rounded())
+    }
+
+    @Test("the bands run bottom-left to top-right, as the export draws them")
+    func bandsRunAlongTheDrawnDiagonal() throws {
+        let hatch = try #require(
+            render(PhotoHatch(base: .black, stripe: .white))
+        )
+
+        let downRight = meanDifference(in: hatch, dx: Self.step, dy: Self.step)
+        let upRight = meanDifference(in: hatch, dx: Self.step, dy: -Self.step)
+
+        // The buffer's row order relative to the view's is a property of the
+        // drawing pipeline, not something to assume. A plain top-to-bottom
+        // gradient rendered the same way answers it outright.
+        let topDown = try #require(bufferRunsTopDown())
+
+        // In view coordinates a "/" band runs (1, -1): x rises as y falls. A
+        // flipped buffer swaps which measured diagonal that is.
+        let alongTheBand = topDown ? upRight : downRight
+        let acrossTheBands = topDown ? downRight : upRight
+
+        #expect(alongTheBand < acrossTheBands)
+        // Not merely smaller — a uniform fill would satisfy that. The bands
+        // have to actually be there.
+        #expect(acrossTheBands > 64)
+        #expect(alongTheBand < 8)
+    }
+
+    // MARK: - Measuring
+
+    /// Mean absolute difference between each pixel and the one `dx`, `dy` away.
+    private func meanDifference(in image: GrayImage, dx: Int, dy: Int) -> Double {
+        var total = 0.0
+        var count = 0
+        for y in 0..<image.height where y + dy >= 0 && y + dy < image.height {
+            for x in 0..<image.width where x + dx >= 0 && x + dx < image.width {
+                let here = Double(image[x, y])
+                let there = Double(image[x + dx, y + dy])
+                total += abs(here - there)
+                count += 1
+            }
+        }
+        return count == 0 ? 0 : total / Double(count)
+    }
+
+    /// Whether row zero of a rendered buffer is the top of the view.
+    ///
+    /// Measured rather than assumed, through the same renderer the hatch goes
+    /// through, so whatever the pipeline does to one it does to the other.
+    private func bufferRunsTopDown() -> Bool? {
+        let gradient = LinearGradient(
+            colors: [.black, .white],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        guard let image = render(gradient) else { return nil }
+
+        var firstRow = 0.0
+        var lastRow = 0.0
+        for x in 0..<image.width {
+            firstRow += Double(image[x, 0])
+            lastRow += Double(image[x, image.height - 1])
+        }
+        return firstRow < lastRow
+    }
+
+    /// Renders a view to an 8-bit grey buffer at scale 1.
+    private func render(_ content: some View) -> GrayImage? {
+        let renderer = ImageRenderer(
+            content: content.frame(width: Self.edge, height: Self.edge)
+        )
+        renderer.scale = 1
+        guard let cgImage = renderer.cgImage else { return nil }
+
+        let width = cgImage.width
+        let height = cgImage.height
+        var pixels = [UInt8](repeating: 0, count: width * height)
+        pixels.withUnsafeMutableBytes { buffer in
+            guard
+                let base = buffer.baseAddress,
+                let context = CGContext(
+                    data: base,
+                    width: width,
+                    height: height,
+                    bitsPerComponent: 8,
+                    bytesPerRow: width,
+                    space: CGColorSpaceCreateDeviceGray(),
+                    bitmapInfo: CGImageAlphaInfo.none.rawValue
+                )
+            else {
+                return
+            }
+            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        }
+        return GrayImage(pixels: pixels, width: width, height: height)
+    }
+}
+
+/// An 8-bit grey rendering, addressed by column and row.
+private struct GrayImage {
+
+    let pixels: [UInt8]
+    let width: Int
+    let height: Int
+
+    subscript(x: Int, y: Int) -> UInt8 {
+        pixels[y * width + x]
     }
 }
