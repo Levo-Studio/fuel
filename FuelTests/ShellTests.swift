@@ -597,15 +597,76 @@ struct ShellTests {
         )
     }
 
-    @Test("Tapping a meal on Today opens it")
+    /// The screen is **pushed**, and the assertion on `destination` is the
+    /// point of the test rather than a leftover. It is the one destination the
+    /// export draws no frame for, it is reached by tapping a row in a list, and
+    /// a push is what iOS does for that — so it must not be a cover, and a
+    /// future change that made it one again would fail here.
+    @Test("Tapping a meal on Today pushes it rather than presenting it")
     func tappingAMealOpensIt() throws {
         let (store, model) = try makeTodayModel()
         let entry = try logMeal(in: store)
 
         model.openMealDetail(entry.entryID)
 
-        #expect(model.destination == .mealDetail(entry.entryID))
+        #expect(model.pushedMeal == entry.entryID)
+        #expect(model.destination == nil)
         #expect(model.mealDetail?.draft.title == "Oats with skyr")
+    }
+
+    /// What the shell asks before it lets the system's back-swipe through.
+    ///
+    /// An untouched screen answers `false`, exactly as `‹ Back` is immediate on
+    /// one: a confirmation on a screen with nothing at stake would be a dialog
+    /// in front of nothing.
+    @Test("A meal nobody edited can be left without a question")
+    func leavingAnUntouchedMealAsksNothing() throws {
+        let (store, model) = try makeTodayModel()
+        let entry = try logMeal(in: store)
+
+        model.openMealDetail(entry.entryID)
+
+        #expect(model.mealDetailDiscardsEdits == false)
+    }
+
+    /// The reason the interactive pop is intercepted rather than taken as it
+    /// arrives. A previous round found `‹ Back` destroying corrections
+    /// silently; a system gesture that popped straight through would be the
+    /// same bug reached a different way.
+    @Test("A meal with breakdown edits cannot be left silently")
+    func leavingAnEditedMealAsksFirst() throws {
+        let (store, model) = try makeTodayModel()
+        let entry = try logMeal(in: store)
+
+        model.openMealDetail(entry.entryID)
+        model.mealDetail?.addItem("Olive oil, 1 tbsp")
+
+        #expect(model.mealDetailDiscardsEdits)
+        // Nothing has left yet: the question is asked, and the screen is still
+        // on the stack until it is answered.
+        #expect(model.pushedMeal == entry.entryID)
+    }
+
+    /// `hasItemEdits` and not "anything at all was touched". The pill writes
+    /// straight to the store and is undone in one tap, so gating on it would
+    /// put the dialog in front of nothing.
+    @Test("A relabelled meal is not an edited one")
+    func relabellingDoesNotRaiseTheQuestion() throws {
+        let (store, model) = try makeTodayModel()
+        let entry = try logMeal(in: store)
+
+        model.openMealDetail(entry.entryID)
+        model.mealDetail?.cycleLabel()
+
+        #expect(model.mealDetailDiscardsEdits == false)
+    }
+
+    /// The screen is not there to be asked about once it is gone.
+    @Test("With no meal open there is nothing to ask about")
+    func noMealOpenAsksNothing() throws {
+        let (_, model) = try makeTodayModel()
+
+        #expect(model.mealDetailDiscardsEdits == false)
     }
 
     /// A row for a meal that is no longer there leaves the tap unanswered
@@ -616,12 +677,12 @@ struct ShellTests {
 
         model.openMealDetail(UUID())
 
-        #expect(model.destination == nil)
+        #expect(model.pushedMeal == nil)
         #expect(model.mealDetail == nil)
     }
 
     /// The screen carries a draft the user may have edited without asking for
-    /// it to be priced, so it is released with the presentation.
+    /// it to be priced, so it is released when it pops.
     @Test("Closing a meal releases the screen it was on")
     func closingAMealReleasesTheScreen() throws {
         let (store, model) = try makeTodayModel()
@@ -629,9 +690,9 @@ struct ShellTests {
 
         model.openMealDetail(entry.entryID)
         model.mealDetail?.addItem("Olive oil, 1 tbsp")
-        model.dismissDestination()
+        model.dismissMealDetail()
 
-        #expect(model.destination == nil)
+        #expect(model.pushedMeal == nil)
         #expect(model.mealDetail == nil)
 
         model.openMealDetail(entry.entryID)
@@ -650,14 +711,15 @@ struct ShellTests {
 
         model.openMealDetail(entry.entryID)
         #expect(model.mealDetail?.delete() == true)
-        model.dismissDestination()
+        model.dismissMealDetail()
 
         #expect(model.today.totals.kilocalories == 0)
         #expect(model.today.groups.isEmpty)
     }
 
-    /// Only one cover can be presented, so the shortcut has to leave the meal
-    /// the way its own `‹ Back` does before the flow can open.
+    /// The shortcut asks for the camera, not for the camera on top of a meal
+    /// the user would find again on the way out — so the push is popped the way
+    /// its own `‹ Back` pops it before the flow opens.
     @Test("A scan request from a meal lands on the camera")
     func scanRequestFromAMeal() throws {
         let (store, model) = try makeTodayModel()
@@ -667,8 +729,26 @@ struct ShellTests {
         model.requestScan()
 
         #expect(model.destination == .logFlow)
+        #expect(model.pushedMeal == nil)
         #expect(model.mealDetail == nil)
         #expect(model.logFlow.selectedTab == .camera)
+    }
+
+    /// A request from outside is not the user leaving, so it is not asked
+    /// about: the dialog stands in front of the gesture and the drawn control,
+    /// and raising it here would ask a question nobody on this screen asked.
+    /// The stored meal is untouched either way.
+    @Test("A scan request does not stop at the discard question")
+    func scanRequestFromAnEditedMeal() throws {
+        let (store, model) = try makeTodayModel()
+        let entry = try logMeal(in: store)
+
+        model.openMealDetail(entry.entryID)
+        model.mealDetail?.addItem("Olive oil, 1 tbsp")
+        model.requestScan()
+
+        #expect(model.destination == .logFlow)
+        #expect(model.pushedMeal == nil)
     }
 
     @Test("The gear opens Settings")

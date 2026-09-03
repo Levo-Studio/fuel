@@ -11,6 +11,11 @@ import SwiftUI
 /// that added a second one would shift every one of them. That is why the log
 /// flow and Settings arrive as full-screen covers and not inside a navigation
 /// stack — see `RootShellModel.Destination`.
+///
+/// The one exception is the screen a logged meal opens on, which is pushed. The
+/// stack it is pushed on is still chromeless: the bar is hidden on both the
+/// root and the pushed screen, so the two are laid out from the top of the
+/// frame exactly as they were under a cover.
 struct RootShell: View {
 
     @State private var model: RootShellModel
@@ -25,6 +30,13 @@ struct RootShell: View {
     /// keys, so a theme changed on screen 16 reaches this palette without a
     /// relaunch and without anything having to be told about it.
     @State private var preferences: SettingsPreferences
+
+    /// Whether the confirmation in front of an interactive pop is up.
+    ///
+    /// Interface state and so held here rather than on the model, the way
+    /// `MealDetailView` holds the delete confirmation: a confirmation is a
+    /// thing the interface is showing, not a thing the meal is doing.
+    @State private var isConfirmingPop = false
 
     /// Where a scan request from outside the app arrives. Held rather than
     /// reached for at the call site so a test can name its own, the way
@@ -73,19 +85,93 @@ struct RootShell: View {
         )
     }
 
+    /// Today, with the one screen that is pushed rather than presented.
+    ///
+    /// The bar is hidden on both ends of the stack. Every Fuel screen is laid
+    /// out from the top of its own frame and brings its own header, so a
+    /// navigation bar would be a second one — and on the root it would push
+    /// Today's date and totals down by its height.
+    private var todayStack: some View {
+        NavigationStack(path: mealDetailPath) {
+            TodayView(
+                presentation: model.today,
+                gettingStarted: model.gettingStarted,
+                onOpenSettings: model.openSettings,
+                onAddEntry: model.openLogFlow,
+                onOpenMeal: model.openMealDetail
+            )
+            .toolbar(.hidden, for: .navigationBar)
+            // The path element is the meal's identity and the screen is the
+            // model the shell built for it, so the identity is not read here.
+            // It is what the stack needs to be a stack — a `Hashable` value it
+            // can hold — while the model stays where every other screen's does,
+            // built and released by the shell model.
+            .navigationDestination(for: UUID.self) { _ in
+                if let detail = model.mealDetail {
+                    MealDetailView(model: detail, onClose: model.dismissMealDetail)
+                        .toolbar(.hidden, for: .navigationBar)
+                }
+            }
+        }
+        // Raised by a pop the user made with the system's gesture, never by
+        // `‹ Back`: that control has its own confirmation inside
+        // `MealResultView`, which this one deliberately repeats word for word.
+        //
+        // It sits here rather than on the meal screen because the gesture is
+        // not something that screen can see. An interactive pop arrives as a
+        // write to the path, which is held here, and the path is also the only
+        // thing that can undo it.
+        .confirmationDialog(
+            MealDetailCopy.discardEditsConfirmation.title,
+            isPresented: $isConfirmingPop,
+            titleVisibility: .visible
+        ) {
+            Button(MealDetailCopy.discardEditsConfirmation.confirm, role: .destructive) {
+                model.dismissMealDetail()
+            }
+
+            Button(MealDetailCopy.discardEditsConfirmation.cancel, role: .cancel) {}
+        }
+    }
+
+    /// The stack's path, and the one place an interactive pop can be caught.
+    ///
+    /// A push cannot be withheld and then still be offered: the system's
+    /// back-swipe belongs to the navigation controller, and SwiftUI exposes no
+    /// way to arm it conditionally or to veto it while the finger is still
+    /// down. What it does expose is this binding, and a binding that does not
+    /// write is a pop that does not happen — the getter still says the meal is
+    /// on the stack, so the screen comes back.
+    ///
+    /// So the gesture is kept and routed through the same question `‹ Back`
+    /// asks. The cost is honest and visible: with edits pending the screen
+    /// returns in one step rather than following the finger back, and the
+    /// dialog arrives over it. Withholding the gesture outright was the
+    /// alternative and is worse — a dead edge is not something a user can see
+    /// the reason for, and it would be dead exactly when they most want out.
+    private var mealDetailPath: Binding<[UUID]> {
+        Binding(
+            get: { model.pushedMeal.map { [$0] } ?? [] },
+            set: { path in
+                // Only a pop is routed here. Pushes are made by
+                // `openMealDetail`, which writes the model directly.
+                guard path.isEmpty, model.pushedMeal != nil else { return }
+                if model.mealDetailDiscardsEdits {
+                    isConfirmingPop = true
+                } else {
+                    model.dismissMealDetail()
+                }
+            }
+        )
+    }
+
     var body: some View {
         ZStack {
             switch model.stage {
             case .onboarding:
                 OnboardingFlow(model: model.onboarding)
             case .today:
-                TodayView(
-                    presentation: model.today,
-                    gettingStarted: model.gettingStarted,
-                    onOpenSettings: model.openSettings,
-                    onAddEntry: model.openLogFlow,
-                    onOpenMeal: model.openMealDetail
-                )
+                todayStack
             }
         }
         // The shell registers for scan requests here rather than in
@@ -146,10 +232,6 @@ struct RootShell: View {
                 .onChange(of: model.textLog.stage) { previous, current in
                     reportTextScan(from: previous, to: current)
                 }
-            case .mealDetail:
-                if let detail = model.mealDetail {
-                    MealDetailView(model: detail, onClose: model.dismissDestination)
-                }
             case .settings:
                 if let counting = model.settingsCounting {
                     SettingsScreen(
@@ -176,6 +258,12 @@ struct RootShell: View {
         // call site would be the design-layer bypass `FuelMotion` exists to
         // prevent.
         .fuelAnimation(FuelMotion.emphasised, value: model.destination)
+        // The same curve on the same subject for the screen that is pushed
+        // rather than presented: a meal deleted on it leaves the day one meal
+        // shorter, and Today rearranges to that while the screen is on its way
+        // out. The push and the pop themselves are the stack's own travel,
+        // which honours Reduce Motion on its own account.
+        .fuelAnimation(FuelMotion.emphasised, value: model.pushedMeal)
         .environment(\.fuelPalette, palette)
         // The theme is a stored choice and never follows the OS, so the system
         // chrome — the status bar, the keyboard, the home indicator — is forced
