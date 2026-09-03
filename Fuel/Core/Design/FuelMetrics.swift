@@ -265,9 +265,8 @@ nonisolated enum FuelMetrics {
         /// keeps the size and the position the export gives it, and only the
         /// region that answers grows around it.
         ///
-        /// It is deliberately not added to `allDrawnValues`, which lists what
-        /// the export draws. That `Space.s44` happens to carry the same figure
-        /// is a coincidence of the ladder, not this rule appearing there.
+        /// It is deliberately not in `allDrawnValues`, whose membership rule
+        /// is *drawn* — see the note on the roster itself.
         static let minimumHitTarget: CGFloat = 44
 
         /// How far that region overhangs a control of `size` on each side.
@@ -325,17 +324,22 @@ nonisolated enum FuelMetrics {
 
     // MARK: - Roster
 
-    /// Every constant in this file, in one list.
+    /// Every value in this file the export draws, in one list.
     ///
     /// It exists so a test can assert a value is *absent* — which is the only
     /// way the mockup's own `46px` corner stays out. A test that checks the
     /// three radii it just pinned proves nothing; a sweep over the whole layer
     /// goes red the moment the number appears anywhere in it.
-    /// Lengths only. The roster exists so `mockupCornerNeverReachesTheApp` can
-    /// assert the phone frame's 46pt corner is absent, so what belongs here is
-    /// anything that could plausibly collide with a mockup dimension. A
-    /// dimensionless ratio such as `Line.spinnerArc` cannot, and putting one in
-    /// would make the list mean two things at once.
+    ///
+    /// **Drawn is the whole membership rule**, and it is what the name says.
+    /// `Line.spinnerArc` is in the list although it is a fraction rather than a
+    /// length, because the export does draw it — one of the spinner's four CSS
+    /// borders, coloured. What is out is the one value in this file the export
+    /// does not draw, `Control.minimumHitTarget`: a hit region is a rule about
+    /// the finger, a static render has no touches, and there is nothing in the
+    /// screens for a sweep to hold it against. That `Space.s44` carries the
+    /// same figure is a coincidence of the spacing ladder, not the minimum
+    /// appearing here under another name.
     static let allDrawnValues: [CGFloat] = [
         Space.s2, Space.s3, Space.s4, Space.s7, Space.s8, Space.s10, Space.s11, Space.s12,
         Space.s13, Space.s14, Space.s15, Space.s16, Space.s17, Space.s18, Space.s20, Space.s22,
