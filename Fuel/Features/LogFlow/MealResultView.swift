@@ -105,6 +105,13 @@ struct MealResultView<Lede: View>: View {
 
     @State private var isConfirmingDiscard = false
 
+    /// What the confirmation does if it is confirmed.
+    ///
+    /// One dialog stands in front of two controls — the trash mark, and
+    /// `‹ Back` when there is something to lose — so what it carries out is
+    /// held here rather than wired into either of them.
+    @State private var pendingDiscard: (() -> Void)?
+
     init(
         draft: MealResultDraft,
         flowLabel: String,
@@ -188,10 +195,17 @@ struct MealResultView<Lede: View>: View {
             isPresented: $isConfirmingDiscard,
             titleVisibility: .visible
         ) {
-            Button(MealResultCopy.discardConfirm, role: .destructive) { onDiscard?() }
+            Button(MealResultCopy.discardConfirm, role: .destructive) { pendingDiscard?() }
 
-            Button(MealResultCopy.discardCancel, role: .cancel) {}
+            Button(MealResultCopy.discardCancel, role: .cancel) { pendingDiscard = nil }
         }
+    }
+
+    /// Puts the confirmation in front of something that throws the user's work
+    /// away.
+    private func confirmDiscard(_ perform: @escaping () -> Void) {
+        pendingDiscard = perform
+        isConfirmingDiscard = true
     }
 
     // MARK: - The item field
@@ -219,7 +233,7 @@ struct MealResultView<Lede: View>: View {
 
     private var header: some View {
         HStack(alignment: .center, spacing: FuelMetrics.Space.s14) {
-            Button(action: onBack) {
+            Button(action: back) {
                 Text(MealResultCopy.back)
                     .fuelStyle(FuelTypography.eyebrow)
                     .foregroundStyle(palette.muted)
@@ -236,6 +250,31 @@ struct MealResultView<Lede: View>: View {
         }
         .padding(.top, FuelMetrics.Space.s22)
         .padding(.horizontal, FuelMetrics.Screen.logFlowHorizontalPadding)
+    }
+
+    /// `‹ Back`, which leaves the estimate behind.
+    ///
+    /// It goes through the same confirmation the trash mark does, **but only
+    /// once the user has changed the breakdown**, and the condition is the
+    /// whole point. The export draws no confirmation on this control, and a
+    /// prompt on an untouched screen would be a dialog in front of nothing —
+    /// so with nothing edited this is immediate, exactly as drawn. With
+    /// something edited it is a control that silently throws away text the user
+    /// typed, standing beside one that asks first.
+    ///
+    /// `hasItemEdits` and not "anything at all was touched": the label pill and
+    /// the favourite mark are single taps that are redone in a single tap, and
+    /// gating on those would put the dialog back in front of nothing.
+    ///
+    /// Both modes get it. What is at risk is the item corrections, and both
+    /// backs destroy those identically — the text mode keeping the sentence
+    /// does not bring back a single rewritten row.
+    private func back() {
+        guard draft.hasItemEdits else {
+            onBack()
+            return
+        }
+        confirmDiscard(onBack)
     }
 
     // MARK: - Label and favourite
@@ -523,8 +562,8 @@ struct MealResultView<Lede: View>: View {
 
     private var footer: some View {
         HStack(alignment: .center, spacing: FuelMetrics.Space.s10) {
-            if onDiscard != nil {
-                discardControl
+            if let onDiscard {
+                discardControl(onDiscard)
             }
 
             Button(action: primaryAction.perform) {
@@ -559,9 +598,14 @@ struct MealResultView<Lede: View>: View {
     /// faces cannot render — the same situation as Today's gear, and the same
     /// answer. `FuelMetrics.Line.Glyph`'s stroke weights do not apply to a
     /// symbol: SF draws its own.
-    private var discardControl: some View {
+    ///
+    /// It asks every time, unlike `‹ Back` above, which asks only once there
+    /// is something to lose. This control's whole subject is throwing the
+    /// estimate away, so a confirmation in front of it is never a dialog in
+    /// front of nothing.
+    private func discardControl(_ perform: @escaping () -> Void) -> some View {
         Button {
-            isConfirmingDiscard = true
+            confirmDiscard(perform)
         } label: {
             Image(systemName: "trash")
                 .fuelStyle(FuelTypography.chipLabel)
