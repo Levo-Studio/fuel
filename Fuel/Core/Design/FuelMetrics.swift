@@ -186,6 +186,13 @@ nonisolated enum FuelMetrics {
 
             /// The box the paths are authored in, like `Ring.viewBox`.
             static let viewBox: CGFloat = 20
+
+            /// The chevron is the one glyph the export does *not* author in
+            /// the 20-unit box: it is drawn `viewBox="0 0 9 6"`, beside the
+            /// meal-label pill on both result screens. Its own box, so the
+            /// path's `M1 1l3.5 3.5L8 1` transfers as written.
+            static let chevronWidth: CGFloat = 9
+            static let chevronHeight: CGFloat = 6
         }
     }
 
@@ -301,6 +308,7 @@ nonisolated enum FuelMetrics {
         Radius.pill, Radius.card, Radius.thumbnail,
         Line.hairline, Line.selectionBorder, Line.spinner, Line.spinnerArc,
         Line.Glyph.chevron, Line.Glyph.plus, Line.Glyph.check, Line.Glyph.viewBox,
+        Line.Glyph.chevronWidth, Line.Glyph.chevronHeight,
         Control.circleButton, Control.swatchRing, Control.swatchDot, Control.shutterRing,
         Control.shutterFill, Control.stepMarkerSlot, Control.stepMarkerDot,
         Control.macroLabelColumn, Control.macroBarHeight, Control.thumbnailHeight,
@@ -308,7 +316,8 @@ nonisolated enum FuelMetrics {
         Control.selectionDot,
         Ring.viewBox, Ring.radius, Ring.strokeWidth, Ring.size, Ring.trailingGap,
         Ring.circumference,
-        Progress.width, Progress.height, Progress.labelGap,
+        Progress.width, Progress.height, Progress.labelGap, Progress.topOffset,
+        Hatch.band,
         ListFade.height
     ]
 
@@ -323,5 +332,35 @@ nonisolated enum FuelMetrics {
 
         /// The vertical gap between the bar and the step label under it.
         static let labelGap = Space.s20
+
+        /// How far down the frozen frame the bar sits, measured from the top
+        /// of that frame. Drawn as `top:330px` on all four analysis screens.
+        ///
+        /// An offset rather than a centring, because that is what was drawn —
+        /// inside the export's 390×844 it lands a little above the middle, and
+        /// on a taller device it stays where the design put it instead of
+        /// drifting down with the frame.
+        static let topOffset: CGFloat = 330
+    }
+
+    // MARK: - Hatch
+
+    /// The diagonal hatch that stands in for a picture: the viewfinder before
+    /// the capture session hands over a frame, the frozen frame under the
+    /// analysis scrim, and the result screen's thumbnail before a photo is
+    /// drawn into it.
+    ///
+    /// Its two tones live in `FuelPalette.Camera.placeholderBase` and
+    /// `placeholderStripe` for the camera surface, and in `soft` over
+    /// `background` on a result screen. The geometry is the same in both:
+    /// `repeating-linear-gradient(135deg, … 0 10px, … 10px 20px)`.
+    enum Hatch {
+
+        /// The angle of the gradient axis, so the stripes run from the
+        /// bottom-left to the top-right.
+        static let angleDegrees: CGFloat = 135
+
+        /// One stripe's width, measured along that axis.
+        static let band = Space.s10
     }
 }
