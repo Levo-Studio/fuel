@@ -52,6 +52,9 @@ struct LogFlowView: View {
                         onBack: camera.discard,
                         onCycleLabel: camera.cycleLabel,
                         onToggleFavourite: camera.toggleFavourite,
+                        onRemoveItem: camera.removeItem,
+                        onEditItem: camera.editItem,
+                        onAddItem: camera.addItem,
                         onNew: camera.discard,
                         onAdd: add
                     )
@@ -83,6 +86,9 @@ struct LogFlowView: View {
                         onBack: text.returnToEntry,
                         onCycleLabel: text.cycleLabel,
                         onToggleFavourite: text.toggleFavourite,
+                        onRemoveItem: text.removeItem,
+                        onEditItem: text.editItem,
+                        onAddItem: text.addItem,
                         onNew: text.discard,
                         onAdd: addTypedMeal
                     )

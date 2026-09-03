@@ -221,6 +221,30 @@ final class CameraLogModel {
 
     // MARK: - Editing the result
 
+    /// The breakdown's own controls: the `✕` on a row, the row itself, and the
+    /// `Add item` row under the list.
+    ///
+    /// All three are the draft's operations rather than this model's, so the
+    /// rule they share — the list has been changed, so the estimate above it is
+    /// stale — is written once and holds for every screen that draws a draft.
+    func removeItem(_ id: RecognisedItem.ID) {
+        guard var draft else { return }
+        draft.removeItem(id)
+        self.draft = draft
+    }
+
+    func editItem(_ id: RecognisedItem.ID, to text: String) {
+        guard var draft else { return }
+        draft.editItem(id, to: text)
+        self.draft = draft
+    }
+
+    func addItem(_ text: String) {
+        guard var draft else { return }
+        draft.addItem(text)
+        self.draft = draft
+    }
+
     /// The label pill. Cycles Breakfast → Lunch → Snack → Dinner and wraps,
     /// through `MealLabel.dayOrder`, and marks the label as the user's so
     /// nothing re-derives it back.

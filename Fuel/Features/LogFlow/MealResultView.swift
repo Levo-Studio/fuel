@@ -43,6 +43,16 @@ struct MealResultView<Lede: View>: View {
     let onBack: () -> Void
     let onCycleLabel: () -> Void
     let onToggleFavourite: () -> Void
+
+    /// The trailing control on a breakdown row: throw this line out.
+    let onRemoveItem: (RecognisedItem.ID) -> Void
+
+    /// The row itself: the user has rewritten this line.
+    let onEditItem: (RecognisedItem.ID, String) -> Void
+
+    /// The `Add item` row at the foot of the list.
+    let onAddItem: (String) -> Void
+
     let onNew: () -> Void
     let onAdd: () -> Void
 
@@ -53,6 +63,15 @@ struct MealResultView<Lede: View>: View {
 
     @Environment(\.fuelPalette) private var palette
 
+    /// Which line the field is open on, and `nil` while it is open on a new
+    /// one. Both cases are the same field, which is the point: an item is a
+    /// sentence, and correcting one and writing one are the same act.
+    @State private var editedItem: RecognisedItem.ID?
+
+    @State private var isEditingItem = false
+
+    @State private var editedText = ""
+
     init(
         draft: MealResultDraft,
         flowLabel: String,
@@ -60,6 +79,9 @@ struct MealResultView<Lede: View>: View {
         onBack: @escaping () -> Void,
         onCycleLabel: @escaping () -> Void,
         onToggleFavourite: @escaping () -> Void,
+        onRemoveItem: @escaping (RecognisedItem.ID) -> Void,
+        onEditItem: @escaping (RecognisedItem.ID, String) -> Void,
+        onAddItem: @escaping (String) -> Void,
         onNew: @escaping () -> Void,
         onAdd: @escaping () -> Void,
         @ViewBuilder lede: @escaping () -> Lede
@@ -70,6 +92,9 @@ struct MealResultView<Lede: View>: View {
         self.onBack = onBack
         self.onCycleLabel = onCycleLabel
         self.onToggleFavourite = onToggleFavourite
+        self.onRemoveItem = onRemoveItem
+        self.onEditItem = onEditItem
+        self.onAddItem = onAddItem
         self.onNew = onNew
         self.onAdd = onAdd
         self.lede = lede
@@ -102,6 +127,41 @@ struct MealResultView<Lede: View>: View {
 
             footer
         }
+        // A system alert with one field, rather than a sheet drawn in the
+        // app's own language. The export has no editor of any kind, so
+        // anything here is undrawn; the platform's own answer is the honest
+        // one, and it brings the ordinary keyboard, the cancel that changes
+        // nothing and the focus behaviour for free.
+        .alert(MealResultCopy.itemEditTitle, isPresented: $isEditingItem) {
+            TextField(MealResultCopy.itemEditPlaceholder, text: $editedText)
+
+            Button(MealResultCopy.itemEditCancel, role: .cancel) {}
+
+            Button(MealResultCopy.itemEditConfirm) { commitItemEdit() }
+        } message: {
+            Text(MealResultCopy.itemEditMessage)
+        }
+    }
+
+    // MARK: - The item field
+
+    private func beginEditing(_ id: RecognisedItem.ID?, text: String) {
+        editedItem = id
+        editedText = text
+        isEditingItem = true
+    }
+
+    /// What `Done` on the field does. An empty field is refused by the draft
+    /// itself, so a user who opened `Add item` and thought better of it leaves
+    /// nothing behind.
+    private func commitItemEdit() {
+        if let editedItem {
+            onEditItem(editedItem, editedText)
+        } else {
+            onAddItem(editedText)
+        }
+        editedText = ""
+        editedItem = nil
     }
 
     // MARK: - Header
@@ -271,42 +331,123 @@ struct MealResultView<Lede: View>: View {
             ForEach(draft.items) { item in
                 itemRow(item)
             }
+
+            addItemRow
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, FuelMetrics.Space.s18)
+        .fuelAnimation(FuelMotion.standard, value: draft.items)
     }
 
-    /// One line of the breakdown: what it is, and what it costs.
+    /// One line of the breakdown: what it is, what it costs, and the two
+    /// things the owner has added to it — a tap to rewrite it and a mark to
+    /// throw it out.
     ///
     /// **The export draws a second line under the name** — `confident · approx.
     /// 150 g` after a photo, `Amount recognised` after text — and the owner has
     /// removed it. It was the one thing on these screens that differed by log
     /// mode, so the row is now literally the same row on both frames.
     ///
+    /// **The export draws no control on this row at all.** The two here are
+    /// recomposed from what it does draw: the name and the figure keep their
+    /// type, their colour and the row's `s13` padding and `hairSoft` rule, and
+    /// the remove mark is the same `✕` the flow's own cancel control is drawn
+    /// with, in the figure's face and size so the trailing column stays one
+    /// kind of thing. Nothing moved to make room for either.
+    ///
     /// `RecognisedItem.Note` is untouched: it is stored with the entry and is
     /// read outside this screen. Nothing draws it here any more.
     private func itemRow(_ item: RecognisedItem) -> some View {
         HStack(alignment: .center, spacing: FuelMetrics.Space.s14) {
-            // Model-written text, already capped at 120 characters at the parse
-            // boundary. Plain `Text`, so there is no markup path into the
-            // interface for a name that arrived from a provider.
-            Text(verbatim: item.name)
-                .fuelStyle(FuelTypography.itemTitle)
-                .foregroundStyle(palette.ink)
+            Button {
+                beginEditing(item.id, text: item.name)
+            } label: {
+                HStack(alignment: .center, spacing: FuelMetrics.Space.s14) {
+                    // Model-written text, already capped at 120 characters at
+                    // the parse boundary, or the user's own. Plain `Text`, so
+                    // there is no markup path into the interface for a name
+                    // that arrived from a provider.
+                    Text(verbatim: item.name)
+                        .fuelStyle(FuelTypography.itemTitle)
+                        .foregroundStyle(palette.ink)
 
-            Spacer(minLength: FuelMetrics.Space.s14)
+                    Spacer(minLength: FuelMetrics.Space.s14)
 
-            Text(LogFlowFormat.figure(item.kilocalories))
-                .fuelStyle(FuelTypography.listValueSmall)
-                .foregroundStyle(palette.ink)
+                    // A line the user has written has no price yet, and the
+                    // device does not make one up. It stays blank until the
+                    // re-analysis fills the whole list in.
+                    if draft.isPriced(item.id) {
+                        Text(LogFlowFormat.figure(item.kilocalories))
+                            .fuelStyle(FuelTypography.listValueSmall)
+                            .foregroundStyle(palette.ink)
+                    }
+                }
+                // The padding sits inside the button so the region that answers
+                // to a finger is the whole drawn row, not the height of the
+                // name.
+                .padding(.vertical, FuelMetrics.Space.s13)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(verbatim: item.name))
+            .accessibilityValue(Text(MealResultCopy.kilocaloriesValue(item.kilocalories)))
+            .accessibilityHint(Text(MealResultCopy.itemEditHint))
+
+            removeControl(item)
         }
-        .padding(.vertical, FuelMetrics.Space.s13)
         .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(alignment: .bottom) {
             palette.hairSoft
                 .frame(height: FuelMetrics.Line.hairline)
         }
-        .accessibilityElement(children: .combine)
+    }
+
+    /// The `✕` at the trailing edge of a row.
+    ///
+    /// Drawn at its natural width and given a `minimumHitTarget` box to answer
+    /// in, aligned trailing so the glyph itself stays on the margin and the
+    /// extra region grows inwards, across the gap it already has to the figure.
+    /// The row keeps its drawn height: the box's vertical reach is the row's
+    /// own `s13` padding, which is what the `.rect` shape below covers.
+    private func removeControl(_ item: RecognisedItem) -> some View {
+        Button {
+            onRemoveItem(item.id)
+        } label: {
+            Text(MealResultCopy.itemRemoveGlyph)
+                .fuelStyle(FuelTypography.listValueSmall)
+                .foregroundStyle(palette.muted)
+                .frame(minWidth: FuelMetrics.Control.minimumHitTarget, alignment: .trailing)
+                .padding(.vertical, FuelMetrics.Space.s13)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(MealResultCopy.itemRemoveLabel))
+    }
+
+    /// The last row of the list, which is not an item.
+    ///
+    /// **Not in the export.** It is the item row with its figure and its remove
+    /// mark taken away and the name replaced by a label, so it keeps the same
+    /// padding, the same rule under it and the same type — a row that reads as
+    /// the end of the list rather than as a button parked beneath it. Muted
+    /// rather than ink, because it names an action and not a thing the user
+    /// ate.
+    private var addItemRow: some View {
+        Button {
+            beginEditing(nil, text: "")
+        } label: {
+            Text(MealResultCopy.itemAdd)
+                .fuelStyle(FuelTypography.itemTitle)
+                .foregroundStyle(palette.muted)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, FuelMetrics.Space.s13)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .bottom) {
+            palette.hairSoft
+                .frame(height: FuelMetrics.Line.hairline)
+        }
     }
 
     // MARK: - Footer

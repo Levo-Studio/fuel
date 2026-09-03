@@ -18,6 +18,9 @@ struct PhotoResultView: View {
     let onBack: () -> Void
     let onCycleLabel: () -> Void
     let onToggleFavourite: () -> Void
+    let onRemoveItem: (RecognisedItem.ID) -> Void
+    let onEditItem: (RecognisedItem.ID, String) -> Void
+    let onAddItem: (String) -> Void
     let onNew: () -> Void
     let onAdd: () -> Void
 
@@ -31,6 +34,9 @@ struct PhotoResultView: View {
             onBack: onBack,
             onCycleLabel: onCycleLabel,
             onToggleFavourite: onToggleFavourite,
+            onRemoveItem: onRemoveItem,
+            onEditItem: onEditItem,
+            onAddItem: onAddItem,
             onNew: onNew,
             onAdd: onAdd,
             lede: { thumbnail }
@@ -74,6 +80,9 @@ struct PhotoResultView: View {
         onBack: {},
         onCycleLabel: {},
         onToggleFavourite: {},
+        onRemoveItem: { _ in },
+        onEditItem: { _, _ in },
+        onAddItem: { _ in },
         onNew: {},
         onAdd: {}
     )

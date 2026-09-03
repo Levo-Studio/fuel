@@ -227,6 +227,78 @@ struct CameraLogTests {
 
     // MARK: - Editing the result
 
+    @Test("removing an item takes it out of the list and marks the estimate stale")
+    func removingAnItem() async throws {
+        let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .success(Self.estimate)))
+        await model.scanning(pixel())
+
+        let spinach = try #require(model.draft?.items.last?.id)
+        #expect(model.draft?.hasItemEdits == false)
+
+        model.removeItem(spinach)
+
+        #expect(model.draft?.items.map(\.name) == ["Salmon fillet, pan-fried"])
+        #expect(model.draft?.hasItemEdits == true)
+        // Nothing is recalculated on the device: the figures above the list are
+        // still the ones the model gave for the meal it was shown.
+        #expect(model.draft?.kilocalories == 460)
+        #expect(model.draft?.macros == MacroTotals(protein: 34, carbs: 28, fat: 23))
+    }
+
+    @Test("removing a line that is not in the list changes nothing")
+    func removingAnUnknownItem() async throws {
+        let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .success(Self.estimate)))
+        await model.scanning(pixel())
+
+        model.removeItem(UUID())
+
+        #expect(model.draft?.items.count == 2)
+        #expect(model.draft?.hasItemEdits == false)
+    }
+
+    @Test("an edited item carries the user's words and loses the model's figure")
+    func editingAnItem() async throws {
+        let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .success(Self.estimate)))
+        await model.scanning(pixel())
+
+        let polenta = try #require(model.draft?.items.first?.id)
+        model.editItem(polenta, to: "  Polenta r50g  ")
+
+        #expect(model.draft?.items.first?.name == "Polenta r50g")
+        #expect(model.draft?.hasItemEdits == true)
+        // The price beside it was the model's answer about a different line.
+        #expect(model.draft?.isPriced(polenta) == false)
+        #expect(model.draft?.isPriced(try #require(model.draft?.items.last?.id)) == true)
+    }
+
+    @Test("an empty item field changes nothing")
+    func editingAnItemToNothing() async throws {
+        let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .success(Self.estimate)))
+        await model.scanning(pixel())
+
+        let salmon = try #require(model.draft?.items.first?.id)
+        model.editItem(salmon, to: "   ")
+        model.addItem("\n")
+
+        #expect(model.draft?.items.map(\.name) == ["Salmon fillet, pan-fried", "Leaf spinach"])
+        // Emptying a row is what the remove control is for, so neither of these
+        // counts as a change the user has to re-analyse.
+        #expect(model.draft?.hasItemEdits == false)
+    }
+
+    @Test("an added item lands at the end of the list with no figure beside it")
+    func addingAnItem() async throws {
+        let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .success(Self.estimate)))
+        await model.scanning(pixel())
+
+        model.addItem("Olive oil, 1 tbsp")
+
+        let items = try #require(model.draft?.items)
+        #expect(items.map(\.name) == ["Salmon fillet, pan-fried", "Leaf spinach", "Olive oil, 1 tbsp"])
+        #expect(model.draft?.isPriced(try #require(items.last?.id)) == false)
+        #expect(model.draft?.hasItemEdits == true)
+    }
+
     @Test("the label pill cycles breakfast, lunch, snack, dinner and wraps")
     func labelPillCycles() async throws {
         let client = ScriptedClient(answer: .success(Self.estimate))

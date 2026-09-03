@@ -991,6 +991,114 @@
         }
       }
     },
+    "result.item.add" : {
+      "comment" : "The last row of the breakdown on a result screen, which opens the same field empty. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add item"
+          }
+        }
+      }
+    },
+    "result.item.edit.cancel" : {
+      "comment" : "Leaves the item field without changing the line. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        }
+      }
+    },
+    "result.item.edit.confirm" : {
+      "comment" : "Accepts what the item field holds. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        }
+      }
+    },
+    "result.item.edit.hint" : {
+      "comment" : "VoiceOver hint on a breakdown row, which opens the item field. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens this item for editing"
+          }
+        }
+      }
+    },
+    "result.item.edit.message" : {
+      "comment" : "Under the item field, saying what belongs in it. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write the item as you would say it, with the amount if you know it."
+          }
+        }
+      }
+    },
+    "result.item.edit.placeholder" : {
+      "comment" : "The empty item field. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Polenta 150 g"
+          }
+        }
+      }
+    },
+    "result.item.edit.title" : {
+      "comment" : "The item field's own title. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Item"
+          }
+        }
+      }
+    },
+    "result.item.remove.glyph" : {
+      "comment" : "The mark at the trailing edge of a breakdown row, the same ✕ the log flow's cancel control is drawn with. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "✕"
+          }
+        }
+      }
+    },
+    "result.item.remove.label" : {
+      "comment" : "The same control for VoiceOver, without the glyph. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove item"
+          }
+        }
+      }
+    },
     "result.kilocalories.value" : {
       "comment" : "The big figure on a result screen, spoken. Drawn bare. Not in the export.",
       "extractionState" : "manual",

@@ -76,6 +76,49 @@ nonisolated enum MealResultCopy {
         String(format: String(localized: "result.macro.grams"), value)
     }
 
+    // MARK: - Breakdown
+
+    /// The `✕` at the trailing edge of a breakdown row.
+    ///
+    /// The same character the flow's cancel control is drawn with, which is why
+    /// it is a glyph in the catalog rather than a symbol: DM Mono carries it,
+    /// and the export already proves so on screen 07.
+    static var itemRemoveGlyph: String {
+        String(localized: "result.item.remove.glyph")
+    }
+
+    static var itemRemoveLabel: String {
+        String(localized: "result.item.remove.label")
+    }
+
+    static var itemAdd: String {
+        String(localized: "result.item.add")
+    }
+
+    static var itemEditHint: String {
+        String(localized: "result.item.edit.hint")
+    }
+
+    static var itemEditTitle: String {
+        String(localized: "result.item.edit.title")
+    }
+
+    static var itemEditMessage: String {
+        String(localized: "result.item.edit.message")
+    }
+
+    static var itemEditPlaceholder: String {
+        String(localized: "result.item.edit.placeholder")
+    }
+
+    static var itemEditCancel: String {
+        String(localized: "result.item.edit.cancel")
+    }
+
+    static var itemEditConfirm: String {
+        String(localized: "result.item.edit.confirm")
+    }
+
     // MARK: - Footer
 
     static var new: String {
