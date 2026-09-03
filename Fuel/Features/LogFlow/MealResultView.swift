@@ -686,6 +686,18 @@ struct MealResultView<Lede: View>: View {
     /// is something to lose. This control's whole subject is throwing the
     /// estimate away, so a confirmation in front of it is never a dialog in
     /// front of nothing.
+    ///
+    /// **`palette.surface` behind it, added on top of what the `New` pill
+    /// carried.** The text pill this replaced had two ink-coloured glyphs'
+    /// worth of drawn content sitting inside a `hair`-opacity ring — enough on
+    /// its own to read as a control. A single small symbol does not: measured
+    /// on a hosted render next to the filled `Add` pill it sits beside, the
+    /// unfilled version was a near-invisible ring with a mark floating in it,
+    /// reported as the pill "rendering transparent". `surface` is the token
+    /// this app already keeps for exactly this — a raised control's own
+    /// ground, distinct from the page behind it — and it was sitting unused.
+    /// The hairline and the ink stay the export's own values; only the fill
+    /// behind them is new.
     private func discardControl(_ perform: @escaping () -> Void) -> some View {
         Button {
             confirmDiscard(perform)
@@ -695,6 +707,10 @@ struct MealResultView<Lede: View>: View {
                 .foregroundStyle(palette.ink)
                 .padding(.vertical, FuelMetrics.Space.s17)
                 .padding(.horizontal, FuelMetrics.Space.s20)
+                .background {
+                    RoundedRectangle(cornerRadius: FuelMetrics.Radius.pill)
+                        .fill(palette.surface)
+                }
                 .overlay {
                     RoundedRectangle(cornerRadius: FuelMetrics.Radius.pill)
                         .strokeBorder(palette.hair, lineWidth: FuelMetrics.Line.hairline)
