@@ -68,7 +68,8 @@ struct ScanIntentTests {
 
     private func makeModel(
         store: FuelStore,
-        keys: any MealKeyPresence = StoredKey()
+        keys: any MealKeyPresence = StoredKey(),
+        router: ScanRouter = ScanRouter()
     ) -> RootShellModel {
         RootShellModel(
             store: store,
@@ -91,16 +92,20 @@ struct ScanIntentTests {
                     provider: provider,
                     pace: {}
                 )
-            }
+            },
+            router: router
         )
     }
 
     /// A shell that has been through onboarding, which is the state every test
     /// but the onboarding one starts from.
-    private func makeTodayModel(keys: any MealKeyPresence = StoredKey()) throws -> RootShellModel {
+    private func makeTodayModel(
+        keys: any MealKeyPresence = StoredKey(),
+        router: ScanRouter = ScanRouter()
+    ) throws -> RootShellModel {
         let store = try makeStore()
         try store.setCountingMode(.goal(.default))
-        return makeModel(store: store, keys: keys)
+        return makeModel(store: store, keys: keys, router: router)
     }
 
     // MARK: - The destination
@@ -236,5 +241,66 @@ struct ScanIntentTests {
 
         #expect(model.destination == .logFlow)
         #expect(model.today.showsRing == false)
+    }
+
+    // MARK: - The hand-off
+
+    /// Fuel is already running, which is the case the router has least to do
+    /// in: the request goes straight through.
+    @Test("A request reaches the shell that registered with the router")
+    func routerForwardsToTheShell() throws {
+        let router = ScanRouter()
+        let model = try makeTodayModel(router: router)
+
+        router.requestScan()
+
+        #expect(model.destination == .logFlow)
+        #expect(model.logFlow.selectedTab == .camera)
+    }
+
+    /// The cold-launch case, and the reason the router is not a plain
+    /// forwarding call. The app is started by the shortcut, so the request can
+    /// arrive before the shell exists; dropping it there would leave the
+    /// shortcut working only when Fuel happened to be open already.
+    @Test("A request that arrives before the shell is answered when it appears")
+    func routerHoldsARequestUntilAShellExists() throws {
+        let router = ScanRouter()
+        router.requestScan()
+
+        let model = try makeTodayModel(router: router)
+
+        #expect(model.destination == .logFlow)
+        #expect(model.logFlow.selectedTab == .camera)
+    }
+
+    /// Held once, not for the life of the process. A request answered at
+    /// launch must not open a viewfinder again in front of whatever the user
+    /// is doing later.
+    @Test("A held request is answered once")
+    func routerHoldsARequestOnlyOnce() throws {
+        let router = ScanRouter()
+        router.requestScan()
+
+        let model = try makeTodayModel(router: router)
+        model.dismissDestination()
+        #expect(model.destination == nil)
+
+        // What a second shell in one process would be: there is none in Fuel,
+        // and the flag must not survive one either.
+        router.adopt(model)
+        #expect(model.destination == nil)
+    }
+
+    /// A shell that never reaches Today answers the request by being on
+    /// screen, so nothing is presented and nothing is kept for later.
+    @Test("A request held for a shell that opens on onboarding presents nothing")
+    func routerHandsAnEarlyRequestToOnboarding() throws {
+        let router = ScanRouter()
+        router.requestScan()
+
+        let model = makeModel(store: try makeStore(), router: router)
+
+        #expect(model.stage == .onboarding)
+        #expect(model.destination == nil)
     }
 }
