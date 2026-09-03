@@ -216,13 +216,30 @@ struct PhotoEstimateTests {
         let estimate = try await client.estimate(photo: tinyPhoto())
 
         #expect(estimate.title == "Porridge with berries")
-        #expect(estimate.kilocalories == 420)
+        // 420 is what the reply says; 508 is what the client actually
+        // returns, because grounding now sits between the parse and the
+        // return. "Porridge" alone matches no CIQUAL row, so item 0 is
+        // untouched, but "Berries" at 90 g fully covers CIQUAL's one row
+        // containing that word — "Red berries tart" — and prices from it:
+        // 231 kcal/100g x 0.9 = 208, replacing the reply's 120 and carrying
+        // an 88 kcal delta onto the meal total. A tart is not the same food
+        // as the berries in it; this is the known cost of a single generic
+        // word matching the one compound dish CIQUAL happens to name with it,
+        // not a result this test is claiming is a good match.
+        #expect(estimate.kilocalories == 508)
+        // Two items, so the meal's macro aggregate is left exactly as the
+        // model estimated it — only a meal of exactly one item has an honest
+        // "before" to replace; see FoodTableGrounding's own doc comment.
         #expect(estimate.macros == MacroTotals(protein: 14, carbs: 62, fat: 11))
         #expect(estimate.items.count == 2)
         #expect(estimate.items[0].name == "Porridge")
         #expect(estimate.items[0].kilocalories == 300)
+        #expect(estimate.items[0].macros == nil)
+        #expect(estimate.items[1].kilocalories == 208)
+        #expect(estimate.items[1].macros == MacroTotals(protein: 3, carbs: 33, fat: 6))
         // A photo carries a confidence and an approximate weight; the note is
-        // the second line of the row on screen 14.
+        // the second line of the row on screen 14. Grounding never touches
+        // the note, whichever item it resolved.
         #expect(estimate.items[0].note == .photo(confidence: .confident, approximateGrams: 250))
         #expect(estimate.items[1].note == .photo(confidence: .unsure, approximateGrams: 90))
     }
@@ -268,7 +285,9 @@ struct PhotoEstimateTests {
 
         let estimate = try await client.estimate(photo: tinyPhoto())
 
-        #expect(estimate.kilocalories == 420)
+        // See anthropicPhoto for why 420 (the reply) is not 508 (the client's
+        // answer, once "Berries" grounds against CIQUAL's "Red berries tart").
+        #expect(estimate.kilocalories == 508)
         #expect(estimate.items.count == 2)
 
         let body = try #require(transport.requests.first?.httpBody)
