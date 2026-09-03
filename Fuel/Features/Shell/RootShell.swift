@@ -81,6 +81,7 @@ struct RootShell: View {
                 LogFlowView(
                     model: model.logFlow,
                     camera: model.cameraLog,
+                    text: model.textLog,
                     onCancel: model.dismissDestination,
                     onLogged: model.dismissDestination
                 )
