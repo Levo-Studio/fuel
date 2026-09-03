@@ -209,19 +209,19 @@ struct CameraLogTests {
         let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .success(Self.estimate)))
         await model.scanning(pixel())
 
-        model.adjustKilocalories(by: CameraLogModel.calorieStep)
+        model.adjustKilocalories(by: MealResultDraft.calorieStep)
         #expect(model.draft?.kilocalories == 470)
 
-        model.adjustKilocalories(by: -CameraLogModel.calorieStep)
+        model.adjustKilocalories(by: -MealResultDraft.calorieStep)
         #expect(model.draft?.kilocalories == 460)
 
         for _ in 0..<50 {
-            model.adjustKilocalories(by: -CameraLogModel.calorieStep)
+            model.adjustKilocalories(by: -MealResultDraft.calorieStep)
         }
         #expect(model.draft?.kilocalories == 0)
 
         // And it comes back up from the floor rather than sticking there.
-        model.adjustKilocalories(by: CameraLogModel.calorieStep)
+        model.adjustKilocalories(by: MealResultDraft.calorieStep)
         #expect(model.draft?.kilocalories == 10)
     }
 
@@ -269,7 +269,7 @@ struct CameraLogTests {
         let model = makeModel(store: store, client: ScriptedClient(answer: .success(Self.estimate)))
         await model.scanning(pixel())
 
-        model.adjustKilocalories(by: CameraLogModel.calorieStep)
+        model.adjustKilocalories(by: MealResultDraft.calorieStep)
         model.toggleFavourite()
         #expect(model.commit())
 

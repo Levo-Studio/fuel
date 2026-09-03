@@ -104,117 +104,25 @@ nonisolated enum CameraCopy {
 
     // MARK: - Screen 14
 
-    static var resultBack: String {
-        String(localized: "camera.result.back")
-    }
-
-    static var resultBackLabel: String {
-        String(localized: "camera.result.back.label")
-    }
-
+    /// `Photo entry`, the flow label top right. Screen 15's is `Text entry`
+    /// and belongs to the text mode.
     static var resultFlow: String {
-        String(localized: "camera.result.flow")
+        String(localized: "result.photo.flow")
+    }
+
+    /// `Recognised`, because this list came from a photo. The text mode's
+    /// heading is `Broken down`.
+    static var resultItemsHeading: String {
+        String(localized: "result.photo.heading")
     }
 
     /// The stand-in the export draws where the photo goes. Only shown when
     /// there is no photo to draw — a preview, or a frame that did not survive.
     static var resultPhotoCaption: String {
-        String(localized: "camera.result.photo.caption")
+        String(localized: "result.photo.caption")
     }
 
     static var resultPhotoLabel: String {
-        String(localized: "camera.result.photo.label")
-    }
-
-    static func mealLabel(_ label: MealLabel) -> String {
-        switch label {
-        case .breakfast: String(localized: "camera.result.label.breakfast")
-        case .lunch: String(localized: "camera.result.label.lunch")
-        case .snack: String(localized: "camera.result.label.snack")
-        case .dinner: String(localized: "camera.result.label.dinner")
-        }
-    }
-
-    static var mealLabelHint: String {
-        String(localized: "camera.result.label.hint")
-    }
-
-    static func favourite(isOn: Bool) -> String {
-        isOn
-            ? String(localized: "camera.result.favourite.on")
-            : String(localized: "camera.result.favourite.off")
-    }
-
-    static var favouriteLabel: String {
-        String(localized: "camera.result.favourite.label")
-    }
-
-    static var resultUnit: String {
-        String(localized: "camera.result.unit")
-    }
-
-    static func kilocaloriesValue(_ kilocalories: Int) -> String {
-        String(format: String(localized: "camera.result.kilocalories.value"), kilocalories)
-    }
-
-    static var stepperDecrease: String {
-        String(localized: "camera.result.stepper.decrease")
-    }
-
-    static var stepperIncrease: String {
-        String(localized: "camera.result.stepper.increase")
-    }
-
-    static var stepperDecreaseLabel: String {
-        String(localized: "camera.result.stepper.decrease.label")
-    }
-
-    static var stepperIncreaseLabel: String {
-        String(localized: "camera.result.stepper.increase.label")
-    }
-
-    static var macroProtein: String {
-        String(localized: "camera.result.macro.protein")
-    }
-
-    static var macroCarbs: String {
-        String(localized: "camera.result.macro.carbs")
-    }
-
-    static var macroFat: String {
-        String(localized: "camera.result.macro.fat")
-    }
-
-    static func grams(_ value: Int) -> String {
-        String(format: String(localized: "camera.result.macro.grams"), value)
-    }
-
-    /// `Recognised`, because this list came from a photo. The text mode's
-    /// heading is `Broken down` and belongs to that screen.
-    static var itemsHeading: String {
-        String(localized: "camera.result.items.heading")
-    }
-
-    /// The confidence line under a recognised item.
-    ///
-    /// `nil` for a note this screen cannot draw. A photo estimate carries
-    /// photo notes; a text note or one written by a build that knew a shape
-    /// this one does not still leaves the row its name and its calories, which
-    /// is the part the user is reading.
-    static func itemNote(_ note: RecognisedItem.Note) -> String? {
-        guard case .photo(let confidence, let grams) = note else { return nil }
-        let format = switch confidence {
-        case .confident: String(localized: "camera.result.item.confident")
-        case .unsure: String(localized: "camera.result.item.unsure")
-        }
-        return String(format: format, grams)
-    }
-
-    static var resultNew: String {
-        String(localized: "camera.result.new")
-    }
-
-    static var resultAdd: String {
-        String(localized: "camera.result.add")
+        String(localized: "result.photo.label")
     }
 }

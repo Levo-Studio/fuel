@@ -229,342 +229,6 @@
         }
       }
     },
-    "camera.result.add" : {
-      "comment" : "Screen 14, the filled footer action. Drawn Hinzufügen.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add"
-          }
-        }
-      }
-    },
-    "camera.result.back" : {
-      "comment" : "Screen 14, the control top left. Drawn ‹ Zurück; the style uppercases it.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "‹ Back"
-          }
-        }
-      }
-    },
-    "camera.result.back.label" : {
-      "comment" : "The same control for VoiceOver, without the glyph. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Back"
-          }
-        }
-      }
-    },
-    "camera.result.favourite.label" : {
-      "comment" : "The favourite toggle for VoiceOver, without the star. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Favourite"
-          }
-        }
-      }
-    },
-    "camera.result.favourite.off" : {
-      "comment" : "Screen 14, the favourite toggle unset. Drawn ☆ Favorit.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "☆ Favourite"
-          }
-        }
-      }
-    },
-    "camera.result.favourite.on" : {
-      "comment" : "Screen 14, the favourite toggle set. Drawn ★ Favorit.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "★ Favourite"
-          }
-        }
-      }
-    },
-    "camera.result.flow" : {
-      "comment" : "Screen 14, the label top right. Drawn Foto-Eintrag; the style uppercases it.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Photo entry"
-          }
-        }
-      }
-    },
-    "camera.result.item.confident" : {
-      "comment" : "The confidence line under a recognised item after a photo. Drawn sicher · ca. 150 g.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "confident · approx. %lld g"
-          }
-        }
-      }
-    },
-    "camera.result.item.unsure" : {
-      "comment" : "The same line where the model was not sure. Drawn unsicher · ca. 90 g.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "unsure · approx. %lld g"
-          }
-        }
-      }
-    },
-    "camera.result.items.heading" : {
-      "comment" : "Screen 14, the heading over the breakdown. Drawn Erkannt; the style uppercases it.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recognised"
-          }
-        }
-      }
-    },
-    "camera.result.kilocalories.value" : {
-      "comment" : "The big figure on screen 14, spoken. Drawn bare. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld kcal"
-          }
-        }
-      }
-    },
-    "camera.result.label.breakfast" : {
-      "comment" : "Screen 14, the meal-label pill.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Breakfast"
-          }
-        }
-      }
-    },
-    "camera.result.label.dinner" : {
-      "comment" : "Screen 14, the meal-label pill.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dinner"
-          }
-        }
-      }
-    },
-    "camera.result.label.hint" : {
-      "comment" : "VoiceOver hint on the meal-label pill, which cycles on a tap. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cycles to the next meal label"
-          }
-        }
-      }
-    },
-    "camera.result.label.lunch" : {
-      "comment" : "Screen 14, the meal-label pill.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lunch"
-          }
-        }
-      }
-    },
-    "camera.result.label.snack" : {
-      "comment" : "Screen 14, the meal-label pill.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Snack"
-          }
-        }
-      }
-    },
-    "camera.result.macro.carbs" : {
-      "comment" : "Screen 14, a macro name.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Carbs"
-          }
-        }
-      }
-    },
-    "camera.result.macro.fat" : {
-      "comment" : "Screen 14, a macro name. Drawn Fett.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fat"
-          }
-        }
-      }
-    },
-    "camera.result.macro.grams" : {
-      "comment" : "A macro figure on screen 14.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld g"
-          }
-        }
-      }
-    },
-    "camera.result.macro.protein" : {
-      "comment" : "Screen 14, a macro name.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Protein"
-          }
-        }
-      }
-    },
-    "camera.result.new" : {
-      "comment" : "Screen 14, the outlined footer action. Drawn Neu.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "New"
-          }
-        }
-      }
-    },
-    "camera.result.photo.caption" : {
-      "comment" : "The stand-in the export draws where the photo goes. Drawn AUFGENOMMENES FOTO and already uppercase, because overlayCaption does not transform.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CAPTURED PHOTO"
-          }
-        }
-      }
-    },
-    "camera.result.photo.label" : {
-      "comment" : "The captured photo for VoiceOver. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The photo this estimate was made from"
-          }
-        }
-      }
-    },
-    "camera.result.stepper.decrease" : {
-      "comment" : "Screen 14, the − of the calorie stepper.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "−"
-          }
-        }
-      }
-    },
-    "camera.result.stepper.decrease.label" : {
-      "comment" : "The same control for VoiceOver. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ten fewer calories"
-          }
-        }
-      }
-    },
-    "camera.result.stepper.increase" : {
-      "comment" : "Screen 14, the + of the calorie stepper.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "+"
-          }
-        }
-      }
-    },
-    "camera.result.stepper.increase.label" : {
-      "comment" : "The same control for VoiceOver. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ten more calories"
-          }
-        }
-      }
-    },
-    "camera.result.unit" : {
-      "comment" : "Screen 14, the unit beside the big figure.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "kcal"
-          }
-        }
-      }
-    },
     "camera.shutter.hint" : {
       "comment" : "VoiceOver hint on the shutter. Not in the export.",
       "extractionState" : "manual",
@@ -1203,6 +867,366 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Step 2 of 2"
+          }
+        }
+      }
+    },
+    "result.add" : {
+      "comment" : "Screens 14 and 15, the filled footer action. Drawn Hinzufügen.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add"
+          }
+        }
+      }
+    },
+    "result.back" : {
+      "comment" : "Screens 14 and 15, the control top left. Drawn ‹ Zurück; the style uppercases it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "‹ Back"
+          }
+        }
+      }
+    },
+    "result.back.label" : {
+      "comment" : "The same control for VoiceOver, without the glyph. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back"
+          }
+        }
+      }
+    },
+    "result.favourite.label" : {
+      "comment" : "The favourite toggle for VoiceOver, without the star. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favourite"
+          }
+        }
+      }
+    },
+    "result.favourite.off" : {
+      "comment" : "Screens 14 and 15, the favourite toggle unset. Drawn ☆ Favorit.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "☆ Favourite"
+          }
+        }
+      }
+    },
+    "result.favourite.on" : {
+      "comment" : "Screens 14 and 15, the favourite toggle set. Drawn ★ Favorit.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "★ Favourite"
+          }
+        }
+      }
+    },
+    "result.kilocalories.value" : {
+      "comment" : "The big figure on a result screen, spoken. Drawn bare. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld kcal"
+          }
+        }
+      }
+    },
+    "result.label.breakfast" : {
+      "comment" : "Screens 14 and 15, the meal-label pill.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Breakfast"
+          }
+        }
+      }
+    },
+    "result.label.dinner" : {
+      "comment" : "Screens 14 and 15, the meal-label pill.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dinner"
+          }
+        }
+      }
+    },
+    "result.label.hint" : {
+      "comment" : "VoiceOver hint on the meal-label pill, which cycles on a tap. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cycles to the next meal label"
+          }
+        }
+      }
+    },
+    "result.label.lunch" : {
+      "comment" : "Screens 14 and 15, the meal-label pill.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lunch"
+          }
+        }
+      }
+    },
+    "result.label.snack" : {
+      "comment" : "Screens 14 and 15, the meal-label pill.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Snack"
+          }
+        }
+      }
+    },
+    "result.macro.carbs" : {
+      "comment" : "Screens 14 and 15, a macro name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carbs"
+          }
+        }
+      }
+    },
+    "result.macro.fat" : {
+      "comment" : "Screens 14 and 15, a macro name. Drawn Fett.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fat"
+          }
+        }
+      }
+    },
+    "result.macro.grams" : {
+      "comment" : "A macro figure on a result screen.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld g"
+          }
+        }
+      }
+    },
+    "result.macro.protein" : {
+      "comment" : "Screens 14 and 15, a macro name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protein"
+          }
+        }
+      }
+    },
+    "result.new" : {
+      "comment" : "Screens 14 and 15, the outlined footer action. Drawn Neu.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New"
+          }
+        }
+      }
+    },
+    "result.photo.caption" : {
+      "comment" : "The stand-in the export draws where the photo goes. Drawn AUFGENOMMENES FOTO and already uppercase, because overlayCaption does not transform.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CAPTURED PHOTO"
+          }
+        }
+      }
+    },
+    "result.photo.flow" : {
+      "comment" : "Screen 14, the label top right. Drawn Foto-Eintrag; the style uppercases it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo entry"
+          }
+        }
+      }
+    },
+    "result.photo.heading" : {
+      "comment" : "Screen 14, the heading over the breakdown. Drawn Erkannt; the style uppercases it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recognised"
+          }
+        }
+      }
+    },
+    "result.photo.item.confident" : {
+      "comment" : "The confidence line under a recognised item after a photo. Drawn sicher · ca. 150 g.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "confident · approx. %lld g"
+          }
+        }
+      }
+    },
+    "result.photo.item.unsure" : {
+      "comment" : "The same line where the model was not sure. Drawn unsicher · ca. 90 g.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "unsure · approx. %lld g"
+          }
+        }
+      }
+    },
+    "result.photo.label" : {
+      "comment" : "The captured photo for VoiceOver. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The photo this estimate was made from"
+          }
+        }
+      }
+    },
+    "result.stepper.decrease" : {
+      "comment" : "Screens 14 and 15, the − of the calorie stepper.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "−"
+          }
+        }
+      }
+    },
+    "result.stepper.decrease.label" : {
+      "comment" : "The same control for VoiceOver. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ten fewer calories"
+          }
+        }
+      }
+    },
+    "result.stepper.increase" : {
+      "comment" : "Screens 14 and 15, the + of the calorie stepper.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+"
+          }
+        }
+      }
+    },
+    "result.stepper.increase.label" : {
+      "comment" : "The same control for VoiceOver. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ten more calories"
+          }
+        }
+      }
+    },
+    "result.text.item.estimated" : {
+      "comment" : "Screen 15, under an item whose amount the model had to guess. Drawn Menge geschätzt.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amount estimated"
+          }
+        }
+      }
+    },
+    "result.text.item.recognised" : {
+      "comment" : "Screen 15, under an item whose amount the user wrote down. Drawn Menge erkannt.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amount recognised"
+          }
+        }
+      }
+    },
+    "result.unit" : {
+      "comment" : "Screens 14 and 15, the unit beside the big figure.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "kcal"
           }
         }
       }

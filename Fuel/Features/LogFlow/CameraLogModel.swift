@@ -78,15 +78,6 @@ final class CameraLogModel {
     /// The running scan, so `CANCEL` can stop it.
     private var scan: Task<Void, Never>?
 
-    // MARK: - Constants
-
-    /// What one tap of the result stepper is worth, floored at zero.
-    ///
-    /// From `design/Fuel Design Notes.md`, "Result stepper": ±10 kcal per tap.
-    /// It is behaviour rather than geometry, which is why it sits here and not
-    /// in `FuelMetrics`.
-    static let calorieStep = 10
-
     init(
         store: FuelStore,
         client: any AIClient,

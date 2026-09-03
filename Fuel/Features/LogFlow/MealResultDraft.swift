@@ -35,4 +35,12 @@ nonisolated struct MealResultDraft: Equatable, Sendable {
     var isLabelUserSet: Bool
 
     var isFavourite: Bool
+
+    /// What one tap of the result stepper is worth, floored at zero.
+    ///
+    /// From `design/Fuel Design Notes.md`, "Result stepper": ±10 kcal per tap.
+    /// It is behaviour rather than geometry, which is why it sits here and not
+    /// in `FuelMetrics`, and it belongs to the draft rather than to either
+    /// model because both result screens draw the same two buttons.
+    static let calorieStep = 10
 }
