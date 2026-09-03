@@ -110,7 +110,7 @@ struct OnboardingButton: View {
                 .padding(style == .filled ? FuelMetrics.Space.s18 : FuelMetrics.Space.s17)
                 .background(background)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(FuelPressButtonStyle())
     }
 
     @ViewBuilder

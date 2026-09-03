@@ -26,24 +26,22 @@ final class RootShellModel {
 
     /// What is presented over Today.
     ///
-    /// All three are full-screen presentations rather than pushes, because each
-    /// is dismissed by a control the export draws on its own chrome: the log
-    /// flow's `✕ Cancel` at the top left of screens 07, 12 and 13, Settings'
-    /// `Done` opposite its title on screens 16 and 17, and the result screen's
-    /// `‹ Back` on screens 14 and 15. None is a back chevron in a navigation
-    /// bar, and no screen in the export draws one — so there is nothing for a
-    /// stack to draw, and a stack would put its own bar above screens that are
-    /// laid out from the top of the frame.
+    /// Both are full-screen presentations rather than pushes, because each is
+    /// dismissed by a control the export draws on its own chrome: the log
+    /// flow's `✕ Cancel` at the top left of screens 07, 12 and 13, and
+    /// Settings' `Done` opposite its title on screens 16 and 17. Neither is a
+    /// back chevron in a navigation bar, and no screen in the export draws one
+    /// — so there is nothing for a stack to draw, and a stack would put its own
+    /// bar above screens that are laid out from the top of the frame.
+    ///
+    /// **The logged-meal screen is not one of these**, and it is the one
+    /// destination the export draws no frame for at all. It is reached by
+    /// tapping a row in a list, which is the one thing iOS pushes, so it is
+    /// pushed — see `pushedMeal`.
     enum Destination: Hashable, Identifiable {
 
         case logFlow
         case settings
-
-        /// A meal that is already in the store, by the identity the day list
-        /// hands back. It is carried in the case rather than beside it so that
-        /// `fullScreenCover(item:)` replaces the presentation when the user
-        /// opens a different meal.
-        case mealDetail(UUID)
 
         var id: Self { self }
     }
@@ -212,6 +210,35 @@ final class RootShellModel {
     /// that would put a meal they walked away from in front of the next one.
     private(set) var mealDetail: MealDetailModel?
 
+    /// Which meal is on the navigation stack over Today, or `nil` when none is.
+    ///
+    /// Separate from `mealDetail` because the two answer different questions
+    /// and a view needs both: this one is the path the stack is driven by, and
+    /// the other is the screen at the end of it. It is the identity rather than
+    /// the model because a path element has to be `Hashable` and a stack that
+    /// carried the model itself would rebuild the screen whenever the model
+    /// changed.
+    private(set) var pushedMeal: UUID?
+
+    /// Whether leaving the meal screen right now would throw the user's work
+    /// away.
+    ///
+    /// It exists because the system's back-swipe cannot be vetoed. SwiftUI's
+    /// interactive pop is a write to the stack's path, and the only thing a
+    /// path binding can do with a write it does not want is refuse it — there
+    /// is no way to stop the gesture before it finishes. So the pop is asked
+    /// about here first, and a shell that gets `true` puts the same
+    /// confirmation `‹ Back` raises in front of it rather than letting the
+    /// gesture do what the confirmation exists to prevent.
+    ///
+    /// `hasItemEdits` and not "anything at all was touched", for the reason
+    /// `MealResultView.back()` gives: the label pill and the favourite mark are
+    /// written to the store as they are tapped, and gating on those would put
+    /// the dialog in front of nothing.
+    var mealDetailDiscardsEdits: Bool {
+        mealDetail?.draft.hasItemEdits ?? false
+    }
+
     /// Settings' API-key row. Built once, because a re-render must not drop a
     /// half-typed key or restart a check in flight — the same reason
     /// `onboarding` is built here rather than in a view.
@@ -373,7 +400,25 @@ final class RootShellModel {
     func openMealDetail(_ entryID: UUID) {
         guard let detail = makeMealDetail(store, preferences.provider, entryID) else { return }
         mealDetail = detail
-        destination = .mealDetail(entryID)
+        pushedMeal = entryID
+    }
+
+    /// Comes back to Today from the meal screen, by `‹ Back`, by a deletion, or
+    /// by the system's pop.
+    ///
+    /// Separate from `dismissDestination` because a push is not a presentation:
+    /// the two cannot be up at once, nothing here has a camera session to stop,
+    /// and the meal is released rather than a cover cleared. What the two share
+    /// is the re-read, and for the same reason — `today` is worked out from a
+    /// fetch rather than a live query, so a meal deleted on this screen is off
+    /// Today only once this has run.
+    func dismissMealDetail() {
+        // Released with the screen, so a second tap on a row builds it again
+        // rather than reopening onto edits the user walked away from — and so
+        // the meal's breakdown is not held in memory until then.
+        mealDetail = nil
+        pushedMeal = nil
+        refreshToday()
     }
 
     /// The gear on screens 05 and 06.
@@ -394,7 +439,9 @@ final class RootShellModel {
     ///
     /// **One exit for all four of them** — `✕ Cancel`, a meal logged, `Done`,
     /// and a preference changed on the way out — because the refresh is a
-    /// re-read rather than an update. Nothing here is told what happened while
+    /// re-read rather than an update. The meal screen is not among them: it is
+    /// pushed rather than presented, and leaves through `dismissMealDetail`.
+    /// Nothing here is told what happened while
     /// the presentation was up; the store is asked again, and it answers with
     /// the day and the counting mode as they now are. Cancel costs one fetch
     /// that returns the same day, which is the price of not having a second
@@ -424,13 +471,6 @@ final class RootShellModel {
         // beside the `.task(id:)` that starts the session.
         if destination == .logFlow {
             cameraLog.camera.stop()
-        }
-
-        // Released with the presentation, so a second tap on a row builds the
-        // screen again rather than reopening onto edits the user walked away
-        // from — and so the meal's breakdown is not held in memory until then.
-        if case .mealDetail = destination {
-            mealDetail = nil
         }
 
         refreshToday()
@@ -473,16 +513,30 @@ final class RootShellModel {
             // flight cancelled, a captured frame dropped, a result screen the
             // user had not committed replaced by a viewfinder.
             logFlow.selectedTab = .camera
-        case .settings, .mealDetail:
-            // Only one cover can be presented, so whichever is up is left the
-            // way its own control leaves it — through `dismissDestination`,
-            // with the re-read of the day that comes with it — before the flow
-            // is opened as the plus opens it. Both writes land in one update,
-            // and `fullScreenCover(item:)` replaces the presentation when the
+        case .settings:
+            // Only one cover can be presented, so Settings is left the way its
+            // own `Done` leaves it — through `dismissDestination`, with the
+            // re-read of the day that comes with it — before the flow is opened
+            // as the plus opens it. Both writes land in one update, and
+            // `fullScreenCover(item:)` replaces the presentation when the
             // item's identity changes, so Today is not shown in between.
             dismissDestination()
             openLogFlow()
         case nil:
+            // A meal is pushed rather than presented, so it can be underneath a
+            // shortcut with no cover up. It is popped first, the way its own
+            // `‹ Back` pops it: the shortcut asks for the camera, not for the
+            // camera on top of a meal the user would find again on the way out.
+            //
+            // **Without the confirmation**, deliberately. The gesture and the
+            // drawn control are the user leaving; this is the system handing
+            // the app a request from outside, and a dialog raised in front of
+            // it would ask a question nobody on this screen just asked. What is
+            // lost is the same as on any pop with edits pending — the stored
+            // meal is untouched either way.
+            if pushedMeal != nil {
+                dismissMealDetail()
+            }
             openLogFlow()
         }
     }

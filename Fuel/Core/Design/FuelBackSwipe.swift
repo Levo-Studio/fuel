@@ -11,19 +11,28 @@ import SwiftUI
 /// repository forbids a second — so the two cannot come apart here, and saying
 /// "leading" would claim a right-to-left correctness this does not have.
 ///
-/// **Undrawn, like the curves in `FuelMotion`.** Every screen in Fuel is a
-/// `fullScreenCover`, which has no interactive dismissal of its own, and the
-/// export draws none: each screen carries its own `‹ Back` or `✕ Cancel`, and
-/// that stays the control. This is a second way to reach the same exit for
-/// people who reach for the edge before they reach for the corner — **it adds
-/// no affordance of any kind.** There is no edge indicator, no peel, and the
+/// **Undrawn, like the curves in `FuelMotion`.** Every screen Fuel presents in
+/// a `fullScreenCover` has no interactive dismissal of its own, and the export
+/// draws none: each screen carries its own `‹ Back` or `✕ Cancel`, and that
+/// stays the control. This is a second way to reach the same exit for people
+/// who reach for the edge before they reach for the corner — **it adds no
+/// affordance of any kind.** There is no edge indicator, no peel, and the
 /// screen does not track the finger, because all three would be drawing, and
 /// drawing is the owner's.
+///
+/// **Not every screen, any more.** The logged-meal screen is pushed on a
+/// navigation stack rather than covered, which is what a tap on a list row
+/// does on iOS, and a push carries the system's own interactive pop for free
+/// — so it needs nothing from here, and applying this beside that pop would be
+/// a second recogniser answering the same drag. See `RootShell` for where a
+/// pop like that is caught and asked the same question `isEnabled` answers
+/// below.
 ///
 /// A gesture that can destroy work is not a convenience, so `isEnabled` is not
 /// a nicety: a screen holding unsaved edits either routes the gesture through
 /// the same confirmation its drawn control uses, or does not offer it. See
-/// `MealDetailView` for the live case.
+/// `RootShell`'s use on Settings for the live case — Settings has nothing to
+/// lose, so it is unconditional.
 nonisolated enum FuelBackSwipe {
 
     // MARK: - Geometry

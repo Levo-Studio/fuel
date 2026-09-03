@@ -41,7 +41,7 @@ struct SettingsHeader: View {
                     .fuelStyle(FuelTypography.flowLabel)
                     .foregroundStyle(palette.muted)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(FuelPressButtonStyle())
         }
         .padding(.top, FuelMetrics.Space.s26)
     }

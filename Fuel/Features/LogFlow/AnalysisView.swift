@@ -237,7 +237,7 @@ private struct AnalysisAction: View {
                 .foregroundStyle(FuelPalette.Camera.dim)
                 .contentShape(.rect)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(FuelPressButtonStyle())
     }
 }
 
