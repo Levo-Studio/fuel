@@ -41,18 +41,21 @@ struct RootShell: View {
             case .today:
                 TodayView(
                     presentation: model.today,
-                    // Both controls are drawn, and both are inert, for two
-                    // different reasons.
+                    // Both controls are drawn on screens 05 and 06, both
+                    // have a destination that now exists, and both are still
+                    // inert here.
                     //
-                    // Settings exists but is half of itself: screen 16's
-                    // sections are merged and screen 17's are not, and
-                    // `SettingsScreen` says presenting it belongs to whoever
-                    // does. Routing into a screen that is still being built is
-                    // not this branch's call to make.
+                    // Screen 16's three sections are merged and screen 17's
+                    // four are not; the log flow draws its bar and its Recent
+                    // tab, and the two modes that need a key and a capture
+                    // session are placeholders. Neither is finished, and
+                    // neither export draws how it is entered from Today — no
+                    // sheet, no push, no dismissal is drawn anywhere — so the
+                    // presentation is a design decision rather than a wiring
+                    // one, and it is not this branch's to make.
                     //
-                    // The log flow has no target at all — the feature is
-                    // unmerged — so its button has nowhere to go rather than
-                    // somewhere unfinished.
+                    // What is missing is a call, not a mechanism: both take a
+                    // model this shell already has the store for.
                     onOpenSettings: {},
                     onAddEntry: {}
                 )
