@@ -292,6 +292,19 @@ struct FuelMetricsTests {
         #expect(FuelMetrics.Control.addButtonBottomInset == 32)
     }
 
+    @Test("a control drawn smaller than a finger is given the difference, and one drawn larger is not")
+    func hitTargetOverhang() {
+        // The gear on Today is the case this exists for: 34 drawn, 44 needed,
+        // so 5 on each side.
+        let gear = FuelMetrics.Control.hitTargetOverhang(around: FuelMetrics.Control.circleButton)
+        #expect(gear == 5)
+        #expect(FuelMetrics.Control.circleButton + gear * 2 == FuelMetrics.Control.minimumHitTarget)
+
+        // The add button is already 58. A negative overhang here would shrink
+        // the one control on Today that is comfortably large enough.
+        #expect(FuelMetrics.Control.hitTargetOverhang(around: FuelMetrics.Control.addButton) == 0)
+    }
+
     @Test("a goal of zero leaves the ring empty instead of dividing by it")
     func ringSurvivesAZeroGoal() {
         #expect(FuelMetrics.Ring.strokeOffset(total: 500, goal: 0) == FuelMetrics.Ring.circumference)

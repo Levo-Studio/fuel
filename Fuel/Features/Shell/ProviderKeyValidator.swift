@@ -15,8 +15,12 @@ import Foundation
 /// malformed.
 ///
 /// **No networking is written here.** The clients own the requests, the
-/// statuses and the credit-signal matching; this type chooses a client and
-/// translates its answer.
+/// statuses and the credit-signal matching, `ProviderClients` chooses which
+/// client a provider gets, and this type translates its answer.
+///
+/// The key travels as an argument to `checkKey` rather than being read here,
+/// so nothing on this path holds a credential — which is the property
+/// `KeyValidating` asks for in writing.
 nonisolated struct ProviderKeyValidator: KeyValidating {
 
     /// Handed to the client rather than used here, and injectable for the same
@@ -30,24 +34,11 @@ nonisolated struct ProviderKeyValidator: KeyValidating {
     }
 
     func validate(_ key: APIKey, for provider: AIProvider) async -> KeyValidationOutcome {
-        switch await client(for: provider).checkKey(key) {
+        switch await ProviderClients.client(for: provider, transport: transport).checkKey(key) {
         case .passed:
             .passed
         case .failed(let error):
             Self.outcome(for: error)
-        }
-    }
-
-    /// Built per call and thrown away with it.
-    ///
-    /// Both clients are values around a transport, so there is nothing to
-    /// cache. What matters is the other half: the key travels as an argument
-    /// to `checkKey`, so nothing built here holds a credential — which is the
-    /// property `KeyValidating` asks for in writing.
-    private func client(for provider: AIProvider) -> any AIClient {
-        switch provider {
-        case .claude: AnthropicClient(transport: transport)
-        case .mistral: MistralClient(transport: transport)
         }
     }
 

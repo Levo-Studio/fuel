@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import UIKit
 
 @testable import Fuel
 
@@ -52,6 +53,75 @@ private nonisolated struct StubTransport: HTTPTransport {
     }
 }
 
+// MARK: - Camera doubles
+
+/// Answers the key question without a keychain, which is what lets these tests
+/// run without an access group and without ever holding a secret.
+///
+/// It always says yes. Whether the camera half goes dead without a key is
+/// `CameraLogTests`' subject and is covered there; here a key has to exist for
+/// the shutter to reach a stage worth reopening onto.
+private nonisolated struct StubKeys: MealKeyPresence {
+
+    func hasKey(for provider: AIProvider) -> Bool { true }
+}
+
+/// A client no test in this file lets an estimate reach.
+///
+/// **Nothing here goes near a provider.** The shell's business with the camera
+/// half is which one it is pointed at and when it is built, never what an
+/// estimate comes back as — that is `CameraLogTests`' subject and it has its
+/// own recorded shapes.
+private nonisolated struct UnusedEstimator: AIClient {
+
+    let provider: AIProvider = .claude
+
+    func checkKey(_ key: APIKey) async -> KeyCheckResult { .failed(.cancelled) }
+
+    func estimate(photo: MealPhoto) async throws -> MealEstimate { throw AIError.cancelled }
+
+    func estimate(text: String) async throws -> MealEstimate { throw AIError.cancelled }
+}
+
+/// A camera that opens nothing and counts the one thing this suite asks about.
+///
+/// Only `stop()` is counted. The shell never starts a session — the flow does
+/// that when its tab appears — so a `startCount` here would be a number no
+/// test could assert without pretending the shell had a part in it.
+private final class StubCamera: MealCamera {
+
+    private(set) var stopCount = 0
+
+    var preview: MealCameraPreview { .unavailable }
+
+    func start() async {}
+
+    func stop() { stopCount += 1 }
+
+    func capturePhoto() async throws -> UIImage { UIImage() }
+}
+
+/// A camera whose shutter fails, which is how a test drives the camera half
+/// into a stage the viewfinder is not.
+private final class FailingCamera: MealCamera {
+
+    var preview: MealCameraPreview { .unavailable }
+
+    func start() async {}
+
+    func stop() {}
+
+    func capturePhoto() async throws -> UIImage { throw MealCameraError.unavailable }
+}
+
+/// Remembers which provider each log flow was built for.
+private final class ProviderLog {
+
+    private(set) var providers: [AIProvider] = []
+
+    func record(_ provider: AIProvider) { providers.append(provider) }
+}
+
 // MARK: - Suite
 
 @Suite("Shell")
@@ -66,8 +136,37 @@ struct ShellTests {
         try FuelStore(inMemory: true)
     }
 
-    private func makeModel(store: FuelStore) -> RootShellModel {
-        RootShellModel(store: store, validator: UnusedValidator())
+    /// Never the app's suite: these tests write a provider preference, and a
+    /// run must not change the provider Fuel opens on for whoever is on the
+    /// machine.
+    private func makePreferences() -> SettingsPreferences {
+        let suite = "apps.levo-studio.Fuel.tests.shell.\(UUID().uuidString)"
+        return SettingsPreferences(defaults: UserDefaults(suiteName: suite) ?? .standard)
+    }
+
+    private func makeModel(
+        store: FuelStore,
+        preferences: SettingsPreferences? = nil,
+        makeCameraLog: @escaping RootShellModel.CameraLogFactory = ShellTests.stubCameraLog
+    ) -> RootShellModel {
+        RootShellModel(
+            store: store,
+            validator: UnusedValidator(),
+            preferences: preferences ?? makePreferences(),
+            makeCameraLog: makeCameraLog
+        )
+    }
+
+    /// The camera half, with nothing behind it that could reach a provider, a
+    /// keychain or a lens.
+    private static let stubCameraLog: RootShellModel.CameraLogFactory = { store, provider in
+        CameraLogModel(
+            store: store,
+            client: UnusedEstimator(),
+            camera: StubCamera(),
+            keys: StubKeys(),
+            provider: provider
+        )
     }
 
     // MARK: - Launch decision
@@ -126,6 +225,186 @@ struct ShellTests {
         #expect(model.onboarding.complete())
 
         #expect(model.stage == .today)
+        #expect(model.today.showsRing == false)
+    }
+
+    // MARK: - Leaving and returning to Today
+
+    /// A meal to hand the log flow. Built rather than read back out of the
+    /// store, because what is under test is the shell's refresh and not how a
+    /// Recent row is assembled.
+    private static let meal = RecentMeal(
+        id: UUID(),
+        title: "Oats with skyr",
+        kilocalories: 420,
+        macros: MacroTotals(protein: 30, carbs: 55, fat: 9)
+    )
+
+    private func makeTodayModel() throws -> (FuelStore, RootShellModel) {
+        let store = try makeStore()
+        try store.setCountingMode(.goal(.default))
+        return (store, makeModel(store: store))
+    }
+
+    @Test("The plus opens the log flow")
+    func plusOpensTheLogFlow() throws {
+        let (_, model) = try makeTodayModel()
+        #expect(model.destination == nil)
+
+        model.openLogFlow()
+        #expect(model.destination == .logFlow)
+    }
+
+    /// Screen 07 is the entry into the flow, so a flow opened a second time
+    /// opens where the first one did rather than where it was left.
+    @Test("A reopened log flow starts on the camera tab")
+    func reopenedFlowStartsOnCamera() throws {
+        let (_, model) = try makeTodayModel()
+
+        model.openLogFlow()
+        model.logFlow.selectedTab = .recent
+        model.dismissDestination()
+
+        model.openLogFlow()
+        #expect(model.logFlow.selectedTab == .camera)
+    }
+
+    /// The one the refresh exists for: `today` is worked out from a fetch and
+    /// not a live query, so without the re-read on dismissal the meal is in
+    /// the store and nowhere on the screen.
+    @Test("A meal logged in the flow is on Today when the flow closes")
+    func loggingRefreshesToday() throws {
+        let (_, model) = try makeTodayModel()
+        #expect(model.today.totals.kilocalories == 0)
+        #expect(model.today.groups.isEmpty)
+
+        model.openLogFlow()
+        #expect(model.logFlow.log(Self.meal))
+        model.dismissDestination()
+
+        #expect(model.destination == nil)
+        #expect(model.today.totals.kilocalories == 420)
+        #expect(model.today.totals.macros.protein == 30)
+        // In a meal section, not merely in the totals.
+        #expect(model.today.groups.count == 1)
+        #expect(model.today.groups.first?.entries.count == 1)
+    }
+
+    @Test("Cancelling the flow writes nothing")
+    func cancellingWritesNothing() throws {
+        let (store, model) = try makeTodayModel()
+
+        model.openLogFlow()
+        model.dismissDestination()
+
+        #expect(model.destination == nil)
+        #expect(try store.entries(on: Date()).isEmpty)
+        #expect(model.today.totals.kilocalories == 0)
+        #expect(model.today.groups.isEmpty)
+    }
+
+    /// The camera half is rebuilt with the flow for a reason `LogFlowModel`
+    /// does not have: it carries a stage. A flow abandoned on a failed scan
+    /// would otherwise reopen onto that failure rather than onto the
+    /// viewfinder screen 07 draws.
+    @Test("A reopened flow is back at the viewfinder, whatever the last scan ended on")
+    func reopenedFlowResetsTheCameraHalf() async throws {
+        let (store, _) = try makeTodayModel()
+        let model = makeModel(store: store) { store, provider in
+            CameraLogModel(
+                store: store,
+                client: UnusedEstimator(),
+                camera: FailingCamera(),
+                keys: StubKeys(),
+                provider: provider
+            )
+        }
+
+        model.openLogFlow()
+        await model.cameraLog.capture()
+        #expect(model.cameraLog.stage == .failed(.retry))
+
+        model.dismissDestination()
+        model.openLogFlow()
+        #expect(model.cameraLog.stage == .viewfinder)
+        #expect(model.cameraLog.photo == nil)
+    }
+
+    /// What this pins is the read: the provider a flow is built for is taken
+    /// when the flow opens, not held from launch, so switching the segment on
+    /// screen 16 and scanning straight afterwards is built for the provider
+    /// the user just chose.
+    ///
+    /// It does not pin what that provider is then spent on. The factory is
+    /// replaced here, and the real one keeps its client and the provider it
+    /// looks a key up under private — the suite cannot see either. That the
+    /// two agree is structural rather than tested: `liveCameraLog` takes one
+    /// provider and passes it to both, so there is no second source for them
+    /// to drift apart from.
+    @Test("The provider selected in Settings is the one the next scan is built for")
+    func providerPreferenceReachesTheFlow() throws {
+        let (store, _) = try makeTodayModel()
+        let preferences = makePreferences()
+        let providers = ProviderLog()
+        let model = makeModel(store: store, preferences: preferences) { store, provider in
+            providers.record(provider)
+            return ShellTests.stubCameraLog(store, provider)
+        }
+
+        #expect(preferences.provider == .claude)
+        #expect(providers.providers == [.claude])
+
+        preferences.provider = .mistral
+        model.openLogFlow()
+
+        #expect(providers.providers.last == .mistral)
+    }
+
+    /// The session outliving the cover is the bug this closes: the flow stops
+    /// it when the tab changes, and a dismissal is not a tab change.
+    @Test("Dismissing the flow stops the capture session")
+    func dismissingStopsTheCamera() throws {
+        let (store, _) = try makeTodayModel()
+        let camera = StubCamera()
+        let model = makeModel(store: store) { store, provider in
+            CameraLogModel(
+                store: store,
+                client: UnusedEstimator(),
+                camera: camera,
+                keys: StubKeys(),
+                provider: provider
+            )
+        }
+
+        model.openLogFlow()
+        #expect(camera.stopCount == 0)
+
+        model.dismissDestination()
+        #expect(camera.stopCount == 1)
+    }
+
+    @Test("The gear opens Settings")
+    func gearOpensSettings() throws {
+        let (_, model) = try makeTodayModel()
+
+        model.openSettings()
+        #expect(model.destination == .settings)
+    }
+
+    /// Screen 17's counting control is the preference that changes what Today
+    /// draws rather than how it is tinted: goal mode has a ring and count-only
+    /// has none. Driven through Settings' own model, so what is under test is
+    /// the whole way back — the control writes, and Today re-reads on the way
+    /// out.
+    @Test("A counting mode changed in Settings is what Today draws afterwards")
+    func settingsChangeReachesToday() throws {
+        let (_, model) = try makeTodayModel()
+        #expect(model.today.showsRing)
+
+        model.openSettings()
+        model.settingsCounting?.choice = .countOnly
+        model.dismissDestination()
+
         #expect(model.today.showsRing == false)
     }
 

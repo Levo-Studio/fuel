@@ -249,6 +249,36 @@ nonisolated enum FuelMetrics {
         /// The radio dot on an onboarding choice card: accent-filled when the
         /// option is chosen, a `Line.selectionBorder` ring when it is not.
         static let selectionDot: CGFloat = 18
+
+        /// The smallest area a control may answer to a finger in, whatever it
+        /// draws.
+        ///
+        /// **This one is not read out of the export**, and it is the only
+        /// number in this file that is not. Several of the controls above are
+        /// drawn smaller than a fingertip — `circleButton` at 34 is the one
+        /// that matters most, because it is how Today reaches Settings — and
+        /// the export has nothing to say about hit testing, which a static
+        /// render cannot draw.
+        ///
+        /// It lives here rather than at the call site because it is a rule
+        /// applied to a drawn control, not a measurement of one: the circle
+        /// keeps the size and the position the export gives it, and only the
+        /// region that answers grows around it.
+        ///
+        /// It is deliberately not in `allDrawnValues`, whose membership rule
+        /// is *drawn* — see the note on the roster itself.
+        static let minimumHitTarget: CGFloat = 44
+
+        /// How far that region overhangs a control of `size` on each side.
+        ///
+        /// The halving is here rather than at the call site for the same
+        /// reason the minimum is: a view asks how much bigger the region is
+        /// than the drawing, it does not work it out. Zero for anything
+        /// already large enough, so a control that grows past 44 does not
+        /// acquire a negative inset.
+        static func hitTargetOverhang(around size: CGFloat) -> CGFloat {
+            max(.zero, (minimumHitTarget - size) / 2)
+        }
     }
 
     // MARK: - Ring
@@ -294,17 +324,22 @@ nonisolated enum FuelMetrics {
 
     // MARK: - Roster
 
-    /// Every constant in this file, in one list.
+    /// Every value in this file the export draws, in one list.
     ///
     /// It exists so a test can assert a value is *absent* — which is the only
     /// way the mockup's own `46px` corner stays out. A test that checks the
     /// three radii it just pinned proves nothing; a sweep over the whole layer
     /// goes red the moment the number appears anywhere in it.
-    /// Lengths only. The roster exists so `mockupCornerNeverReachesTheApp` can
-    /// assert the phone frame's 46pt corner is absent, so what belongs here is
-    /// anything that could plausibly collide with a mockup dimension. A
-    /// dimensionless ratio such as `Line.spinnerArc` cannot, and putting one in
-    /// would make the list mean two things at once.
+    ///
+    /// **Drawn is the whole membership rule**, and it is what the name says.
+    /// `Line.spinnerArc` is in the list although it is a fraction rather than a
+    /// length, because the export does draw it — one of the spinner's four CSS
+    /// borders, coloured. What is out is the one value in this file the export
+    /// does not draw, `Control.minimumHitTarget`: a hit region is a rule about
+    /// the finger, a static render has no touches, and there is nothing in the
+    /// screens for a sweep to hold it against. That `Space.s44` carries the
+    /// same figure is a coincidence of the spacing ladder, not the minimum
+    /// appearing here under another name.
     static let allDrawnValues: [CGFloat] = [
         Space.s2, Space.s3, Space.s4, Space.s7, Space.s8, Space.s10, Space.s11, Space.s12,
         Space.s13, Space.s14, Space.s15, Space.s16, Space.s17, Space.s18, Space.s20, Space.s22,
