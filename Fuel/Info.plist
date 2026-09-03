@@ -18,12 +18,19 @@
 
 	<!-- Both strings are shown by iOS verbatim, so they say where the picture
 	     goes. Fuel sends it to the user's own provider with the user's own key
-	     and keeps no copy anywhere but the log entry — the permission sheet is
-	     the one place a user asks that question, so it is answered there. -->
+	     and keeps no copy of it at all — the permission sheet is the one place a
+	     user asks that question, so it is answered there.
+
+	     "Kept only in the entry it creates" is what these strings used to say,
+	     and it was wrong in the direction that matters: FoodEntry holds a title,
+	     a calorie figure, three macros and the recognised items, and no image
+	     bytes reach it or anything else on disk. The picture is captured,
+	     compressed, sent and released. Nothing of it is kept, which is both
+	     truer than the old wording and a stronger promise. -->
 	<key>NSCameraUsageDescription</key>
-	<string>Fuel uses the camera to photograph a meal. The picture goes straight to the model provider you set up, with your key, and is kept only in the entry it creates.</string>
+	<string>Fuel uses the camera to photograph a meal. The picture goes straight to the model provider you set up, with your key. Fuel keeps no copy of it — only the meal's name and its figures are written down.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Fuel reads a photo you pick so it can estimate the meal. The picture goes straight to the model provider you set up, with your key, and is kept only in the entry it creates.</string>
+	<string>Fuel reads a photo you pick so it can estimate the meal. The picture goes straight to the model provider you set up, with your key. Fuel keeps no copy of it — only the meal's name and its figures are written down.</string>
 
 	<!-- The two typefaces the design draws, both bundled so the app never
 	     reaches the network for a face. Plus Jakarta Sans ships as the variable
