@@ -356,7 +356,12 @@ struct TextLogTests {
         model.typedText = Self.sentence
         await model.estimating()
 
-        model.reanalyse()
+        // Driven through the helper for the same reason the keyless test is:
+        // `reanalyse()` returns before its task would have run, so a bare call
+        // leaves the count below reading 1 whether the guard is there or not.
+        // This is the assertion that says a screen with nothing changed cannot
+        // spend the user's credit, so it has to be able to fail.
+        await model.reanalysing()
 
         #expect(client.requests == 1)
         #expect(model.stage == .result)
