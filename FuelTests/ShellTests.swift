@@ -325,10 +325,17 @@ struct ShellTests {
         #expect(model.cameraLog.photo == nil)
     }
 
-    /// The provider is read when the flow opens, not held from launch, so
-    /// switching the segment on screen 16 and scanning straight afterwards
-    /// talks to the provider the user just chose — and looks for that
-    /// provider's key before the shutter works.
+    /// What this pins is the read: the provider a flow is built for is taken
+    /// when the flow opens, not held from launch, so switching the segment on
+    /// screen 16 and scanning straight afterwards is built for the provider
+    /// the user just chose.
+    ///
+    /// It does not pin what that provider is then spent on. The factory is
+    /// replaced here, and the real one keeps its client and the provider it
+    /// looks a key up under private — the suite cannot see either. That the
+    /// two agree is structural rather than tested: `liveCameraLog` takes one
+    /// provider and passes it to both, so there is no second source for them
+    /// to drift apart from.
     @Test("The provider selected in Settings is the one the next scan is built for")
     func providerPreferenceReachesTheFlow() throws {
         let (store, _) = try makeTodayModel()

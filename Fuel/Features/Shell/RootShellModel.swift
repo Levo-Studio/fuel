@@ -247,6 +247,14 @@ final class RootShellModel {
         // Stopping belongs here rather than in the flow because this is what
         // owns the model's lifetime: it builds the camera half when the flow
         // opens and releases it here.
+        //
+        // **It is not a teardown the flow has of its own**, and that is the
+        // cost of putting it here. Every dismissal Fuel can reach funnels
+        // through this method — `✕ Cancel`, a meal logged, and the binding
+        // `RootShell` clears — so nothing leaks today. A second presenter of
+        // `LogFlowView` that did not come through here would leak silently
+        // again, and the durable answer if one ever arrives is a teardown
+        // beside the `.task(id:)` that starts the session.
         if destination == .logFlow {
             cameraLog.camera.stop()
         }
