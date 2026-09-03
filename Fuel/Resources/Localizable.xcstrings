@@ -991,6 +991,18 @@
         }
       }
     },
+    "settings.privacyNote" : {
+      "comment" : "The standing note at the foot of the Settings screen.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All data lives on this device. No account, no sync."
+          }
+        }
+      }
+    },
     "settings.provider.claude" : {
       "comment" : "First segment of the provider control. A product name, not translated.",
       "extractionState" : "manual",
