@@ -64,6 +64,25 @@ struct CameraLogTests {
         ]
     )
 
+    /// What the model comes back with once the user has corrected the list.
+    private static let reestimate = MealEstimate(
+        title: "Salmon with polenta",
+        kilocalories: 390,
+        macros: MacroTotals(protein: 33, carbs: 21, fat: 19),
+        items: [
+            RecognisedItem(
+                name: "Salmon fillet, pan-fried",
+                kilocalories: 240,
+                note: .photo(confidence: .confident, approximateGrams: 150)
+            ),
+            RecognisedItem(
+                name: "Polenta",
+                kilocalories: 150,
+                note: .photo(confidence: .confident, approximateGrams: 50)
+            ),
+        ]
+    )
+
     // MARK: - No key
 
     @Test("with no key stored the tab is disabled and no request is made")
@@ -227,25 +246,78 @@ struct CameraLogTests {
 
     // MARK: - Editing the result
 
-    @Test("the stepper moves ten kilocalories a tap and floors at zero")
-    func stepperFloorsAtZero() async throws {
+    @Test("removing an item takes it out of the list and marks the estimate stale")
+    func removingAnItem() async throws {
         let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .success(Self.estimate)))
         await model.scanning(pixel())
 
-        model.adjustKilocalories(by: MealResultDraft.calorieStep)
-        #expect(model.draft?.kilocalories == 470)
+        let spinach = try #require(model.draft?.items.last?.id)
+        #expect(model.draft?.hasItemEdits == false)
 
-        model.adjustKilocalories(by: -MealResultDraft.calorieStep)
+        model.removeItem(spinach)
+
+        #expect(model.draft?.items.map(\.name) == ["Salmon fillet, pan-fried"])
+        #expect(model.draft?.hasItemEdits == true)
+        // Nothing is recalculated on the device: the figures above the list are
+        // still the ones the model gave for the meal it was shown.
         #expect(model.draft?.kilocalories == 460)
+        #expect(model.draft?.macros == MacroTotals(protein: 34, carbs: 28, fat: 23))
+    }
 
-        for _ in 0..<50 {
-            model.adjustKilocalories(by: -MealResultDraft.calorieStep)
-        }
-        #expect(model.draft?.kilocalories == 0)
+    @Test("removing a line that is not in the list changes nothing")
+    func removingAnUnknownItem() async throws {
+        let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .success(Self.estimate)))
+        await model.scanning(pixel())
 
-        // And it comes back up from the floor rather than sticking there.
-        model.adjustKilocalories(by: MealResultDraft.calorieStep)
-        #expect(model.draft?.kilocalories == 10)
+        model.removeItem(UUID())
+
+        #expect(model.draft?.items.count == 2)
+        #expect(model.draft?.hasItemEdits == false)
+    }
+
+    @Test("an edited item carries the user's words and loses the model's figure")
+    func editingAnItem() async throws {
+        let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .success(Self.estimate)))
+        await model.scanning(pixel())
+
+        // The first of the two items is the salmon. Correcting it with a
+        // weight the photograph could not give is the case the owner named.
+        let salmon = try #require(model.draft?.items.first?.id)
+        model.editItem(salmon, to: "  Salmon fillet, r180g  ")
+
+        #expect(model.draft?.items.first?.name == "Salmon fillet, r180g")
+        #expect(model.draft?.hasItemEdits == true)
+        // The price beside it was the model's answer about a different line.
+        #expect(model.draft?.isPriced(salmon) == false)
+        #expect(model.draft?.isPriced(try #require(model.draft?.items.last?.id)) == true)
+    }
+
+    @Test("an empty item field changes nothing")
+    func editingAnItemToNothing() async throws {
+        let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .success(Self.estimate)))
+        await model.scanning(pixel())
+
+        let salmon = try #require(model.draft?.items.first?.id)
+        model.editItem(salmon, to: "   ")
+        model.addItem("\n")
+
+        #expect(model.draft?.items.map(\.name) == ["Salmon fillet, pan-fried", "Leaf spinach"])
+        // Emptying a row is what the remove control is for, so neither of these
+        // counts as a change the user has to re-analyse.
+        #expect(model.draft?.hasItemEdits == false)
+    }
+
+    @Test("an added item lands at the end of the list with no figure beside it")
+    func addingAnItem() async throws {
+        let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .success(Self.estimate)))
+        await model.scanning(pixel())
+
+        model.addItem("Olive oil, 1 tbsp")
+
+        let items = try #require(model.draft?.items)
+        #expect(items.map(\.name) == ["Salmon fillet, pan-fried", "Leaf spinach", "Olive oil, 1 tbsp"])
+        #expect(model.draft?.isPriced(try #require(items.last?.id)) == false)
+        #expect(model.draft?.hasItemEdits == true)
     }
 
     @Test("the label pill cycles breakfast, lunch, snack, dinner and wraps")
@@ -284,6 +356,138 @@ struct CameraLogTests {
         #expect(model.draft?.isFavourite == false)
     }
 
+    // MARK: - Re-analysing
+
+    @Test("a changed breakdown is re-estimated from the edited list, not the photograph")
+    func reanalysingSendsTheEditedList() async throws {
+        let client = ScriptedClient(answers: [.success(Self.estimate), .success(Self.reestimate)])
+        let model = makeModel(store: try makeStore(), client: client)
+        await model.scanning(pixel())
+
+        // The second of the two items is the spinach, which is what the model
+        // read the polenta as — a misrecognised line, corrected by name and by
+        // weight at once.
+        let spinach = try #require(model.draft?.items.last?.id)
+        model.editItem(spinach, to: "Polenta r50g")
+        await model.reanalysing()
+
+        // The text estimate, which is what carries the list. A second photo
+        // request would ask the model to re-derive what the user overruled.
+        #expect(client.requests == 2)
+        #expect(client.lastText == "Salmon fillet, pan-fried, Polenta r50g")
+
+        #expect(model.stage == .result)
+        #expect(model.draft?.kilocalories == 390)
+        #expect(model.draft?.items.map(\.name) == ["Salmon fillet, pan-fried", "Polenta"])
+        // The new estimate is the model's throughout, so the figures are back.
+        #expect(model.draft?.hasItemEdits == false)
+        #expect(model.draft?.isPriced(try #require(model.draft?.items.last?.id)) == true)
+    }
+
+    @Test("an unchanged breakdown makes no request")
+    func reanalysingWithoutAnEditIsRefused() async throws {
+        let client = ScriptedClient(answer: .success(Self.estimate))
+        let model = makeModel(store: try makeStore(), client: client)
+        await model.scanning(pixel())
+
+        // Driven through the helper for the same reason the keyless test is:
+        // `reanalyse()` returns before its task would have run, so a bare call
+        // leaves the count below reading 1 whether the guard is there or not.
+        // This is the assertion that says a screen with nothing changed cannot
+        // spend the user's credit, so it has to be able to fail.
+        await model.reanalysing()
+
+        #expect(client.requests == 1)
+        #expect(model.stage == .result)
+    }
+
+    @Test("a re-analysis keeps the label and the favourite the user set")
+    func reanalysingKeepsTheUsersChoices() async throws {
+        let client = ScriptedClient(answers: [.success(Self.estimate), .success(Self.reestimate)])
+        let model = makeModel(store: try makeStore(), client: client)
+        await model.scanning(pixel())
+
+        model.cycleLabel()
+        model.toggleFavourite()
+        let label = try #require(model.draft?.label)
+
+        model.addItem("Olive oil, 1 tbsp")
+        await model.reanalysing()
+
+        #expect(model.draft?.label == label)
+        #expect(model.draft?.isLabelUserSet == true)
+        #expect(model.draft?.isFavourite == true)
+    }
+
+    @Test("with no key stored a re-analysis makes no request and keeps the draft")
+    func reanalysingWithoutAKey() async throws {
+        let client = ScriptedClient(answers: [.success(Self.estimate), .success(Self.reestimate)])
+        let keys = MutableKeys(hasKey: true)
+        let model = makeModel(store: try makeStore(), client: client, keys: keys)
+        await model.scanning(pixel())
+
+        model.addItem("Olive oil, 1 tbsp")
+        // The key goes away in Settings while the result screen is up.
+        keys.hasKey = false
+        // Driven through the helper, not through a bare `reanalyse()`: that
+        // returns before its task would have run, so the request count below
+        // would read 1 whether the guard was there or not and could never go
+        // red. Waiting the way a real re-analysis is waited on is what makes it
+        // an assertion.
+        await model.reanalysing()
+
+        #expect(client.requests == 1)
+        #expect(model.stage == .failed(.invalidKey))
+
+        // And leaving that state puts the user back on the work they had done.
+        model.dismissFailure()
+        #expect(model.stage == .result)
+        #expect(model.draft?.items.count == 3)
+        #expect(model.draft?.hasItemEdits == true)
+    }
+
+    @Test("a re-analysis that fails leaves the edits where they were")
+    func reanalysingThatFails() async throws {
+        let client = ScriptedClient(answers: [.success(Self.estimate), .failure(.network)])
+        let model = makeModel(store: try makeStore(), client: client)
+        await model.scanning(pixel())
+
+        model.addItem("Olive oil, 1 tbsp")
+        await model.reanalysing()
+
+        #expect(model.stage == .failed(.retry))
+
+        model.dismissFailure()
+        #expect(model.stage == .result)
+        #expect(model.draft?.items.map(\.name).last == "Olive oil, 1 tbsp")
+        #expect(model.draft?.hasItemEdits == true)
+    }
+
+    @Test("trying a failed re-analysis again sends the list, not the frame")
+    func retryingAReanalysis() async throws {
+        let client = ScriptedClient(answers: [
+            .success(Self.estimate),
+            .failure(.network),
+            .success(Self.reestimate),
+        ])
+        let model = makeModel(store: try makeStore(), client: client)
+        await model.scanning(pixel())
+
+        model.removeItem(try #require(model.draft?.items.last?.id))
+        await model.reanalysing()
+        #expect(model.stage == .failed(.retry))
+
+        model.retry()
+        while case .analysing = model.stage {
+            await Task.yield()
+        }
+
+        #expect(client.requests == 3)
+        #expect(client.lastText == "Salmon fillet, pan-fried")
+        #expect(model.stage == .result)
+        #expect(model.draft?.hasItemEdits == false)
+    }
+
     // MARK: - Committing
 
     @Test("committing writes an entry whose macros and items match the estimate")
@@ -292,7 +496,6 @@ struct CameraLogTests {
         let model = makeModel(store: store, client: ScriptedClient(answer: .success(Self.estimate)))
         await model.scanning(pixel())
 
-        model.adjustKilocalories(by: MealResultDraft.calorieStep)
         model.toggleFavourite()
         #expect(model.commit())
 
@@ -300,9 +503,7 @@ struct CameraLogTests {
         #expect(entries.count == 1)
         let entry = try #require(entries.first)
         #expect(entry.title == "Salmon with polenta")
-        // The stepper's tap is part of what is written, not a display-only
-        // adjustment.
-        #expect(entry.kilocalories == 470)
+        #expect(entry.kilocalories == 460)
         #expect(entry.macros == MacroTotals(protein: 34, carbs: 28, fat: 23))
         #expect(entry.isFavourite)
         #expect(entry.source == .photo)
@@ -367,6 +568,28 @@ struct CameraLogTests {
         #expect(try store.entries(on: at(19, 20)).isEmpty)
     }
 
+    @Test("discarding an edited estimate writes nothing and lets the frame go")
+    func discardAfterEditingWritesNothing() async throws {
+        let store = try makeStore()
+        let model = makeModel(store: store, client: ScriptedClient(answer: .success(Self.estimate)))
+        await model.scanning(pixel())
+
+        model.removeItem(try #require(model.draft?.items.first?.id))
+        model.addItem("Olive oil, 1 tbsp")
+        model.toggleFavourite()
+
+        // What the trash control does once the confirmation is answered. The
+        // confirmation itself is the screen's state, not the model's: nothing
+        // here runs until it is confirmed, which is what makes backing out of
+        // it safe.
+        model.discard()
+
+        #expect(model.stage == .viewfinder)
+        #expect(model.draft == nil)
+        #expect(model.photo == nil)
+        #expect(try store.entries(on: at(19, 20)).isEmpty)
+    }
+
     @Test("a commit with nothing to commit reports failure rather than writing")
     func commitWithoutADraft() throws {
         let store = try makeStore()
@@ -389,6 +612,14 @@ private extension CameraLogModel {
     /// production type free of a hook that exists only for tests.
     func scanning(_ image: UIImage) async {
         analyse(image)
+        while case .analysing = stage {
+            await Task.yield()
+        }
+    }
+
+    /// Taps `Re-analyse` and waits for it to settle, for the same reason.
+    func reanalysing() async {
+        reanalyse()
         while case .analysing = stage {
             await Task.yield()
         }

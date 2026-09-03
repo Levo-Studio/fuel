@@ -56,11 +56,15 @@ final class TextLogModel {
     /// What the user has typed. Bound straight to the field on screen 12.
     ///
     /// Kept after the estimate rather than cleared, because screen 15 quotes
-    /// it back and `‹ Back` returns to the field the user wrote in. `New`
-    /// clears it — that is what makes it a new entry rather than a second go
-    /// at the same one. The export draws neither transition; a photo cannot be
-    /// edited on the way back, so the camera mode had no version of this
-    /// question to answer.
+    /// it back and `‹ Back` returns to the field the user wrote in.
+    /// Discarding clears it — that is what makes the next one a new entry
+    /// rather than a second go at the same one. The export draws neither
+    /// transition; a photo cannot be edited on the way back, so the camera
+    /// mode had no version of this question to answer.
+    ///
+    /// A re-analysis does not touch it. What it sends is the edited item list,
+    /// and overwriting the user's own sentence with a list Fuel assembled
+    /// would put words in the quote that they never typed.
     var typedText: String = ""
 
     private(set) var draft: MealResultDraft?
@@ -92,6 +96,14 @@ final class TextLogModel {
 
     /// The running estimate, so `CANCEL` can stop it.
     private var estimation: Task<Void, Never>?
+
+    /// Whether the request in flight is a re-estimate of an edited breakdown
+    /// rather than the sentence the user typed.
+    ///
+    /// It decides two things that differ between the two: what `Try again` on
+    /// a failure sends, and where dismissing that failure lands. A re-analysis
+    /// has a result screen behind it and a first estimate has the field.
+    private var isReanalysing = false
 
     init(
         store: FuelStore,
@@ -167,35 +179,94 @@ final class TextLogModel {
         estimation?.cancel()
     }
 
-    /// The retry state's action: the same sentence, the same request, from the
-    /// top.
+    /// The retry state's action: the same request as the one that failed, from
+    /// the top — the typed sentence after an estimate, the edited list after a
+    /// re-analysis.
     func retry() {
+        if isReanalysing {
+            isReanalysing = false
+            reanalyse()
+            return
+        }
         analyse()
+    }
+
+    // MARK: - Re-analysing
+
+    /// The footer's `Re-analyse`, which is what `Add` becomes once the user has
+    /// changed the breakdown.
+    ///
+    /// **The edited list is sent, not the sentence.** The list is what the user
+    /// has just corrected, and the sentence is what produced the version they
+    /// corrected. The sentence itself is untouched — screen 15 still quotes
+    /// back what they wrote, and `‹ Back` still returns them to it.
+    ///
+    /// **It only ever runs from a tap.** Nothing here is called when a draft
+    /// changes, and the guard on `hasItemEdits` means a second press after a
+    /// successful re-analysis is refused rather than charged for.
+    func reanalyse() {
+        guard let draft, draft.hasItemEdits else { return }
+
+        let described = draft.itemSentence
+        guard !described.isEmpty else { return }
+
+        // No key, no request — and the draft survives, because the failure
+        // state this lands on returns to the result screen rather than
+        // throwing it away. `missingKey` and a refused key have the same
+        // remedy, which is why `AnalysisFailure` already collapses them.
+        guard keys.hasKey(for: provider) else {
+            isReanalysing = true
+            stage = .failed(.invalidKey)
+            return
+        }
+
+        isReanalysing = true
+        stage = .analysing(.analysingMeal)
+        estimation = Task { [weak self] in await self?.rerun(described) }
     }
 
     // MARK: - The estimate
 
     private func run(_ described: String) async {
         do {
-            let stepper = Task { [weak self] in await self?.walkSteps() }
-            let estimate: MealEstimate
-            do {
-                estimate = try await client.estimate(text: described)
-            } catch {
-                stepper.cancel()
-                _ = await stepper.value
-                throw error
-            }
-
-            // Awaited rather than only cancelled, so a step cannot land on the
-            // stage after the result has replaced it.
-            stepper.cancel()
-            _ = await stepper.value
+            let estimate = try await stepping(described)
 
             try Task.checkCancellation()
             present(estimate)
         } catch {
             fail(with: error)
+        }
+    }
+
+    private func rerun(_ described: String) async {
+        do {
+            let estimate = try await stepping(described)
+
+            try Task.checkCancellation()
+            represent(estimate)
+        } catch {
+            fail(with: error)
+        }
+    }
+
+    /// Walks the four analysis states around one request.
+    ///
+    /// Shared by the first estimate and the re-analysis because the export
+    /// draws one set of four states and says nothing about what is being
+    /// waited on.
+    private func stepping(_ described: String) async throws -> MealEstimate {
+        let stepper = Task { [weak self] in await self?.walkSteps() }
+        do {
+            let estimate = try await client.estimate(text: described)
+            // Awaited rather than only cancelled, so a step cannot land on the
+            // stage after the result has replaced it.
+            stepper.cancel()
+            _ = await stepper.value
+            return estimate
+        } catch {
+            stepper.cancel()
+            _ = await stepper.value
+            throw error
         }
     }
 
@@ -222,24 +293,68 @@ final class TextLogModel {
         stage = .result
     }
 
+    /// Puts a re-estimate over the draft, keeping the label and the favourite
+    /// mark the user set on it.
+    private func represent(_ estimate: MealEstimate) {
+        guard var draft else { return present(estimate) }
+        draft.replaceEstimate(with: estimate)
+        self.draft = draft
+        isReanalysing = false
+        stage = .result
+    }
+
     private func fail(with error: any Error) {
         // The clients throw `AIError` already; `transportFailure` is here for
         // the structured-concurrency cancellation that can arrive around them.
         let aiError = (error as? AIError) ?? AIError.transportFailure(error)
         guard let failure = AnalysisFailure(aiError) else {
-            returnToEntry()
+            // A cancelled request says nothing. Where that leaves the user
+            // depends on what they cancelled, which is what `dismissFailure`
+            // already answers.
+            dismissFailure()
             return
         }
         stage = .failed(failure)
     }
 
+    /// Leaving a failure state.
+    ///
+    /// A failed estimate has the field behind it and goes back to it, with the
+    /// sentence still in it. A failed re-analysis has the result the user was
+    /// editing behind it, and their edits are exactly what must not be thrown
+    /// away by a request that did not arrive.
+    func dismissFailure() {
+        guard draft != nil else {
+            returnToEntry()
+            return
+        }
+        isReanalysing = false
+        stage = .result
+    }
+
     // MARK: - Editing the result
 
-    /// The `−` and `+` beside the calorie figure. Floored at zero: a negative
-    /// meal is not a thing, and the day total would quietly absorb it.
-    func adjustKilocalories(by delta: Int) {
+    /// The breakdown's own controls: the `✕` on a row, the row itself, and the
+    /// `Add item` row under the list.
+    ///
+    /// All three are the draft's operations rather than this model's, so the
+    /// rule they share — the list has been changed, so the estimate above it is
+    /// stale — is written once and holds for every screen that draws a draft.
+    func removeItem(_ id: RecognisedItem.ID) {
         guard var draft else { return }
-        draft.kilocalories = max(0, draft.kilocalories + delta)
+        draft.removeItem(id)
+        self.draft = draft
+    }
+
+    func editItem(_ id: RecognisedItem.ID, to text: String) {
+        guard var draft else { return }
+        draft.editItem(id, to: text)
+        self.draft = draft
+    }
+
+    func addItem(_ text: String) {
+        guard var draft else { return }
+        draft.addItem(text)
         self.draft = draft
     }
 
@@ -296,12 +411,14 @@ final class TextLogModel {
     func returnToEntry() {
         estimation?.cancel()
         estimation = nil
+        isReanalysing = false
         draft = nil
         stage = keys.hasKey(for: provider) ? .entry : .noKey
     }
 
-    /// `New` on the result screen, and what a commit leaves behind: an empty
-    /// field, ready for the next meal.
+    /// The result screen's discard control once its confirmation is answered,
+    /// and what a commit leaves behind: an empty field, ready for the next
+    /// meal.
     func discard() {
         typedText = ""
         returnToEntry()

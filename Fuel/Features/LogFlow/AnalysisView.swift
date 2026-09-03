@@ -146,8 +146,17 @@ struct AnalysisFailureView: View {
 
 // MARK: - Shared surface
 
-/// What every analysis state is drawn on: the backdrop, a block at the
-/// export's drop from the top, and a foot.
+/// What every analysis state is drawn on: the backdrop, a block centred in it,
+/// and a foot.
+///
+/// **The export drops the block rather than centring it.** All four analysis
+/// frames position it `top:330px` inside their 390×844, which is a little
+/// above the middle of the frame. Transcribed as a drop it stayed where it was
+/// drawn on a taller device — and on an iPhone 17 Pro that reads as sitting
+/// too low, because the frame it is dropped into is the taller one. **The
+/// owner has asked for it centred**, so the block sits in the middle of
+/// whatever the frozen frame turns out to be. `FuelMetrics.Progress.topOffset`
+/// keeps the drawn number and says the same thing from the other side.
 private struct AnalysisSurface<Content: View, Footer: View>: View {
 
     let backdrop: AnalysisBackdrop
@@ -167,7 +176,7 @@ private struct AnalysisSurface<Content: View, Footer: View>: View {
                 .ignoresSafeArea()
 
             VStack(alignment: .center, spacing: .zero) {
-                ZStack(alignment: .top) {
+                ZStack {
                     // The text mode has nothing to freeze and nothing to dim:
                     // both the frame and the scrim over it belong to the
                     // photograph, and drawing the hatch without one would claim
@@ -182,7 +191,6 @@ private struct AnalysisSurface<Content: View, Footer: View>: View {
                     }
 
                     content()
-                        .padding(.top, FuelMetrics.Progress.topOffset)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()

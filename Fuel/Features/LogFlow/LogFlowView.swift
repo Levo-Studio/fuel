@@ -42,7 +42,7 @@ struct LogFlowView: View {
                     failure: failure,
                     backdrop: .photo(camera.photo),
                     onRetry: camera.retry,
-                    onDismiss: camera.discard
+                    onDismiss: camera.dismissFailure
                 )
             case .result:
                 if let draft = camera.draft {
@@ -52,9 +52,12 @@ struct LogFlowView: View {
                         onBack: camera.discard,
                         onCycleLabel: camera.cycleLabel,
                         onToggleFavourite: camera.toggleFavourite,
-                        onAdjustCalories: camera.adjustKilocalories,
-                        onNew: camera.discard,
-                        onAdd: add
+                        onRemoveItem: camera.removeItem,
+                        onEditItem: camera.editItem,
+                        onAddItem: camera.addItem,
+                        onReanalyse: camera.reanalyse,
+                        onDiscard: camera.discard,
+                        commit: MealResultAction(title: MealResultCopy.add, perform: add)
                     )
                 }
             case .viewfinder, .noKey:
@@ -69,24 +72,27 @@ struct LogFlowView: View {
                     failure: failure,
                     backdrop: .text,
                     onRetry: text.retry,
-                    onDismiss: text.returnToEntry
+                    onDismiss: text.dismissFailure
                 )
             case .result:
                 if let draft = text.draft {
                     TextResultView(
                         draft: draft,
                         typedText: text.typedText,
-                        // `Back` keeps the sentence and `New` clears it, which
-                        // is the one thing the text mode can offer that the
-                        // camera mode cannot: a photograph is not editable on
-                        // the way back, so the export had no version of this
+                        // `Back` keeps the sentence and discarding clears it,
+                        // which is the one thing the text mode can offer that
+                        // the camera mode cannot: a photograph is not editable
+                        // on the way back, so the export had no version of this
                         // to draw.
                         onBack: text.returnToEntry,
                         onCycleLabel: text.cycleLabel,
                         onToggleFavourite: text.toggleFavourite,
-                        onAdjustCalories: text.adjustKilocalories,
-                        onNew: text.discard,
-                        onAdd: addTypedMeal
+                        onRemoveItem: text.removeItem,
+                        onEditItem: text.editItem,
+                        onAddItem: text.addItem,
+                        onReanalyse: text.reanalyse,
+                        onDiscard: text.discard,
+                        commit: MealResultAction(title: MealResultCopy.add, perform: addTypedMeal)
                     )
                 }
             case .entry, .noKey:

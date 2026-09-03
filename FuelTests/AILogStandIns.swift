@@ -17,32 +17,46 @@ import UIKit
 /// bearing in both suites — a mode that is drawn as unavailable and still sends
 /// the request passes any test that only looks at the stage.
 
-/// Answers one estimate, from memory, and counts how often it was asked.
+/// Answers estimates, from memory, and counts how often it was asked.
+///
+/// A list rather than a single answer, because a re-analysis is a second
+/// request about the same meal: a test that pins one has to be able to tell the
+/// new estimate from the old. The last answer repeats, so the ordinary case —
+/// one answer, however many requests — is still `init(answer:)`.
 final class ScriptedClient: AIClient, @unchecked Sendable {
 
     let provider: AIProvider = .claude
 
-    private let answer: Result<MealEstimate, AIError>
+    private let answers: [Result<MealEstimate, AIError>]
     private(set) var requests = 0
 
     /// The last sentence it was asked about, so a test can check that a retry
-    /// sends what the user actually typed. Never printed anywhere.
+    /// sends what the user actually typed, and that a re-analysis sends the
+    /// edited list. Never printed anywhere.
     private(set) var lastText: String?
 
-    init(answer: Result<MealEstimate, AIError>) {
-        self.answer = answer
+    convenience init(answer: Result<MealEstimate, AIError>) {
+        self.init(answers: [answer])
+    }
+
+    init(answers: [Result<MealEstimate, AIError>]) {
+        self.answers = answers
     }
 
     func checkKey(_ key: APIKey) async -> KeyCheckResult { .passed }
 
     func estimate(photo: MealPhoto) async throws -> MealEstimate {
-        requests += 1
-        return try answer.get()
+        try next()
     }
 
     func estimate(text: String) async throws -> MealEstimate {
-        requests += 1
         lastText = text
+        return try next()
+    }
+
+    private func next() throws -> MealEstimate {
+        let answer = answers[min(requests, answers.count - 1)]
+        requests += 1
         return try answer.get()
     }
 }

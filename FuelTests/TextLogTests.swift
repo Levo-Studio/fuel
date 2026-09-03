@@ -51,6 +51,17 @@ struct TextLogTests {
         ]
     )
 
+    /// What the model comes back with once the user has corrected the list.
+    private static let reestimate = MealEstimate(
+        title: "Eggs with cottage cheese and polenta",
+        kilocalories: 520,
+        macros: MacroTotals(protein: 44, carbs: 41, fat: 23),
+        items: [
+            RecognisedItem(name: "2 eggs", kilocalories: 158, note: .text(amount: .recognised)),
+            RecognisedItem(name: "Polenta, raw 50 g", kilocalories: 180, note: .text(amount: .recognised)),
+        ]
+    )
+
     // MARK: - No key
 
     @Test("with no key stored the tab is disabled and no request is made")
@@ -273,28 +284,6 @@ struct TextLogTests {
 
     // MARK: - Editing the result
 
-    @Test("the stepper moves ten kilocalories a tap and floors at zero")
-    func stepperFloorsAtZero() async throws {
-        let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .success(Self.estimate)))
-        model.typedText = Self.sentence
-        await model.estimating()
-
-        model.adjustKilocalories(by: MealResultDraft.calorieStep)
-        #expect(model.draft?.kilocalories == 638)
-
-        model.adjustKilocalories(by: -MealResultDraft.calorieStep)
-        #expect(model.draft?.kilocalories == 628)
-
-        for _ in 0..<70 {
-            model.adjustKilocalories(by: -MealResultDraft.calorieStep)
-        }
-        #expect(model.draft?.kilocalories == 0)
-
-        // And it comes back up from the floor rather than sticking there.
-        model.adjustKilocalories(by: MealResultDraft.calorieStep)
-        #expect(model.draft?.kilocalories == 10)
-    }
-
     @Test("the label pill cycles breakfast, lunch, snack, dinner and wraps")
     func labelPillCycles() async throws {
         // 08:10 on an empty day, so the first label is breakfast and the cycle
@@ -336,6 +325,75 @@ struct TextLogTests {
         #expect(model.draft?.isFavourite == false)
     }
 
+    // MARK: - Re-analysing
+
+    @Test("a changed breakdown is re-estimated from the edited list, not the sentence")
+    func reanalysingSendsTheEditedList() async throws {
+        let client = ScriptedClient(answers: [.success(Self.estimate), .success(Self.reestimate)])
+        let model = makeModel(store: try makeStore(), client: client)
+        model.typedText = Self.sentence
+        await model.estimating()
+
+        let polenta = try #require(model.draft?.items.last?.id)
+        model.editItem(polenta, to: "Polenta r50g")
+        await model.reanalysing()
+
+        #expect(client.requests == 2)
+        #expect(client.lastText == "2 eggs, Polenta r50g")
+        // The sentence itself is untouched: screen 15 still quotes it back and
+        // `‹ Back` still returns to the field holding it.
+        #expect(model.typedText == Self.sentence)
+
+        #expect(model.stage == .result)
+        #expect(model.draft?.kilocalories == 520)
+        #expect(model.draft?.hasItemEdits == false)
+    }
+
+    @Test("an unchanged breakdown makes no request")
+    func reanalysingWithoutAnEditIsRefused() async throws {
+        let client = ScriptedClient(answer: .success(Self.estimate))
+        let model = makeModel(store: try makeStore(), client: client)
+        model.typedText = Self.sentence
+        await model.estimating()
+
+        // Driven through the helper for the same reason the keyless test is:
+        // `reanalyse()` returns before its task would have run, so a bare call
+        // leaves the count below reading 1 whether the guard is there or not.
+        // This is the assertion that says a screen with nothing changed cannot
+        // spend the user's credit, so it has to be able to fail.
+        await model.reanalysing()
+
+        #expect(client.requests == 1)
+        #expect(model.stage == .result)
+    }
+
+    @Test("with no key stored a re-analysis makes no request and keeps the draft")
+    func reanalysingWithoutAKey() async throws {
+        let client = ScriptedClient(answers: [.success(Self.estimate), .success(Self.reestimate)])
+        let keys = MutableKeys(hasKey: true)
+        let model = makeModel(store: try makeStore(), client: client, keys: keys)
+        model.typedText = Self.sentence
+        await model.estimating()
+
+        model.addItem("Olive oil, 1 tbsp")
+        // The key goes away in Settings while the result screen is up.
+        keys.hasKey = false
+        // Driven through the helper, not through a bare `reanalyse()`: that
+        // returns before its task would have run, so the request count below
+        // would read 1 whether the guard was there or not and could never go
+        // red. Waiting the way a real re-analysis is waited on is what makes it
+        // an assertion.
+        await model.reanalysing()
+
+        #expect(client.requests == 1)
+        #expect(model.stage == .failed(.invalidKey))
+
+        model.dismissFailure()
+        #expect(model.stage == .result)
+        #expect(model.draft?.items.count == 3)
+        #expect(model.draft?.hasItemEdits == true)
+    }
+
     // MARK: - Committing
 
     @Test("committing writes a text entry whose macros and items match the estimate")
@@ -345,7 +403,6 @@ struct TextLogTests {
         model.typedText = Self.sentence
         await model.estimating()
 
-        model.adjustKilocalories(by: MealResultDraft.calorieStep)
         model.toggleFavourite()
         #expect(model.commit())
 
@@ -355,9 +412,7 @@ struct TextLogTests {
         // The estimate's name, not the user's wording: the sentence is what
         // was asked, and the entry records what the meal was.
         #expect(entry.title == "Eggs with cottage cheese and polenta")
-        // The stepper's tap is part of what is written, not a display-only
-        // adjustment.
-        #expect(entry.kilocalories == 638)
+        #expect(entry.kilocalories == 628)
         #expect(entry.macros == MacroTotals(protein: 47, carbs: 63, fat: 25))
         #expect(entry.isFavourite)
         #expect(entry.source == .text)
@@ -451,6 +506,14 @@ private extension TextLogModel {
     /// production type free of a hook that exists only for tests.
     func estimating() async {
         analyse()
+        while case .analysing = stage {
+            await Task.yield()
+        }
+    }
+
+    /// Taps `Re-analyse` and waits for it to settle, for the same reason.
+    func reanalysing() async {
+        reanalyse()
         while case .analysing = stage {
             await Task.yield()
         }

@@ -955,6 +955,54 @@
         }
       }
     },
+    "result.discard.cancel" : {
+      "comment" : "Backs out of the discard confirmation, leaving the estimate and its edits alone. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep editing"
+          }
+        }
+      }
+    },
+    "result.discard.confirm" : {
+      "comment" : "The destructive action in the discard confirmation. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard"
+          }
+        }
+      }
+    },
+    "result.discard.label" : {
+      "comment" : "The leading footer control, which is a trash mark and no word, for VoiceOver. The export draws it as Neu. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard this estimate"
+          }
+        }
+      }
+    },
+    "result.discard.title" : {
+      "comment" : "The discard confirmation's own title. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard this estimate?"
+          }
+        }
+      }
+    },
     "result.favourite.label" : {
       "comment" : "The favourite toggle for VoiceOver, without the star. Not in the export.",
       "extractionState" : "manual",
@@ -987,6 +1035,102 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "★ Favourite"
+          }
+        }
+      }
+    },
+    "result.item.add" : {
+      "comment" : "The last row of the breakdown on a result screen, which opens the same field empty. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add item"
+          }
+        }
+      }
+    },
+    "result.item.edit.cancel" : {
+      "comment" : "Leaves the item field without changing the line. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        }
+      }
+    },
+    "result.item.edit.confirm" : {
+      "comment" : "Accepts what the item field holds. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        }
+      }
+    },
+    "result.item.edit.hint" : {
+      "comment" : "VoiceOver hint on a breakdown row, which opens the item field. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens this item for editing"
+          }
+        }
+      }
+    },
+    "result.item.edit.message" : {
+      "comment" : "Under the item field, saying what belongs in it. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write the item as you would say it, with the amount if you know it."
+          }
+        }
+      }
+    },
+    "result.item.edit.placeholder" : {
+      "comment" : "The empty item field. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Polenta 150 g"
+          }
+        }
+      }
+    },
+    "result.item.edit.title" : {
+      "comment" : "The item field's own title. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Item"
+          }
+        }
+      }
+    },
+    "result.item.remove.label" : {
+      "comment" : "The remove control at the trailing edge of a breakdown row, for VoiceOver. The mark itself is an SF Symbol and so has no key. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove item"
           }
         }
       }
@@ -1111,18 +1255,6 @@
         }
       }
     },
-    "result.new" : {
-      "comment" : "Screens 14 and 15, the outlined footer action. Drawn Neu.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "New"
-          }
-        }
-      }
-    },
     "result.photo.caption" : {
       "comment" : "The stand-in the export draws where the photo goes. Drawn AUFGENOMMENES FOTO and already uppercase, because overlayCaption does not transform.",
       "extractionState" : "manual",
@@ -1159,30 +1291,6 @@
         }
       }
     },
-    "result.photo.item.confident" : {
-      "comment" : "The confidence line under a recognised item after a photo. Drawn sicher · ca. 150 g.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "confident · approx. %lld g"
-          }
-        }
-      }
-    },
-    "result.photo.item.unsure" : {
-      "comment" : "The same line where the model was not sure. Drawn unsicher · ca. 90 g.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "unsure · approx. %lld g"
-          }
-        }
-      }
-    },
     "result.photo.label" : {
       "comment" : "The captured photo for VoiceOver. Not in the export.",
       "extractionState" : "manual",
@@ -1195,50 +1303,14 @@
         }
       }
     },
-    "result.stepper.decrease" : {
-      "comment" : "Screens 14 and 15, the − of the calorie stepper.",
+    "result.reanalyse" : {
+      "comment" : "What the filled footer action becomes once the user has changed the breakdown. Not in the export.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "−"
-          }
-        }
-      }
-    },
-    "result.stepper.decrease.label" : {
-      "comment" : "The same control for VoiceOver. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ten fewer calories"
-          }
-        }
-      }
-    },
-    "result.stepper.increase" : {
-      "comment" : "Screens 14 and 15, the + of the calorie stepper.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "+"
-          }
-        }
-      }
-    },
-    "result.stepper.increase.label" : {
-      "comment" : "The same control for VoiceOver. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ten more calories"
+            "value" : "Re-analyse"
           }
         }
       }
@@ -1263,30 +1335,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Broken down"
-          }
-        }
-      }
-    },
-    "result.text.item.estimated" : {
-      "comment" : "Screen 15, under an item whose amount the model had to guess. Drawn Menge geschätzt.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Amount estimated"
-          }
-        }
-      }
-    },
-    "result.text.item.recognised" : {
-      "comment" : "Screen 15, under an item whose amount the user wrote down. Drawn Menge erkannt.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Amount recognised"
           }
         }
       }

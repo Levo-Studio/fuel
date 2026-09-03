@@ -78,6 +78,14 @@ final class CameraLogModel {
     /// The running scan, so `CANCEL` can stop it.
     private var scan: Task<Void, Never>?
 
+    /// Whether the request in flight is a re-estimate of an edited breakdown
+    /// rather than a scan of the frame.
+    ///
+    /// It decides two things that differ between the two: what `Try again` on
+    /// a failure sends, and where dismissing that failure lands. A re-analysis
+    /// has a result screen behind it and a first scan has a viewfinder.
+    private var isReanalysing = false
+
     init(
         store: FuelStore,
         client: any AIClient,
@@ -155,6 +163,42 @@ final class CameraLogModel {
         scan?.cancel()
     }
 
+    // MARK: - Re-analysing
+
+    /// The footer's `Re-analyse`, which is what `Add` becomes once the user has
+    /// changed the breakdown.
+    ///
+    /// **The photograph is not sent again.** The frame is what produced the
+    /// list the user has just corrected, and asking the model to look at it a
+    /// second time invites it to re-derive exactly what they overruled — at the
+    /// price of the image tokens they are paying for. The edited list is the
+    /// better description of the meal, so this goes through the same text
+    /// estimate the typed mode uses. There is no second request shape.
+    ///
+    /// **It only ever runs from a tap.** Nothing here is called when a draft
+    /// changes, and the guard on `hasItemEdits` means a second press after a
+    /// successful re-analysis is refused rather than charged for.
+    func reanalyse() {
+        guard let draft, draft.hasItemEdits else { return }
+
+        let described = draft.itemSentence
+        guard !described.isEmpty else { return }
+
+        // No key, no request — and the draft survives, because the failure
+        // state this lands on returns to the result screen rather than
+        // throwing it away. `missingKey` and a refused key have the same
+        // remedy, which is why `AnalysisFailure` already collapses them.
+        guard keys.hasKey(for: provider) else {
+            isReanalysing = true
+            stage = .failed(.invalidKey)
+            return
+        }
+
+        isReanalysing = true
+        stage = .analysing(.analysingMeal)
+        scan = Task { [weak self] in await self?.rerun(described) }
+    }
+
     // MARK: - The scan
 
     private func run(_ image: UIImage) async {
@@ -163,25 +207,43 @@ final class CameraLogModel {
             // steps start walking, so an unsendable photo costs no request.
             let compressed = try MealPhotoCompressor.compress(image)
 
-            let stepper = Task { [weak self] in await self?.walkSteps() }
-            let estimate: MealEstimate
-            do {
-                estimate = try await client.estimate(photo: compressed)
-            } catch {
-                stepper.cancel()
-                _ = await stepper.value
-                throw error
-            }
-
-            // Awaited rather than only cancelled, so a step cannot land on the
-            // stage after the result has replaced it.
-            stepper.cancel()
-            _ = await stepper.value
+            let estimate = try await stepping { try await self.client.estimate(photo: compressed) }
 
             try Task.checkCancellation()
             present(estimate)
         } catch {
             fail(with: error)
+        }
+    }
+
+    private func rerun(_ described: String) async {
+        do {
+            let estimate = try await stepping { try await self.client.estimate(text: described) }
+
+            try Task.checkCancellation()
+            represent(estimate)
+        } catch {
+            fail(with: error)
+        }
+    }
+
+    /// Walks the four analysis states around one request.
+    ///
+    /// Shared by the scan and the re-analysis because the export draws one set
+    /// of four states and says nothing about what is being waited on.
+    private func stepping(_ request: () async throws -> MealEstimate) async throws -> MealEstimate {
+        let stepper = Task { [weak self] in await self?.walkSteps() }
+        do {
+            let estimate = try await request()
+            // Awaited rather than only cancelled, so a step cannot land on the
+            // stage after the result has replaced it.
+            stepper.cancel()
+            _ = await stepper.value
+            return estimate
+        } catch {
+            stepper.cancel()
+            _ = await stepper.value
+            throw error
         }
     }
 
@@ -208,24 +270,68 @@ final class CameraLogModel {
         stage = .result
     }
 
+    /// Puts a re-estimate over the draft, keeping the label and the favourite
+    /// mark the user set on it.
+    private func represent(_ estimate: MealEstimate) {
+        guard var draft else { return present(estimate) }
+        draft.replaceEstimate(with: estimate)
+        self.draft = draft
+        isReanalysing = false
+        stage = .result
+    }
+
     private func fail(with error: any Error) {
         // The clients throw `AIError` already; `transportFailure` is here for
         // the structured-concurrency cancellation that can arrive around them.
         let aiError = (error as? AIError) ?? AIError.transportFailure(error)
         guard let failure = AnalysisFailure(aiError) else {
-            discard()
+            // A cancelled request says nothing. Where that leaves the user
+            // depends on what they cancelled, which is what `dismissFailure`
+            // already answers.
+            dismissFailure()
             return
         }
         stage = .failed(failure)
     }
 
+    /// Leaving a failure state.
+    ///
+    /// A failed scan has nothing behind it and goes back to the viewfinder. A
+    /// failed re-analysis has the result the user was editing behind it, and
+    /// their edits are exactly what must not be thrown away by a request that
+    /// did not arrive.
+    func dismissFailure() {
+        guard draft != nil else {
+            discard()
+            return
+        }
+        isReanalysing = false
+        stage = .result
+    }
+
     // MARK: - Editing the result
 
-    /// The `−` and `+` beside the calorie figure. Floored at zero: a negative
-    /// meal is not a thing, and the day total would quietly absorb it.
-    func adjustKilocalories(by delta: Int) {
+    /// The breakdown's own controls: the `✕` on a row, the row itself, and the
+    /// `Add item` row under the list.
+    ///
+    /// All three are the draft's operations rather than this model's, so the
+    /// rule they share — the list has been changed, so the estimate above it is
+    /// stale — is written once and holds for every screen that draws a draft.
+    func removeItem(_ id: RecognisedItem.ID) {
         guard var draft else { return }
-        draft.kilocalories = max(0, draft.kilocalories + delta)
+        draft.removeItem(id)
+        self.draft = draft
+    }
+
+    func editItem(_ id: RecognisedItem.ID, to text: String) {
+        guard var draft else { return }
+        draft.editItem(id, to: text)
+        self.draft = draft
+    }
+
+    func addItem(_ text: String) {
+        guard var draft else { return }
+        draft.addItem(text)
         self.draft = draft
     }
 
@@ -277,21 +383,33 @@ final class CameraLogModel {
         }
     }
 
-    /// Throws the scan away and returns to the viewfinder — `New` on the
-    /// result screen, the retry state's dismissal, a cancelled analysis.
+    /// Throws the scan away and returns to the viewfinder: the result screen's
+    /// discard control once its confirmation is answered, and a commit that
+    /// has just written the meal down.
+    ///
+    /// A failure state reaches this too, but through `dismissFailure()` rather
+    /// than directly — leaving one only throws the scan away when there is no
+    /// draft behind it to go back to.
     ///
     /// The frame is released here. That is the whole lifetime of the photo:
     /// captured, sent, drawn, gone.
     func discard() {
         scan?.cancel()
         scan = nil
+        isReanalysing = false
         photo = nil
         draft = nil
         stage = keys.hasKey(for: provider) ? .viewfinder : .noKey
     }
 
-    /// The retry state's action: same frame, same request, from the top.
+    /// The retry state's action: the same request as the one that failed, from
+    /// the top — the frame after a scan, the edited list after a re-analysis.
     func retry() {
+        if isReanalysing {
+            isReanalysing = false
+            reanalyse()
+            return
+        }
         guard let photo else {
             discard()
             return

@@ -17,9 +17,12 @@ struct TextResultView: View {
     let onBack: () -> Void
     let onCycleLabel: () -> Void
     let onToggleFavourite: () -> Void
-    let onAdjustCalories: (Int) -> Void
-    let onNew: () -> Void
-    let onAdd: () -> Void
+    let onRemoveItem: (RecognisedItem.ID) -> Void
+    let onEditItem: (RecognisedItem.ID, String) -> Void
+    let onAddItem: (String) -> Void
+    let onReanalyse: () -> Void
+    let onDiscard: (() -> Void)?
+    let commit: MealResultAction
 
     @Environment(\.fuelPalette) private var palette
 
@@ -31,9 +34,12 @@ struct TextResultView: View {
             onBack: onBack,
             onCycleLabel: onCycleLabel,
             onToggleFavourite: onToggleFavourite,
-            onAdjustCalories: onAdjustCalories,
-            onNew: onNew,
-            onAdd: onAdd,
+            onRemoveItem: onRemoveItem,
+            onEditItem: onEditItem,
+            onAddItem: onAddItem,
+            onReanalyse: onReanalyse,
+            onDiscard: onDiscard,
+            commit: commit,
             lede: { quote }
         )
     }
@@ -77,9 +83,12 @@ struct TextResultView: View {
         onBack: {},
         onCycleLabel: {},
         onToggleFavourite: {},
-        onAdjustCalories: { _ in },
-        onNew: {},
-        onAdd: {}
+        onRemoveItem: { _ in },
+        onEditItem: { _, _ in },
+        onAddItem: { _ in },
+        onReanalyse: {},
+        onDiscard: {},
+        commit: MealResultAction(title: MealResultCopy.add, perform: {})
     )
     .environment(\.fuelPalette, FuelPalette(theme: .light, accent: .green))
 }

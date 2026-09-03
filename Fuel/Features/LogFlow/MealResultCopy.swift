@@ -60,22 +60,6 @@ nonisolated enum MealResultCopy {
         String(format: String(localized: "result.kilocalories.value"), kilocalories)
     }
 
-    static var stepperDecrease: String {
-        String(localized: "result.stepper.decrease")
-    }
-
-    static var stepperIncrease: String {
-        String(localized: "result.stepper.increase")
-    }
-
-    static var stepperDecreaseLabel: String {
-        String(localized: "result.stepper.decrease.label")
-    }
-
-    static var stepperIncreaseLabel: String {
-        String(localized: "result.stepper.increase.label")
-    }
-
     static var macroProtein: String {
         String(localized: "result.macro.protein")
     }
@@ -94,39 +78,68 @@ nonisolated enum MealResultCopy {
 
     // MARK: - Breakdown
 
-    /// The second line of a breakdown row.
+    /// The remove mark at the trailing edge of a breakdown row, for VoiceOver.
     ///
-    /// Chosen by the shape of the note rather than by which screen is asking,
-    /// because the note already carries the mode: a photo item knows a
-    /// confidence and an approximate weight, a typed item knows only whether
-    /// the amount was written down. A note this build cannot read draws
-    /// nothing, and the row keeps its name and its calories — the part the
-    /// user is reading.
-    static func itemNote(_ note: RecognisedItem.Note) -> String? {
-        switch note {
-        case .photo(let confidence, let grams):
-            let format = switch confidence {
-            case .confident: String(localized: "result.photo.item.confident")
-            case .unsure: String(localized: "result.photo.item.unsure")
-            }
-            return String(format: format, grams)
-        case .text(let amount):
-            return switch amount {
-            case .recognised: String(localized: "result.text.item.recognised")
-            case .estimated: String(localized: "result.text.item.estimated")
-            }
-        case .unknown:
-            return nil
-        }
+    /// There is no glyph key beside it: the mark is an SF Symbol, because
+    /// neither bundled face carries the `✕` the export writes on screen 07.
+    /// `MealResultView.removeControl` has the cmap evidence and the precedent.
+    static var itemRemoveLabel: String {
+        String(localized: "result.item.remove.label")
+    }
+
+    static var itemAdd: String {
+        String(localized: "result.item.add")
+    }
+
+    static var itemEditHint: String {
+        String(localized: "result.item.edit.hint")
+    }
+
+    static var itemEditTitle: String {
+        String(localized: "result.item.edit.title")
+    }
+
+    static var itemEditMessage: String {
+        String(localized: "result.item.edit.message")
+    }
+
+    static var itemEditPlaceholder: String {
+        String(localized: "result.item.edit.placeholder")
+    }
+
+    static var itemEditCancel: String {
+        String(localized: "result.item.edit.cancel")
+    }
+
+    static var itemEditConfirm: String {
+        String(localized: "result.item.edit.confirm")
     }
 
     // MARK: - Footer
 
-    static var new: String {
-        String(localized: "result.new")
+    /// The leading footer control, which is a trash mark and no word.
+    static var discardLabel: String {
+        String(localized: "result.discard.label")
+    }
+
+    static var discardTitle: String {
+        String(localized: "result.discard.title")
+    }
+
+    static var discardConfirm: String {
+        String(localized: "result.discard.confirm")
+    }
+
+    static var discardCancel: String {
+        String(localized: "result.discard.cancel")
     }
 
     static var add: String {
         String(localized: "result.add")
+    }
+
+    /// What `Add` becomes once the user has changed the breakdown.
+    static var reanalyse: String {
+        String(localized: "result.reanalyse")
     }
 }
