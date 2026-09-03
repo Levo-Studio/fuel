@@ -53,7 +53,7 @@ struct TodayView: View {
                 // legible at the top of it and gone at the bottom.
                 .padding(.bottom, FuelMetrics.ListFade.height)
             }
-            .scrollBounceBehavior(.basedOnSize)
+            .fuelScrolling()
 
             TodayListFade()
 

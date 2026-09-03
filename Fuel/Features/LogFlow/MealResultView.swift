@@ -193,7 +193,7 @@ struct MealResultView<Lede: View>: View {
                     .padding(.top, FuelMetrics.Space.s26)
                     .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
                 }
-                .scrollBounceBehavior(.basedOnSize)
+                .fuelScrolling()
                 // The list ends above the footer, as the export draws it —
                 // and it ends above wherever the footer currently is, which is
                 // the whole point of taking the inset from the footer rather
