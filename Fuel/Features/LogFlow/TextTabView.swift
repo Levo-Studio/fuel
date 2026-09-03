@@ -68,10 +68,15 @@ struct TextTabView: View {
     /// field remains what names it, for VoiceOver as well.
     ///
     /// It grows downward as the sentence wraps, which is the only reading of a
-    /// screen that draws prose at `19px/1.5` and gives it no box. Nothing is
-    /// remembered anywhere: the text lives in the model for as long as the flow
-    /// is open, and no autofill, no correction dictionary and no state
-    /// restoration is offered a copy.
+    /// screen that draws prose at `19px/1.5` and gives it no box. **The example
+    /// does not**: a prompt is one line and truncates, so an example that
+    /// outran the line would lose the export's trailing ellipsis to a system
+    /// one. Their widths are held to the design layer's own scaling cap in
+    /// `TextPlaceholderTests`.
+    ///
+    /// Nothing is remembered anywhere: the text lives in the model for as long
+    /// as the flow is open, and no autofill, no correction dictionary and no
+    /// state restoration is offered a copy.
     private var field: some View {
         TextField("", text: $typedText, prompt: prompt, axis: .vertical)
             .fuelStyle(FuelTypography.textEntry)
