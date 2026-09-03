@@ -1123,6 +1123,7 @@ struct RequestShapeTests {
         let body = try #require(request.httpBody)
         let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
         #expect(json["model"] as? String == "claude-sonnet-5")
+        #expect(json["max_tokens"] as? Int == EstimateContract.maxTokens)
     }
 
     @Test("Mistral gets a bearer token and no x-api-key")
@@ -1142,6 +1143,10 @@ struct RequestShapeTests {
         #expect(request.url?.absoluteString == "https://api.mistral.ai/v1/chat/completions")
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer \(Self.mistralSecret)")
         #expect(request.value(forHTTPHeaderField: "x-api-key") == nil)
+
+        let body = try #require(request.httpBody)
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(json["max_tokens"] as? Int == EstimateContract.maxTokens)
     }
 
     /// The regression this whole suite is most worth having.

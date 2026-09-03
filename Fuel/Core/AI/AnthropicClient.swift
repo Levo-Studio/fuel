@@ -24,10 +24,6 @@ nonisolated struct AnthropicClient: AIClient {
 
     private static let messagesURL = URL(string: "https://api.anthropic.com/v1/messages")!
 
-    /// Enough for one meal's JSON with a generous breakdown, and short enough
-    /// that a model which starts writing prose instead runs out rather than
-    /// billing the user for an essay.
-    private static let maxTokens = 1024
 
     private let transport: any HTTPTransport
     private let keys: ProviderKeySource
@@ -121,7 +117,7 @@ nonisolated struct AnthropicClient: AIClient {
     private func complete(content: [[String: Any]], mode: AILogMode) async throws -> MealEstimate {
         let body: [String: Any] = [
             "model": Self.model,
-            "max_tokens": Self.maxTokens,
+            "max_tokens": EstimateContract.maxTokens,
             "system": EstimateContract.systemPrompt,
             "messages": [["role": "user", "content": content]]
         ]

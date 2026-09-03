@@ -36,7 +36,6 @@ nonisolated struct MistralClient: AIClient {
 
     private static let baseURL = URL(string: "https://api.mistral.ai")!
 
-    private static let maxTokens = 1024
 
     private let transport: any HTTPTransport
     private let keys: ProviderKeySource
@@ -119,7 +118,7 @@ nonisolated struct MistralClient: AIClient {
     private func complete(userContent: [[String: Any]], mode: AILogMode) async throws -> MealEstimate {
         let body: [String: Any] = [
             "model": Self.model,
-            "max_tokens": Self.maxTokens,
+            "max_tokens": EstimateContract.maxTokens,
             // Asked for as well as prompted for. It is not a guarantee — the
             // parser assumes nothing — but it costs nothing and removes the
             // most common way a reply arrives unusable, which is a code fence.

@@ -149,6 +149,43 @@ nonisolated enum EstimateContract {
 
     // MARK: - Bounds
 
+    /// The request ceiling both clients send as `max_tokens`.
+    ///
+    /// **Shared for the same reason the shape is: it is one product decision,
+    /// not a per-provider knob**, and a client that quietly ran its own number
+    /// would be exactly the kind of drift this file exists to prevent.
+    ///
+    /// **The economics, because they run one way and not the other.** Both
+    /// providers bill generated tokens, not the ceiling — a reply that
+    /// finishes in 500 tokens costs the same whether the ceiling was 1024 or
+    /// 4096. A reply that hits the ceiling is the opposite: it bills every one
+    /// of those tokens *and* comes back as `AIError.truncatedReply`, unusable,
+    /// so the user taps `Try again` and pays for a second request on top. A
+    /// higher ceiling is free on the reply that would have fit anyway, and it
+    /// is the only lever that makes the expensive outcome less likely. Raising
+    /// it is not caution spent against the user's credit; refusing to is.
+    ///
+    /// **Sized against the contract's own shape, not against a photograph.**
+    /// Five fields per item — `name`, `kilocalories`, `grams`, `confidence`,
+    /// `amount` — plus the raw-weight convention's bracketed suffix on a name
+    /// that used it, and the four top-level fields around the list. A busy
+    /// plate of twelve to fifteen items, at that shape, runs somewhere in the
+    /// 600–900 token range; this is roughly double the top of that, so a
+    /// plate half again as busy still has headroom, and so does a reply a
+    /// model has indented or spaced despite being told to write one compact
+    /// object — neither provider's JSON mode is a guarantee, and whitespace a
+    /// human would call formatting is tokens here.
+    ///
+    /// **What raising it costs in the other direction.** A model that ignores
+    /// "reply with one JSON object and nothing else" and free-writes prose now
+    /// runs twice as long before this cuts it off — a larger bill on the
+    /// failure mode this file already treats as a bug in the model's
+    /// instruction-following, not in Fuel. That case was always possible at
+    /// the old ceiling too, only more cheaply; it is bounded, and it is a
+    /// smaller and rarer cost than the retry a truncated *well-formed* reply
+    /// guarantees on every busy plate that needed the room.
+    static let maxTokens = 2048
+
     /// The longest a model-written name may be by the time it leaves this
     /// file — the meal `title`, and every line item's `name`.
     ///
