@@ -151,7 +151,23 @@ struct CameraGalleryButton: View {
                     Circle()
                         .strokeBorder(FuelPalette.Camera.hair, lineWidth: FuelMetrics.Line.hairline)
                 }
-                .contentShape(.circle)
+                // The drawn circle is 34 and a finger is 44 — the same
+                // arithmetic Today's gear does, and for the same reason. The
+                // larger frame grows the region that answers around it, and
+                // the negative padding gives the layout its 34 back, so the
+                // circle keeps the size and the position the export puts it in
+                // and the header row is laid out as though nothing here were
+                // bigger than what is drawn.
+                .frame(
+                    width: FuelMetrics.Control.minimumHitTarget,
+                    height: FuelMetrics.Control.minimumHitTarget
+                )
+                .contentShape(Rectangle())
+                .padding(
+                    -FuelMetrics.Control.hitTargetOverhang(
+                        around: FuelMetrics.Control.circleButton
+                    )
+                )
         }
     }
 }
