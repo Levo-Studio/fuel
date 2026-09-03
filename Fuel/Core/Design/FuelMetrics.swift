@@ -249,6 +249,37 @@ nonisolated enum FuelMetrics {
         /// The radio dot on an onboarding choice card: accent-filled when the
         /// option is chosen, a `Line.selectionBorder` ring when it is not.
         static let selectionDot: CGFloat = 18
+
+        /// The smallest area a control may answer to a finger in, whatever it
+        /// draws.
+        ///
+        /// **This one is not read out of the export**, and it is the only
+        /// number in this file that is not. Several of the controls above are
+        /// drawn smaller than a fingertip — `circleButton` at 34 is the one
+        /// that matters most, because it is how Today reaches Settings — and
+        /// the export has nothing to say about hit testing, which a static
+        /// render cannot draw.
+        ///
+        /// It lives here rather than at the call site because it is a rule
+        /// applied to a drawn control, not a measurement of one: the circle
+        /// keeps the size and the position the export gives it, and only the
+        /// region that answers grows around it.
+        ///
+        /// It is deliberately not added to `allDrawnValues`, which lists what
+        /// the export draws. That `Space.s44` happens to carry the same figure
+        /// is a coincidence of the ladder, not this rule appearing there.
+        static let minimumHitTarget: CGFloat = 44
+
+        /// How far that region overhangs a control of `size` on each side.
+        ///
+        /// The halving is here rather than at the call site for the same
+        /// reason the minimum is: a view asks how much bigger the region is
+        /// than the drawing, it does not work it out. Zero for anything
+        /// already large enough, so a control that grows past 44 does not
+        /// acquire a negative inset.
+        static func hitTargetOverhang(around size: CGFloat) -> CGFloat {
+            max(.zero, (minimumHitTarget - size) / 2)
+        }
     }
 
     // MARK: - Ring
