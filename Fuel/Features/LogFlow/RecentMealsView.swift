@@ -69,7 +69,11 @@ private struct RecentMealRow: View {
                         .padding(.top, FuelMetrics.Space.s3)
                 }
 
-                Spacer(minLength: FuelMetrics.Space.s14)
+                // No minimum, for the same reason as the header row: the
+                // export draws the row `space-between`, and the 14 below is
+                // the gap inside the right-hand group, not a floor between the
+                // two sides.
+                Spacer(minLength: .zero)
 
                 HStack(alignment: .center, spacing: FuelMetrics.Space.s14) {
                     Text(LogFlowFormat.figure(meal.kilocalories))

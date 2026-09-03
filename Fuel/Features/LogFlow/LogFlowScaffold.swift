@@ -99,7 +99,10 @@ private struct LogFlowHeader<Accessory: View>: View {
             .buttonStyle(.plain)
             .accessibilityLabel(Text(LogFlowCopy.cancelLabel))
 
-            Spacer(minLength: FuelMetrics.Space.s14)
+            // No minimum: the export draws the row `space-between`, and a
+            // floor here would be a distance the design does not set at this
+            // position.
+            Spacer(minLength: .zero)
 
             accessory()
         }
