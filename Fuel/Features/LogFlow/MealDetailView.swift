@@ -100,23 +100,14 @@ struct MealDetailView: View {
 
             Button(MealDetailCopy.deleteCancel, role: .cancel) {}
         }
-        // The second way back to Today, for a thumb that reaches for the edge
-        // before it reaches for the corner. `‹ Back` stays the drawn control
-        // and nothing is added to the screen to advertise this one.
-        //
-        // **It is off the moment there is something to lose.** `MealResultView`
-        // puts a confirmation in front of `‹ Back` once the breakdown has been
-        // changed, and a gesture that skipped it would put back exactly the bug
-        // that confirmation exists to fix — item edits thrown away without a
-        // question. The confirmation belongs to that view and cannot be reached
-        // from here, so with edits pending this offers nothing and the drawn
-        // control, which asks, is the only way out. The analysis and failure
-        // states are excluded for the plainer reason that they draw their own
-        // cancel over the whole screen.
-        .fuelBackSwipe(
-            isEnabled: model.stage == .detail && !model.draft.hasItemEdits,
-            perform: onClose
-        )
+        // No `fuelBackSwipe` here, unlike Settings. This screen is pushed on
+        // `RootShell`'s navigation stack rather than presented in a cover, so
+        // it already has a real edge-swipe — the system's own interactive pop
+        // — and a hand-built one beside it would be a second recogniser
+        // answering the same drag. The discard confirmation a custom gesture
+        // would have needed to route around is handled where the pop itself is
+        // caught: `RootShell.mealDetailPath`, the one place that can intercept
+        // it before the screen is gone.
         .onChange(of: model.stage) { previous, current in
             reportOutcome(from: previous, to: current)
         }
