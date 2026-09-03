@@ -102,7 +102,8 @@ nonisolated struct MistralClient: AIClient {
             ]
         ]
 
-        return try await complete(userContent: content, mode: .photo)
+        let estimate = try await complete(userContent: content, mode: .photo)
+        return FoodTableGrounding.groundAgainstBundledTable(estimate, mode: .photo, originalText: nil)
     }
 
     func estimate(text: String) async throws -> MealEstimate {
@@ -110,7 +111,8 @@ nonisolated struct MistralClient: AIClient {
             ["type": "text", "text": EstimateContract.textInstruction(for: text)]
         ]
 
-        return try await complete(userContent: content, mode: .text)
+        let estimate = try await complete(userContent: content, mode: .text)
+        return FoodTableGrounding.groundAgainstBundledTable(estimate, mode: .text, originalText: text)
     }
 
     // MARK: - The one request path

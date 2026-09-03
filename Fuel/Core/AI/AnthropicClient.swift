@@ -101,7 +101,8 @@ nonisolated struct AnthropicClient: AIClient {
             ["type": "text", "text": EstimateContract.photoInstruction]
         ]
 
-        return try await complete(content: content, mode: .photo)
+        let estimate = try await complete(content: content, mode: .photo)
+        return FoodTableGrounding.groundAgainstBundledTable(estimate, mode: .photo, originalText: nil)
     }
 
     func estimate(text: String) async throws -> MealEstimate {
@@ -109,7 +110,8 @@ nonisolated struct AnthropicClient: AIClient {
             ["type": "text", "text": EstimateContract.textInstruction(for: text)]
         ]
 
-        return try await complete(content: content, mode: .text)
+        let estimate = try await complete(content: content, mode: .text)
+        return FoodTableGrounding.groundAgainstBundledTable(estimate, mode: .text, originalText: text)
     }
 
     // MARK: - The one request path
