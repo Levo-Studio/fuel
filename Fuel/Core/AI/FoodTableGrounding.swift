@@ -15,21 +15,39 @@ import Foundation
 /// time this file was written, which is a second, incidental reason to leave
 /// its parsing untouched rather than folding this in there.
 ///
-/// **A table hit corrects kilocalories and nothing else.** `RecognisedItem`
-/// has no per-item macro breakdown today — only a name and a kilocalorie
-/// figure — and the meal's `macros` is a single top-level estimate covering
-/// every item at once. Grounding one item's kilocalories against the table
-/// while leaving the others as the model wrote them has an exact answer:
-/// apply that item's own kilocalorie delta to the meal's total, and nothing
-/// else needs to move. Grounding macros the same way does not have an exact
-/// answer, because there is no stored per-item macro figure to take a delta
-/// against — only a meal-wide number that was never broken down by item in
-/// the first place. Approximating one by splitting the meal's macros across
-/// items by kilocalorie share would be presenting a guess as a CIQUAL figure,
-/// which is the opposite of what this table is for. Carrying a per-item macro
-/// breakdown is a real improvement and a real change to `RecognisedItem`'s
-/// shape; it is a question for whoever schedules that, not a corner to cut
-/// silently inside a kilocalorie fix.
+/// **A table hit corrects all four numbers — kilocalories, protein, carbs,
+/// fat — at the item level, and kilocalories always, macros only where the
+/// arithmetic is honest, at the meal level.** The asymmetry is not a
+/// shortcut; it is forced by what the model is actually asked for.
+/// `EstimateContract`'s schema itemises `kilocalories` per item and asks for
+/// `protein_g`/`carbs_g`/`fat_g` only once, for the whole meal — so an item
+/// arriving here always has a real prior kilocalorie figure to take a delta
+/// against, and never has a prior macro figure to take one against, because
+/// the model was never asked to say what it was.
+///
+/// Item level is unaffected by that gap: `RecognisedItem.macros` starts `nil`
+/// on every item regardless of mode, and a table hit with complete macro data
+/// simply fills it in — there is no "before" to reconcile, only an absence
+/// becoming a fact. See that property's own doc comment for why a `nil`
+/// there, rather than a second flag, is what marks a value as the model's own
+/// estimate.
+///
+/// Meal level is where the missing prior actually matters, and it is handled
+/// rather than guessed at: **when the reply holds exactly one item, that
+/// item's grounded macros become the meal's macros outright**, because with
+/// one item the meal's prior macro estimate and that item's implied,
+/// unstated prior macro estimate are the same number — there is nothing else
+/// in the meal for the model to have been describing. This is not a special
+/// case bolted onto the delta idea; it is what the delta collapses to when
+/// the only available "before" is the meal's own total: `new = old + (item -
+/// old) = item`. For two items or more, no such identity holds — nothing
+/// says how the model's one meal-wide guess was ever split between them —
+/// and the meal's macros are left exactly as estimated. Splitting it by
+/// kilocalorie share would answer that question with a number CIQUAL never
+/// produced, which is the mistake this whole table exists to stop making.
+/// Kilocalories are not bound by any of this, because every item always
+/// carries its own real prior figure: the existing per-item delta applies
+/// unconditionally, at any item count.
 nonisolated enum FoodTableGrounding {
 
     // MARK: - Entry point
@@ -76,7 +94,15 @@ nonisolated enum FoodTableGrounding {
     ) -> MealEstimate {
         let textWeight = soleTextWeight(for: estimate, mode: mode, originalText: originalText)
 
+        // Whether the meal has exactly one item, decided once, up front,
+        // rather than re-derived inside the loop below — see this type's own
+        // doc comment for why one item is the one case a meal-level macro
+        // correction has an honest "before" to work from.
+        let isSoleItem = estimate.items.count == 1
+
         var kilocalorieDelta = 0
+        var soleItemMacros: MacroTotals?
+
         let items = estimate.items.map { item -> RecognisedItem in
             guard
                 let weight = weight(for: item, mode: mode, soleTextWeight: textWeight),
@@ -90,6 +116,19 @@ nonisolated enum FoodTableGrounding {
 
             var grounded = item
             grounded.kilocalories = portion.kilocalories
+
+            // A row missing one of its own macros — CIQUAL has no fat figure
+            // for cooked polenta — leaves `macros` `nil` rather than writing
+            // a zero nothing measured. Kilocalories are unaffected: CIQUAL
+            // never publishes a row without an energy value, only sometimes
+            // without every macro, so this gap never reaches `kilocalories`.
+            if !portion.incompleteMacros {
+                grounded.macros = portion.macros
+                if isSoleItem {
+                    soleItemMacros = portion.macros
+                }
+            }
+
             return grounded
         }
 
@@ -99,6 +138,9 @@ nonisolated enum FoodTableGrounding {
         // a value that reaches the day's ring regardless of how a delta got
         // there.
         grounded.kilocalories = max(0, estimate.kilocalories + kilocalorieDelta)
+        if let soleItemMacros {
+            grounded.macros = soleItemMacros
+        }
         return grounded
     }
 

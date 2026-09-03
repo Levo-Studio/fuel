@@ -40,6 +40,13 @@ struct FoodTableGroundingTests {
 
         #expect(grounded.items[0].kilocalories == 158)   // 350 kcal/100g x 0.45
         #expect(grounded.kilocalories == 158)             // 72 + (158 - 72)
+
+        // Raw polenta's macros are complete in CIQUAL, so the item gets its
+        // own real figures, and — this being the meal's only item — those
+        // figures become the meal's macros outright.
+        let expected = MacroTotals(protein: 4, carbs: 33, fat: 1)   // 7.88/74/1.8 x 0.45
+        #expect(grounded.items[0].macros == expected)
+        #expect(grounded.macros == expected)
     }
 
     @Test("The same sentence without the marker is priced from the prepared row")
@@ -60,6 +67,15 @@ struct FoodTableGroundingTests {
         // 76.1 kcal/100g x 0.45 = 34.245 -> 34.
         #expect(grounded.items[0].kilocalories == 34)
         #expect(grounded.kilocalories == 34)
+
+        // CIQUAL has no fat figure for cooked polenta. Kilocalories is
+        // unaffected by that gap — the row still publishes an energy value —
+        // but macros stays nil rather than reporting a zero fat nothing
+        // measured, on the item and, because this is the meal's only item,
+        // on the meal as well: nothing here is a fact to replace the meal's
+        // prior estimate with.
+        #expect(grounded.items[0].macros == nil)
+        #expect(grounded.macros == estimate.macros)
     }
 
     /// The item name itself carries the model's own raw-weight annotation —
@@ -329,22 +345,67 @@ struct FoodTableGroundingTests {
         #expect(grounded.kilocalories == 0)
     }
 
-    @Test("Macros are left exactly as the model wrote them")
-    func macrosUntouched() {
-        let macros = MacroTotals(protein: 11, carbs: 22, fat: 33)
+    /// A meal's macros can only honestly move when there is exactly one item
+    /// to have supplied them — see this file's own doc comment for why. Two
+    /// items each still get their own real figures; the meal's aggregate,
+    /// which the model split across them in a way nothing here can recover,
+    /// stays exactly as estimated.
+    @Test("Two grounded items each get real macros; the meal's aggregate does not move")
+    func multiItemMacrosStayAggregate() {
+        let modelMacros = MacroTotals(protein: 11, carbs: 22, fat: 33)
         let estimate = MealEstimate(
-            title: "Polenta",
-            kilocalories: 72,
-            macros: macros,
+            title: "Rice and chicken",
+            kilocalories: 999,
+            macros: modelMacros,
             items: [
-                RecognisedItem(name: "Polenta", kilocalories: 72, note: .text(amount: .recognised))
+                RecognisedItem(
+                    name: "Rice", kilocalories: 300,
+                    note: .photo(confidence: .confident, approximateGrams: 150)
+                ),
+                RecognisedItem(
+                    name: "Chicken breast", kilocalories: 300,
+                    note: .photo(confidence: .confident, approximateGrams: 100)
+                )
             ]
         )
 
-        let grounded = FoodTableGrounding.ground(
-            estimate, mode: .text, originalText: "r45g polenta", table: table
+        let grounded = FoodTableGrounding.ground(estimate, mode: .photo, originalText: nil, table: table)
+
+        #expect(grounded.items[0].macros == MacroTotals(protein: 5, carbs: 42, fat: 1))
+        #expect(grounded.items[1].macros == MacroTotals(protein: 30, carbs: 0, fat: 8))
+        #expect(grounded.macros == modelMacros)
+    }
+
+    /// The sole-item collapse is specifically an *item-count* rule, not a
+    /// generic "meal totals move when anything grounds" rule — this pins that
+    /// a two-item meal declines the meal-level correction even though both of
+    /// its items resolve, which `multiItemMacrosStayAggregate` already checks
+    /// on the macro side; this checks the reverse would-be trap does not
+    /// exist on the kilocalorie side either, i.e. that kilocalorie grounding
+    /// was never gated on item count to begin with.
+    @Test("Kilocalorie grounding was never gated on item count")
+    func kilocalorieDeltaIgnoresItemCount() {
+        let estimate = MealEstimate(
+            title: "Rice and chicken",
+            kilocalories: 600,
+            macros: .zero,
+            items: [
+                RecognisedItem(
+                    name: "Rice", kilocalories: 300,
+                    note: .photo(confidence: .confident, approximateGrams: 150)
+                ),
+                RecognisedItem(
+                    name: "Chicken breast", kilocalories: 300,
+                    note: .photo(confidence: .confident, approximateGrams: 100)
+                )
+            ]
         )
 
-        #expect(grounded.macros == macros)
+        let grounded = FoodTableGrounding.ground(estimate, mode: .photo, originalText: nil, table: table)
+
+        // 212 (rice) + 189 (chicken) replacing 300 + 300.
+        #expect(grounded.items[0].kilocalories == 212)
+        #expect(grounded.items[1].kilocalories == 189)
+        #expect(grounded.kilocalories == 600 + (212 - 300) + (189 - 300))
     }
 }
