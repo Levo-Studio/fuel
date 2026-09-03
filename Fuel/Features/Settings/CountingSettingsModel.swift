@@ -92,11 +92,21 @@ final class CountingSettingsModel {
     /// edit — and the digit filter is the same one the onboarding field uses,
     /// so a pasted `2,400` cannot land here as something the number pad would
     /// never have produced.
+    ///
+    /// **A draft that means what is already held is not written.** The rows
+    /// seed their fields from this model when they appear, and a text field
+    /// cannot tell that seed from a keystroke, so four drafts arrive here
+    /// unchanged every time the section is shown — and again each time the user
+    /// switches back from count-only. Storing them would reach `persist()` and
+    /// create the `GoalSettings` row, and that row existing is what marks
+    /// onboarding as answered: a screen opened to read a goal would answer the
+    /// question for the user. The guard belongs here rather than at the call
+    /// site because every caller of this setter has the same problem.
     func setValue(from typed: String, for target: GoalTarget) {
-        targets[keyPath: target.keyPath] = GoalFieldInput.value(
-            from: typed,
-            previous: value(for: target)
-        )
+        let stored = value(for: target)
+        let meant = GoalFieldInput.value(from: typed, previous: stored)
+        guard meant != stored else { return }
+        targets[keyPath: target.keyPath] = meant
         persist()
     }
 

@@ -53,6 +53,28 @@ struct SettingsGoalsTests {
         #expect(try store.existingGoalSettings() == nil)
     }
 
+    /// The same invariant one step further along, where it was actually broken.
+    ///
+    /// Constructing the model writes nothing, but the rows do not stop there:
+    /// each one seeds its text field from the model when it appears, and the
+    /// field's change handler cannot tell that seed from a keystroke. Four rows
+    /// therefore hand the model back its own numbers on every appearance, and a
+    /// setter that stored them would create the `GoalSettings` row — which is
+    /// what marks onboarding as answered. Opening Settings to read a goal must
+    /// not answer the question for the user.
+    @Test("the rows seeding their fields does not end onboarding")
+    func seedingTheFieldsWritesNothing() throws {
+        let store = try makeStore()
+        let model = try CountingSettingsModel(store: store)
+
+        for target in GoalTarget.allCases {
+            model.setValue(from: String(model.value(for: target)), for: target)
+        }
+
+        #expect(try store.existingGoalSettings() == nil)
+        #expect(model.targets == .default)
+    }
+
     // MARK: - Switching modes
 
     @Test("switching to count-only and back keeps the four numbers")
