@@ -244,6 +244,76 @@ struct TextLogTests {
         #expect(model.typedText == Self.sentence)
     }
 
+    /// The bug this pins: `cancelEstimate()` cancelled the `Task` but left the
+    /// run current, so a request that happened to complete in the window
+    /// between the tap and the continuation resuming still passed
+    /// `isCurrent` — and presented a result over a cancel the user had just
+    /// made. `GatedClient` holds the answer open past the cancel and releases
+    /// it afterwards, which is the only way to put a test in that window.
+    @Test("a request that completes after CANCEL is not presented anyway")
+    func cancelIsFinalEvenIfTheAnswerArrivesAnyway() async throws {
+        let client = GatedClient(answers: [.success(Self.estimate)])
+        let model = TextLogModel(
+            store: try makeStore(),
+            client: client,
+            keys: StoredKey(),
+            provider: .claude,
+            now: { at(19, 20) },
+            pace: {}
+        )
+        model.typedText = Self.sentence
+
+        model.analyse()
+        while client.requests < 1 { await Task.yield() }
+
+        model.cancelEstimate()
+        #expect(model.stage == .entry)
+
+        // The request the user backed out of answers anyway.
+        client.release(0)
+        for _ in 0..<50 { await Task.yield() }
+
+        #expect(model.stage == .entry)
+        #expect(model.draft == nil)
+        #expect(model.typedText == Self.sentence)
+    }
+
+    /// The re-analysis half of the same hole: a cancelled re-analysis that
+    /// completes anyway must not overwrite the draft the user was looking at
+    /// when they cancelled.
+    @Test("a re-analysis that completes after CANCEL does not overwrite the draft")
+    func cancelledReanalysisDoesNotOverwriteTheDraft() async throws {
+        let client = GatedClient(answers: [.success(Self.estimate), .success(Self.reestimate)])
+        let model = TextLogModel(
+            store: try makeStore(),
+            client: client,
+            keys: StoredKey(),
+            provider: .claude,
+            now: { at(19, 20) },
+            pace: {}
+        )
+        model.typedText = Self.sentence
+        model.analyse()
+        while client.requests < 1 { await Task.yield() }
+        client.release(0)
+        while case .analysing = model.stage { await Task.yield() }
+        #expect(model.stage == .result)
+
+        model.editItem(try #require(model.draft?.items.first?.id), to: "3 eggs")
+        model.reanalyse()
+        while client.requests < 2 { await Task.yield() }
+
+        model.cancelEstimate()
+        #expect(model.stage == .result)
+        let untouched = model.draft
+
+        client.release(1)
+        for _ in 0..<50 { await Task.yield() }
+
+        #expect(model.stage == .result)
+        #expect(model.draft == untouched)
+    }
+
     // MARK: - Two estimates at once
 
     /// The bug this pins: cancelling a request does not stop the answer that

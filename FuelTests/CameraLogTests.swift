@@ -449,6 +449,37 @@ struct CameraLogTests {
         #expect(model.draft?.hasItemEdits == true)
     }
 
+    /// The bug this pins, same shape as its counterpart in `TextLogTests`:
+    /// `cancelScan()` cancelled the `Task` but left the run current, so a
+    /// scan that happened to complete in the window between the tap and the
+    /// continuation resuming still passed `isCurrent` and presented a result
+    /// over a cancel the user had just made.
+    @Test("a scan that completes after CANCEL is not presented anyway")
+    func cancelIsFinalEvenIfTheAnswerArrivesAnyway() async throws {
+        let client = GatedClient(answers: [.success(Self.estimate)])
+        let model = CameraLogModel(
+            store: try makeStore(),
+            client: client,
+            camera: StubCamera(),
+            keys: StoredKey(),
+            provider: .claude,
+            now: { at(19, 20) },
+            pace: {}
+        )
+
+        model.analyse(pixel())
+        while client.requests < 1 { await Task.yield() }
+
+        model.cancelScan()
+        #expect(model.stage == .viewfinder)
+
+        client.release(0)
+        for _ in 0..<50 { await Task.yield() }
+
+        #expect(model.stage == .viewfinder)
+        #expect(model.draft == nil)
+    }
+
     @Test("a re-analysis that fails leaves the edits where they were")
     func reanalysingThatFails() async throws {
         let client = ScriptedClient(answers: [.success(Self.estimate), .failure(.network)])

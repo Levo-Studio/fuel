@@ -200,11 +200,21 @@ final class CameraLogModel {
 
     /// The `CANCEL` control under the progress bar.
     ///
-    /// Cancelling the task is enough: the request comes back as
-    /// `AIError.cancelled`, which `AnalysisFailure` refuses to build, and the
-    /// flow returns to the viewfinder without saying anything.
+    /// **Cancelling the task is not enough, and relying on it was a hole in
+    /// the run numbering.** `Task.cancel()` does not stop a request that is
+    /// already waiting on a socket, so the old code left the run current and
+    /// waited for it to come back as `AIError.cancelled`. A request that
+    /// happened to complete in the window between the tap and the
+    /// continuation resuming still passed `isCurrent`, and presented a result
+    /// over a cancel the user had just made.
+    ///
+    /// Retiring the run closes that window: from the tap onwards nothing that
+    /// request comes back with is acted on, whichever way it lands. Where the
+    /// user goes next is the same question as where dismissing a failure
+    /// takes them, and has the same answer.
     func cancelScan() {
-        scan?.cancel()
+        retireRun()
+        dismissFailure()
     }
 
     // MARK: - Re-analysing
@@ -251,7 +261,7 @@ final class CameraLogModel {
             // steps start walking, so an unsendable photo costs no request.
             let compressed = try MealPhotoCompressor.compress(image)
 
-            let estimate = try await stepping { try await self.client.estimate(photo: compressed) }
+            let estimate = try await stepping(as: run) { try await self.client.estimate(photo: compressed) }
 
             try Task.checkCancellation()
             present(estimate, as: run)
@@ -262,7 +272,7 @@ final class CameraLogModel {
 
     private func rerun(_ described: String, as run: Int) async {
         do {
-            let estimate = try await stepping { try await self.client.estimate(text: described) }
+            let estimate = try await stepping(as: run) { try await self.client.estimate(text: described) }
 
             try Task.checkCancellation()
             represent(estimate, as: run)
@@ -275,8 +285,8 @@ final class CameraLogModel {
     ///
     /// Shared by the scan and the re-analysis because the export draws one set
     /// of four states and says nothing about what is being waited on.
-    private func stepping(_ request: () async throws -> MealEstimate) async throws -> MealEstimate {
-        let stepper = Task { [weak self] in await self?.walkSteps() }
+    private func stepping(as run: Int, _ request: () async throws -> MealEstimate) async throws -> MealEstimate {
+        let stepper = Task { [weak self] in await self?.walkSteps(as: run) }
         do {
             let estimate = try await request()
             // Awaited rather than only cancelled, so a step cannot land on the
@@ -293,10 +303,28 @@ final class CameraLogModel {
 
     /// Walks steps two to four. The first is set the moment the shutter fires,
     /// and the fourth is held until the answer arrives.
-    private func walkSteps() async {
+    ///
+    /// **Guarded by run identity, not only by its own cancellation.** This
+    /// task is unstructured — `stepping()` creates it with a bare `Task { }`,
+    /// not a child task — so cancelling the scan that owns it does not cancel
+    /// it. The only thing that reliably stops it is `stepper.cancel()` in
+    /// `stepping()`, called once that scan's request has resolved, and there
+    /// is a window before that where a superseded run's stepper is still
+    /// ticking. `isCurrent(run)` is checked separately from `Task.isCancelled`
+    /// for that window: `currentRun` is bumped synchronously the moment a run
+    /// is superseded, before any cancellation has had a chance to propagate,
+    /// so it closes the window the other check cannot. Both are kept —
+    /// `Task.isCancelled` still stops a stepper whose own request has simply
+    /// finished.
+    ///
+    /// Bounded and cosmetic on its own — every stage this can still write is
+    /// an analysing step, and both the run it belongs to and the one that
+    /// replaced it are showing the same four screens — but it was the one
+    /// stage writer the run numbering elsewhere in this file did not reach.
+    private func walkSteps(as run: Int) async {
         for step in AnalysisStep.allCases.dropFirst() {
             await pace()
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, isCurrent(run) else { return }
             stage = .analysing(step)
         }
     }

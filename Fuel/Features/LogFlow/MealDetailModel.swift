@@ -215,11 +215,19 @@ final class MealDetailModel {
         estimation = Task { [weak self] in await self?.rerun(described, as: run) }
     }
 
-    /// The `CANCEL` under the progress bar. The request comes back as
-    /// `AIError.cancelled`, which `AnalysisFailure` refuses to build, and the
-    /// screen returns to the meal with its edits intact.
+    /// The `CANCEL` under the progress bar.
+    ///
+    /// **Cancelling the task is not enough.** `Task.cancel()` does not stop a
+    /// request already waiting on a socket, so leaving the run current meant a
+    /// request that completed in the window between the tap and the
+    /// continuation resuming still passed `isCurrent` — and wrote a fresh
+    /// estimate over a meal the user had just stopped re-analysing. Retiring
+    /// the run closes that window; the screen returns to the meal with its
+    /// edits intact either way.
     func cancelReanalysis() {
         estimation?.cancel()
+        currentRun += 1
+        stage = .detail
     }
 
     /// The retry state's action: the same request from the top.
