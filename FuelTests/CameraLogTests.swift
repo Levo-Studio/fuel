@@ -510,7 +510,15 @@ struct PhotoHatchTests {
         // The buffer's row order relative to the view's is a property of the
         // drawing pipeline, not something to assume. A plain top-to-bottom
         // gradient rendered the same way answers it outright.
-        let topDown = try #require(bufferRunsTopDown())
+        //
+        // Rendered here rather than inside the helper so that what `#require`
+        // unwraps is the image. `#require` on a `Bool?` is ambiguous — it
+        // cannot tell "unwrap this optional" from "assert this is true" — and
+        // says so as a warning.
+        let gradient = try #require(
+            render(LinearGradient(colors: [.black, .white], startPoint: .top, endPoint: .bottom))
+        )
+        let topDown = rowsRunTopDown(in: gradient)
 
         // In view coordinates a "/" band runs (1, -1): x rises as y falls. A
         // flipped buffer swaps which measured diagonal that is.
@@ -543,16 +551,11 @@ struct PhotoHatchTests {
 
     /// Whether row zero of a rendered buffer is the top of the view.
     ///
-    /// Measured rather than assumed, through the same renderer the hatch goes
-    /// through, so whatever the pipeline does to one it does to the other.
-    private func bufferRunsTopDown() -> Bool? {
-        let gradient = LinearGradient(
-            colors: [.black, .white],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        guard let image = render(gradient) else { return nil }
-
+    /// Takes an already-rendered image so the caller owns the one thing that
+    /// can fail, and this stays a plain measurement over pixels. Given a
+    /// gradient that runs black at the top to white at the bottom, the darker
+    /// end tells you which row came from the top of the view.
+    private func rowsRunTopDown(in image: GrayImage) -> Bool {
         var firstRow = 0.0
         var lastRow = 0.0
         for x in 0..<image.width {
