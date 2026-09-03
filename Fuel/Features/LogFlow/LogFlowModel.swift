@@ -39,6 +39,10 @@ final class LogFlowModel {
     /// 13 draws no error state, so the only two things the tab can say are
     /// "here is what you ate" and "nothing yet" — and claiming the second when
     /// the read merely failed would be a lie about the user's own history.
+    ///
+    /// The second is what `RecentMealsView` draws for an empty list: the
+    /// heading alone, without the hint that explains a tap there is nothing to
+    /// make.
     func reload() {
         guard let entries = try? store.recentEntries(limit: RecentMeals.entriesRead) else { return }
         recentMeals = RecentMeals.list(from: entries.map(\.nutritionValue))

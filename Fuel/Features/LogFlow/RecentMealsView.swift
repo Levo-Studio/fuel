@@ -19,10 +19,21 @@ struct RecentMealsView: View {
                     .fuelStyle(FuelTypography.sheetTitle)
                     .foregroundStyle(FuelPalette.Camera.ink)
 
-                Text(LogFlowCopy.recentHint)
-                    .fuelStyle(FuelTypography.hint)
-                    .foregroundStyle(FuelPalette.Camera.muted)
-                    .padding(.top, FuelMetrics.Space.s8)
+                // The hint explains a tap, so it is drawn only when there is
+                // something to tap. On a fresh install it would otherwise
+                // promise a row that is not on the screen.
+                //
+                // The heading stays either way: a titled screen with nothing
+                // under it reads as empty, an untitled one reads as broken.
+                // There is no designed empty state to draw instead — the
+                // export has no such screen, and inventing one is not this
+                // feature's call.
+                if !meals.isEmpty {
+                    Text(LogFlowCopy.recentHint)
+                        .fuelStyle(FuelTypography.hint)
+                        .foregroundStyle(FuelPalette.Camera.muted)
+                        .padding(.top, FuelMetrics.Space.s8)
+                }
 
                 VStack(alignment: .leading, spacing: .zero) {
                     ForEach(meals) { meal in
@@ -100,7 +111,7 @@ private struct RecentMealRow: View {
     }
 }
 
-// MARK: - Preview
+// MARK: - Previews
 
 #Preview("Recent meals") {
     ZStack {
@@ -108,5 +119,16 @@ private struct RecentMealRow: View {
             .ignoresSafeArea()
 
         RecentMealsView(meals: LogFlowPreviewData.meals, onLog: { _ in })
+    }
+}
+
+/// A fresh install, which is the state the tab is there for: the heading
+/// stands, the hint does not.
+#Preview("Recent meals · nothing logged yet") {
+    ZStack {
+        FuelPalette(theme: .dark, accent: .mono).camera
+            .ignoresSafeArea()
+
+        RecentMealsView(meals: [], onLog: { _ in })
     }
 }
