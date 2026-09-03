@@ -1,58 +1,76 @@
 import Foundation
-import SwiftUI
 
 // MARK: - Model
 
-/// The camera half of the log flow: screen 07, the four analysis states, and
-/// screen 14.
+/// The text half of the log flow: screen 12, the four analysis states, and
+/// screen 15.
 ///
-/// Everything it holds of the photo lives in memory. The frame is captured,
-/// compressed, sent and released; no temporary file is written, nothing is
-/// logged, and the only place the meal's content is ever written down is the
-/// SwiftData entry `commit()` creates.
+/// The same shape as the camera half without the picture — a key has to be
+/// there, a sentence is sent, an estimate comes back editable, and only `Add`
+/// writes anything down.
+///
+/// **The sentence the user typed lives here and nowhere else.** It is not
+/// logged, not written to a file, not put in `UserDefaults` and not carried
+/// into an error: `AnalysisFailure` has three cases and no text. The only
+/// place a meal's content is ever written down is the SwiftData entry
+/// `commit()` creates, and even there it is the estimate's title rather than
+/// the wording.
+///
+/// **Without a stored key there is no request to make.** `hasKey(for:)` is
+/// asked before the client is touched, and it is the only Keychain call the
+/// feature can make — `MealKeyPresence` cannot return a key. A tab drawn in
+/// the keyless state that still sent the request would look right and be
+/// wrong, so the guard sits on the action rather than on the drawing.
 @MainActor
 @Observable
-final class CameraLogModel {
+final class TextLogModel {
 
     // MARK: - Stage
 
-    /// Which of the camera half's screens is showing.
+    /// Which of the text half's screens is showing.
     nonisolated enum Stage: Equatable, Sendable {
 
-        /// Screen 07 with a working shutter.
-        case viewfinder
+        /// Screen 12 with a working `Analyse` button.
+        case entry
 
-        /// Screen 07 with no key stored, so no scan can be made. The export
-        /// draws no such state; it is built in the same visual language and
-        /// its copy is marked `Not in the export` in the catalog.
+        /// Screen 12 with no key stored, so no estimate can be made. The
+        /// export draws no such state; it is built in the same visual language
+        /// as its camera counterpart and its copy is marked `Not in the
+        /// export` in the catalog.
         case noKey
 
-        /// Screens 08 to 11.
+        /// Screens 08 to 11, with nothing behind them — there is no photograph
+        /// in this mode to freeze.
         case analysing(AnalysisStep)
 
-        /// A scan that did not produce an estimate. Also not in the export.
+        /// An estimate that did not arrive. Also not in the export.
         case failed(AnalysisFailure)
 
-        /// Screen 14. The draft it draws is held separately, so editing a
+        /// Screen 15. The draft it draws is held separately, so editing a
         /// figure does not rebuild the stage.
         case result
     }
 
-    private(set) var stage: Stage = .viewfinder
+    private(set) var stage: Stage = .entry
 
-    /// The captured frame, kept only while it is being analysed and shown.
-    private(set) var photo: UIImage?
+    /// What the user has typed. Bound straight to the field on screen 12.
+    ///
+    /// Kept after the estimate rather than cleared, because screen 15 quotes
+    /// it back and `‹ Back` returns to the field the user wrote in. `New`
+    /// clears it — that is what makes it a new entry rather than a second go
+    /// at the same one. The export draws neither transition; a photo cannot be
+    /// edited on the way back, so the camera mode had no version of this
+    /// question to answer.
+    var typedText: String = ""
 
     private(set) var draft: MealResultDraft?
 
-    /// When the shutter was pressed. Fixed there rather than read again at
+    /// When `Analyse` was tapped. Fixed there rather than read again at
     /// `commit()`, so a result screen left open for ten minutes still files
     /// the meal at the time it was eaten.
-    private(set) var capturedAt: Date = .distantPast
+    private(set) var enteredAt: Date = .distantPast
 
     // MARK: - Dependencies
-
-    let camera: any MealCamera
 
     private let store: FuelStore
     private let client: any AIClient
@@ -67,21 +85,17 @@ final class CameraLogModel {
 
     private let now: () -> Date
 
-    /// How long each analysis step is held before the next one.
-    ///
-    /// Injected so a test can walk all four instantly. The duration itself is
-    /// `FuelMotion.analysisStepHold` — the export draws four states and says
-    /// nothing about their timing, and a value the design does not dictate
-    /// still belongs to the design layer rather than to this initialiser.
+    /// How long each analysis step is held before the next one. Injected so a
+    /// test can walk all four instantly; the duration itself is
+    /// `FuelMotion.analysisStepHold`.
     private let pace: @Sendable () async -> Void
 
-    /// The running scan, so `CANCEL` can stop it.
-    private var scan: Task<Void, Never>?
+    /// The running estimate, so `CANCEL` can stop it.
+    private var estimation: Task<Void, Never>?
 
     init(
         store: FuelStore,
         client: any AIClient,
-        camera: any MealCamera,
         keys: any MealKeyPresence = KeychainStore(),
         provider: AIProvider = .claude,
         now: @escaping () -> Date = Date.init,
@@ -89,7 +103,6 @@ final class CameraLogModel {
     ) {
         self.store = store
         self.client = client
-        self.camera = camera
         self.keys = keys
         self.provider = provider
         self.now = now
@@ -98,75 +111,76 @@ final class CameraLogModel {
 
     // MARK: - Availability
 
-    /// Whether a scan can be made at all.
+    /// Whether an estimate can be made at all.
     ///
     /// Asked every time the tab appears rather than once at launch: a key can
-    /// be removed in Settings while the app is running, and the shutter has to
+    /// be removed in Settings while the app is running, and the button has to
     /// go dead when it is.
     func refreshAvailability() {
         switch stage {
-        case .viewfinder, .noKey:
-            stage = keys.hasKey(for: provider) ? .viewfinder : .noKey
+        case .entry, .noKey:
+            stage = keys.hasKey(for: provider) ? .entry : .noKey
         case .analysing, .failed, .result:
-            // A scan already in flight is not interrupted by the answer to a
-            // question it asked before it started.
+            // An estimate already in flight is not interrupted by the answer
+            // to a question it asked before it started.
             break
         }
     }
 
-    // MARK: - Capturing
+    // MARK: - Estimating
 
-    /// Presses the shutter.
+    /// The sentence as it would be sent: the field's text without the spaces
+    /// and newlines around it.
     ///
-    /// A capture failure is a retry rather than silence: the user pressed
-    /// something and nothing happened, and the screen has to say so.
-    func capture() async {
-        guard keys.hasKey(for: provider) else {
-            stage = .noKey
-            return
-        }
-        do {
-            analyse(try await camera.capturePhoto())
-        } catch {
-            stage = .failed(.retry)
-        }
+    /// A field holding a space is an empty field to the person looking at it,
+    /// and sending it would spend a request on nothing.
+    private var describedMeal: String {
+        typedText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Starts a scan of an already-held frame — the shutter, or the picture
-    /// the user picked from the gallery.
-    func analyse(_ image: UIImage) {
+    /// The `Analyse` button.
+    ///
+    /// The button is drawn the way the export draws it whether or not the
+    /// field has anything in it — the design has no second state for it, and
+    /// inventing a dimmed one would be a deviation — so an empty field is
+    /// refused here, the way the onboarding screen refuses an empty key.
+    func analyse() {
         guard keys.hasKey(for: provider) else {
             stage = .noKey
             return
         }
+        let described = describedMeal
+        guard !described.isEmpty else { return }
 
-        photo = image
-        capturedAt = now()
+        enteredAt = now()
         stage = .analysing(.analysingMeal)
-        scan = Task { [weak self] in await self?.run(image) }
+        estimation = Task { [weak self] in await self?.run(described) }
     }
 
     /// The `CANCEL` control under the progress bar.
     ///
     /// Cancelling the task is enough: the request comes back as
     /// `AIError.cancelled`, which `AnalysisFailure` refuses to build, and the
-    /// flow returns to the viewfinder without saying anything.
-    func cancelScan() {
-        scan?.cancel()
+    /// flow returns to the field without saying anything. The sentence is
+    /// still in it.
+    func cancelEstimate() {
+        estimation?.cancel()
     }
 
-    // MARK: - The scan
+    /// The retry state's action: the same sentence, the same request, from the
+    /// top.
+    func retry() {
+        analyse()
+    }
 
-    private func run(_ image: UIImage) async {
+    // MARK: - The estimate
+
+    private func run(_ described: String) async {
         do {
-            // Compression happens before anything is sent, and before the
-            // steps start walking, so an unsendable photo costs no request.
-            let compressed = try MealPhotoCompressor.compress(image)
-
             let stepper = Task { [weak self] in await self?.walkSteps() }
             let estimate: MealEstimate
             do {
-                estimate = try await client.estimate(photo: compressed)
+                estimate = try await client.estimate(text: described)
             } catch {
                 stepper.cancel()
                 _ = await stepper.value
@@ -185,8 +199,8 @@ final class CameraLogModel {
         }
     }
 
-    /// Walks steps two to four. The first is set the moment the shutter fires,
-    /// and the fourth is held until the answer arrives.
+    /// Walks steps two to four. The first is set the moment `Analyse` is
+    /// tapped, and the fourth is held until the answer arrives.
     private func walkSteps() async {
         for step in AnalysisStep.allCases.dropFirst() {
             await pace()
@@ -201,7 +215,7 @@ final class CameraLogModel {
             kilocalories: estimate.kilocalories,
             macros: estimate.macros,
             items: estimate.items,
-            label: store.provisionalLabel(at: capturedAt),
+            label: store.provisionalLabel(at: enteredAt),
             isLabelUserSet: false,
             isFavourite: false
         )
@@ -213,7 +227,7 @@ final class CameraLogModel {
         // the structured-concurrency cancellation that can arrive around them.
         let aiError = (error as? AIError) ?? AIError.transportFailure(error)
         guard let failure = AnalysisFailure(aiError) else {
-            discard()
+            returnToEntry()
             return
         }
         stage = .failed(failure)
@@ -260,8 +274,8 @@ final class CameraLogModel {
                 title: draft.title,
                 kilocalories: draft.kilocalories,
                 macros: draft.macros,
-                loggedAt: capturedAt,
-                source: .photo,
+                loggedAt: enteredAt,
+                source: .text,
                 isFavourite: draft.isFavourite,
                 items: draft.items
             )
@@ -277,25 +291,19 @@ final class CameraLogModel {
         }
     }
 
-    /// Throws the scan away and returns to the viewfinder — `New` on the
-    /// result screen, the retry state's dismissal, a cancelled analysis.
-    ///
-    /// The frame is released here. That is the whole lifetime of the photo:
-    /// captured, sent, drawn, gone.
-    func discard() {
-        scan?.cancel()
-        scan = nil
-        photo = nil
+    /// `‹ Back` from the result, and a cancelled estimate: the draft goes, the
+    /// sentence stays, and the user is back in the field they wrote it in.
+    func returnToEntry() {
+        estimation?.cancel()
+        estimation = nil
         draft = nil
-        stage = keys.hasKey(for: provider) ? .viewfinder : .noKey
+        stage = keys.hasKey(for: provider) ? .entry : .noKey
     }
 
-    /// The retry state's action: same frame, same request, from the top.
-    func retry() {
-        guard let photo else {
-            discard()
-            return
-        }
-        analyse(photo)
+    /// `New` on the result screen, and what a commit leaves behind: an empty
+    /// field, ready for the next meal.
+    func discard() {
+        typedText = ""
+        returnToEntry()
     }
 }

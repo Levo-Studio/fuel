@@ -4,26 +4,27 @@ import SwiftUI
 // MARK: - Log flow
 
 /// The log flow: the chrome from screen 07 around whichever of the three modes
-/// is selected, and — above it — the screens a scan goes through.
+/// is selected, and — above it — the screens an estimate goes through.
 ///
-/// Camera and Recent are built. The text tab selects and draws its empty body,
-/// so the bar is honest about how many modes there are while the one that still
-/// needs a field and an `Analyse` button is to come — see `LogFlowPlaceholder`.
-///
-/// The analysis states and the result cover the whole flow rather than sitting
+/// The analysis states and the results cover the whole flow rather than sitting
 /// inside the scaffold, because the export draws them that way: screens 08 to
-/// 11 and 14 carry no tab bar and no cancel row of their own.
+/// 11, 14 and 15 carry no tab bar and no cancel row of their own. That is also
+/// why the two AI modes cannot both have an overlay up — while one of them
+/// does, the tab bar it would be switched from is not on screen.
 struct LogFlowView: View {
 
     @Bindable var model: LogFlowModel
 
     @Bindable var camera: CameraLogModel
 
+    @Bindable var text: TextLogModel
+
     /// Leaves the flow without logging anything — the `✕ Cancel` control.
     let onCancel: () -> Void
 
     /// A meal was logged and the flow is done. Recent returns to Today on the
-    /// tap itself; a scan returns once the result screen's `Add` is tapped.
+    /// tap itself; an estimate returns once the result screen's `Add` is
+    /// tapped.
     let onLogged: () -> Void
 
     /// The image the gallery picker handed back, held only until it is loaded.
@@ -35,11 +36,11 @@ struct LogFlowView: View {
 
             switch camera.stage {
             case .analysing(let step):
-                AnalysisView(step: step, photo: camera.photo, onCancel: camera.cancelScan)
+                AnalysisView(step: step, backdrop: .photo(camera.photo), onCancel: camera.cancelScan)
             case .failed(let failure):
                 AnalysisFailureView(
                     failure: failure,
-                    photo: camera.photo,
+                    backdrop: .photo(camera.photo),
                     onRetry: camera.retry,
                     onDismiss: camera.discard
                 )
@@ -59,12 +60,46 @@ struct LogFlowView: View {
             case .viewfinder, .noKey:
                 EmptyView()
             }
+
+            switch text.stage {
+            case .analysing(let step):
+                AnalysisView(step: step, backdrop: .text, onCancel: text.cancelEstimate)
+            case .failed(let failure):
+                AnalysisFailureView(
+                    failure: failure,
+                    backdrop: .text,
+                    onRetry: text.retry,
+                    onDismiss: text.returnToEntry
+                )
+            case .result:
+                if let draft = text.draft {
+                    TextResultView(
+                        draft: draft,
+                        typedText: text.typedText,
+                        // `Back` keeps the sentence and `New` clears it, which
+                        // is the one thing the text mode can offer that the
+                        // camera mode cannot: a photograph is not editable on
+                        // the way back, so the export had no version of this
+                        // to draw.
+                        onBack: text.returnToEntry,
+                        onCycleLabel: text.cycleLabel,
+                        onToggleFavourite: text.toggleFavourite,
+                        onAdjustCalories: text.adjustKilocalories,
+                        onNew: text.discard,
+                        onAdd: addTypedMeal
+                    )
+                }
+            case .entry, .noKey:
+                EmptyView()
+            }
         }
         .fuelAnimation(FuelMotion.emphasised, value: camera.stage)
+        .fuelAnimation(FuelMotion.emphasised, value: text.stage)
         .task(id: pickedPhoto) { await loadPickedPhoto() }
         .onAppear {
             model.reload()
             camera.refreshAvailability()
+            text.refreshAvailability()
         }
     }
 
@@ -91,7 +126,11 @@ struct LogFlowView: View {
                         onShutter: { Task { await camera.capture() } }
                     )
                 case .text:
-                    LogFlowPlaceholder()
+                    TextTabView(
+                        typedText: $text.typedText,
+                        isEstimateAvailable: text.stage != .noKey,
+                        onAnalyse: text.analyse
+                    )
                 case .recent:
                     RecentMealsView(meals: model.recentMeals, onLog: log)
                 }
@@ -109,6 +148,11 @@ struct LogFlowView: View {
 
     private func add() {
         guard camera.commit() else { return }
+        onLogged()
+    }
+
+    private func addTypedMeal() {
+        guard text.commit() else { return }
         onLogged()
     }
 
@@ -140,33 +184,16 @@ struct LogFlowView: View {
     }
 }
 
-// MARK: - Placeholder
-
-/// What the text tab draws until it is built.
-///
-/// Deliberately empty rather than a message: the text mode's body is the entry
-/// field and its `Analyse` button (screen 12), which has no designed loading or
-/// unavailable state that this could stand in for. An invented placeholder
-/// would be a screen the export does not contain.
-///
-/// The text agent replaces the `.text` arm above. It needs no change to the
-/// scaffold, the tab bar or this file's neighbours.
-private struct LogFlowPlaceholder: View {
-
-    var body: some View {
-        Color.clear
-            .accessibilityHidden(true)
-    }
-}
-
 // MARK: - Previews
 
 #Preview("Recent") {
     if let model = LogFlowPreviewData.model(showing: .recent),
-       let camera = CameraPreviewData.model(hasKey: true) {
+       let camera = CameraPreviewData.model(hasKey: true),
+       let text = TextPreviewData.model(hasKey: true) {
         LogFlowView(
             model: model,
             camera: camera,
+            text: text,
             onCancel: {},
             onLogged: {}
         )
@@ -176,10 +203,12 @@ private struct LogFlowPlaceholder: View {
 
 #Preview("Camera") {
     if let model = LogFlowPreviewData.model(showing: .camera),
-       let camera = CameraPreviewData.model(hasKey: true) {
+       let camera = CameraPreviewData.model(hasKey: true),
+       let text = TextPreviewData.model(hasKey: true) {
         LogFlowView(
             model: model,
             camera: camera,
+            text: text,
             onCancel: {},
             onLogged: {}
         )
@@ -187,15 +216,32 @@ private struct LogFlowPlaceholder: View {
     }
 }
 
-#Preview("Camera without a key") {
-    if let model = LogFlowPreviewData.model(showing: .camera),
-       let camera = CameraPreviewData.model(hasKey: false) {
+#Preview("Text") {
+    if let model = LogFlowPreviewData.model(showing: .text),
+       let camera = CameraPreviewData.model(hasKey: true),
+       let text = TextPreviewData.model(hasKey: true) {
         LogFlowView(
             model: model,
             camera: camera,
+            text: text,
             onCancel: {},
             onLogged: {}
         )
         .environment(\.fuelPalette, FuelPalette(theme: .dark, accent: .mono))
+    }
+}
+
+#Preview("Text without a key") {
+    if let model = LogFlowPreviewData.model(showing: .text),
+       let camera = CameraPreviewData.model(hasKey: false),
+       let text = TextPreviewData.model(hasKey: false) {
+        LogFlowView(
+            model: model,
+            camera: camera,
+            text: text,
+            onCancel: {},
+            onLogged: {}
+        )
+        .environment(\.fuelPalette, FuelPalette(theme: .light, accent: .mono))
     }
 }

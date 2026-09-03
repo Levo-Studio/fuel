@@ -145,6 +145,29 @@ struct CameraLogTests {
         #expect(model.draft?.isLabelUserSet == false)
     }
 
+    /// The case a clock stub cannot pass.
+    ///
+    /// 19:20 above is `.dinner` under the day rule *and* under a naive
+    /// `labelFor(hour)` — the stub the export ships for its click-through and
+    /// that `design/Fuel Design Notes.md` warns is not the spec — so that test
+    /// alone would stay green through exactly the fork it is named for. 16:00
+    /// sits in the gap between the lunch and dinner windows: a clock says
+    /// Snack, and the rule says Lunch, because the lunch window passed unused
+    /// and dinner has not been reached. See `design/Fuel Design Notes.md`,
+    /// "The meal label", second consequence.
+    ///
+    /// It proves the delegation, not the rule. The rule itself is
+    /// `MealLabeler`'s and is covered against it directly in `MealLabelTests`.
+    @Test("an entry at 16:00 on a day with no lunch is lunch, not a snack")
+    func provisionalLabelUsesTheDayRuleAndNotTheClock() async throws {
+        let client = ScriptedClient(answer: .success(Self.estimate))
+        let model = makeModel(store: try makeStore(), client: client, at: at(16, 0))
+
+        await model.scanning(pixel())
+
+        #expect(model.draft?.label == .lunch)
+    }
+
     // MARK: - Failures
 
     @Test("each provider error maps to the state that is drawn for it", arguments: [
@@ -209,19 +232,19 @@ struct CameraLogTests {
         let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .success(Self.estimate)))
         await model.scanning(pixel())
 
-        model.adjustKilocalories(by: CameraLogModel.calorieStep)
+        model.adjustKilocalories(by: MealResultDraft.calorieStep)
         #expect(model.draft?.kilocalories == 470)
 
-        model.adjustKilocalories(by: -CameraLogModel.calorieStep)
+        model.adjustKilocalories(by: -MealResultDraft.calorieStep)
         #expect(model.draft?.kilocalories == 460)
 
         for _ in 0..<50 {
-            model.adjustKilocalories(by: -CameraLogModel.calorieStep)
+            model.adjustKilocalories(by: -MealResultDraft.calorieStep)
         }
         #expect(model.draft?.kilocalories == 0)
 
         // And it comes back up from the floor rather than sticking there.
-        model.adjustKilocalories(by: CameraLogModel.calorieStep)
+        model.adjustKilocalories(by: MealResultDraft.calorieStep)
         #expect(model.draft?.kilocalories == 10)
     }
 
@@ -269,7 +292,7 @@ struct CameraLogTests {
         let model = makeModel(store: store, client: ScriptedClient(answer: .success(Self.estimate)))
         await model.scanning(pixel())
 
-        model.adjustKilocalories(by: CameraLogModel.calorieStep)
+        model.adjustKilocalories(by: MealResultDraft.calorieStep)
         model.toggleFavourite()
         #expect(model.commit())
 
@@ -373,59 +396,6 @@ private extension CameraLogModel {
 }
 
 // MARK: - Stand-ins
-
-/// Answers one estimate, from memory, and counts how often it was asked.
-///
-/// The count is the point of `noKeyDisablesTheTab`: a disabled tab that still
-/// sent the request would pass a test that only looked at the stage.
-private final class ScriptedClient: AIClient, @unchecked Sendable {
-
-    let provider: AIProvider = .claude
-
-    private let answer: Result<MealEstimate, AIError>
-    private(set) var requests = 0
-
-    init(answer: Result<MealEstimate, AIError>) {
-        self.answer = answer
-    }
-
-    func checkKey(_ key: APIKey) async -> KeyCheckResult { .passed }
-
-    func estimate(photo: MealPhoto) async throws -> MealEstimate {
-        requests += 1
-        return try answer.get()
-    }
-
-    func estimate(text: String) async throws -> MealEstimate {
-        requests += 1
-        return try answer.get()
-    }
-}
-
-/// No key for any provider.
-private struct NoKeys: MealKeyPresence {
-
-    func hasKey(for provider: AIProvider) -> Bool { false }
-}
-
-/// A key for every provider.
-private struct StoredKey: MealKeyPresence {
-
-    func hasKey(for provider: AIProvider) -> Bool { true }
-}
-
-/// A key that can be added or taken away between two questions, which is what
-/// Settings does while the app is running.
-private final class MutableKeys: MealKeyPresence, @unchecked Sendable {
-
-    var hasKey: Bool
-
-    init(hasKey: Bool) {
-        self.hasKey = hasKey
-    }
-
-    func hasKey(for provider: AIProvider) -> Bool { hasKey }
-}
 
 /// A camera that hands back the smallest possible frame.
 @MainActor

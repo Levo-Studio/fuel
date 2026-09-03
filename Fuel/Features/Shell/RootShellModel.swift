@@ -65,6 +65,25 @@ final class RootShellModel {
         )
     }
 
+    /// Builds the text half of a log flow for the same provider, at the same
+    /// moment.
+    typealias TextLogFactory = @MainActor (FuelStore, AIProvider) -> TextLogModel
+
+    /// The real thing: the client for that provider, and no camera — screen 12
+    /// sends a sentence.
+    ///
+    /// The provider is passed twice for the reason it is above, and the two
+    /// questions are the same two: which endpoint the estimate is sent to, and
+    /// which key the model looks for before it lets `Analyse` do anything.
+    @MainActor
+    static let liveTextLog: TextLogFactory = { store, provider in
+        TextLogModel(
+            store: store,
+            client: ProviderClients.client(for: provider),
+            provider: provider
+        )
+    }
+
     // MARK: - Dependencies
 
     private let store: FuelStore
@@ -84,6 +103,11 @@ final class RootShellModel {
     /// all: the real composition opens the device camera and builds a client
     /// pointed at a provider's endpoint.
     private let makeCameraLog: CameraLogFactory
+
+    /// How the text half of a log flow is built, and a seam for the same two
+    /// reasons: `TextLogModel` keeps its client and its provider to itself, and
+    /// the real composition points a client at a provider's endpoint.
+    private let makeTextLog: TextLogFactory
 
     // MARK: - State
 
@@ -128,6 +152,16 @@ final class RootShellModel {
     /// reason to stay in memory until the next scan replaces it.
     private(set) var cameraLog: CameraLogModel
 
+    /// The text half of the same flow, rebuilt with it and for the same
+    /// reasons the camera half is, plus one of its own. It carries a stage, so
+    /// a flow abandoned on a failed estimate or on screen 15 would reopen onto
+    /// that screen rather than onto the entry field. And it carries the
+    /// sentence the user typed: a flow that was cancelled had, as the note on
+    /// `logFlow` puts it, by definition typed nothing worth keeping, and
+    /// keeping it anyway would put a meal the user walked away from back in
+    /// front of the next one — and hold its content in memory until then.
+    private(set) var textLog: TextLogModel
+
     /// Settings' API-key row. Built once, because a re-render must not drop a
     /// half-typed key or restart a check in flight — the same reason
     /// `onboarding` is built here rather than in a view.
@@ -148,15 +182,22 @@ final class RootShellModel {
         store: FuelStore,
         validator: KeyValidating,
         preferences: SettingsPreferences,
-        makeCameraLog: @escaping CameraLogFactory = RootShellModel.liveCameraLog
+        makeCameraLog: @escaping CameraLogFactory = RootShellModel.liveCameraLog,
+        makeTextLog: @escaping TextLogFactory = RootShellModel.liveTextLog
     ) {
         self.store = store
         self.preferences = preferences
         self.makeCameraLog = makeCameraLog
+        self.makeTextLog = makeTextLog
         self.stage = Self.launchStage(for: store)
         self.today = Self.presentation(for: store)
         self.logFlow = LogFlowModel(store: store)
-        self.cameraLog = makeCameraLog(store, preferences.provider)
+        // One read, spent on both halves. Two reads could not disagree today —
+        // nothing runs between them — but they are two sources for a value the
+        // whole flow has to hold one answer to.
+        let provider = preferences.provider
+        self.cameraLog = makeCameraLog(store, provider)
+        self.textLog = makeTextLog(store, provider)
         self.settingsKey = APIKeySettingsModel(validator: validator)
         self.onboarding = OnboardingModel(
             validator: validator,
@@ -203,9 +244,14 @@ final class RootShellModel {
     func openLogFlow() {
         logFlow = LogFlowModel(store: store)
         // Read here rather than kept from launch, so a provider switched on
-        // screen 16 is the one the next scan talks to and looks a key up
+        // screen 16 is the one the next estimate talks to and looks a key up
         // under. Nothing has to tell the flow that Settings was used.
-        cameraLog = makeCameraLog(store, preferences.provider)
+        //
+        // Read once and spent on both halves: the camera and the text tab of
+        // one flow must not be pointed at two different providers.
+        let provider = preferences.provider
+        cameraLog = makeCameraLog(store, provider)
+        textLog = makeTextLog(store, provider)
         destination = .logFlow
     }
 

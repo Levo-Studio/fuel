@@ -154,6 +154,12 @@ nonisolated enum FuelMetrics {
         /// The active step's spinner ring on the key-test screen.
         static let spinner: CGFloat = 2
 
+        /// The accent rule down the left of the typed sentence on screen 15,
+        /// drawn `border-left:2px solid var(--accent)`. The same width as the
+        /// spinner and named apart from it, because the two would have to be
+        /// changed separately if either moved.
+        static let quoteRule: CGFloat = 2
+
         /// How much of that ring is painted in `ink`.
         ///
         /// The export draws the spinner as a full circle bordered in `soft`
@@ -348,7 +354,7 @@ nonisolated enum FuelMetrics {
         Screen.horizontalPadding, Screen.logFlowHorizontalPadding,
         Screen.onboardingTopPadding, Screen.keyTestTopPadding,
         Radius.pill, Radius.card, Radius.thumbnail,
-        Line.hairline, Line.selectionBorder, Line.spinner, Line.spinnerArc,
+        Line.hairline, Line.selectionBorder, Line.spinner, Line.quoteRule, Line.spinnerArc,
         Line.Glyph.chevron, Line.Glyph.plus, Line.Glyph.check, Line.Glyph.viewBox,
         Line.Glyph.chevronWidth, Line.Glyph.chevronHeight, Line.Glyph.chevronInset,
         Control.circleButton, Control.swatchRing, Control.swatchDot, Control.shutterRing,

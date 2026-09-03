@@ -378,6 +378,14 @@ nonisolated struct FuelPalette: Sendable {
         /// Titles and the shutter fill.
         static let ink = FuelRGBA(hex: 0xFAFAFA).color
 
+        /// What is drawn *on* `ink`: the label of the `Analyse` button on
+        /// screen 12, which the export fills `#fafafa` and letters `#111213`.
+        ///
+        /// The same hex as the dark theme's background, and not that value:
+        /// the button keeps this pairing in the light theme too, because the
+        /// whole log flow sits on the camera surface in both.
+        static let onInk = FuelRGBA(hex: 0x111213).color
+
         /// The `+` glyph on the Recent rows and the cancel row above the tabs.
         static let inkSecondary = FuelRGBA(hex: 0xFAFAFA, opacity: 0.5).color
 
