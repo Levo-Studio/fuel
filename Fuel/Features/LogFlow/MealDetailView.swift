@@ -31,6 +31,16 @@ struct MealDetailView: View {
     /// must not be able to reach a state where a meal is half-deleted.
     @State private var isConfirmingDelete = false
 
+    /// Whether a re-analysis is running that the user has not called off.
+    ///
+    /// It exists because the two ways out of `.analysing` on this screen are
+    /// the same case: an estimate that arrived returns to `.detail`, and so
+    /// does a cancelled one. The log flow does not have this problem — its
+    /// success is `.result` — so the flag lives here rather than being carried
+    /// by the stage for everybody. Without it, calling a re-analysis off would
+    /// be answered with the haptic for one that succeeded.
+    @State private var isReanalysing = false
+
     var body: some View {
         ZStack {
             MealResultView(
@@ -38,7 +48,7 @@ struct MealDetailView: View {
                 flowLabel: MealDetailCopy.flow,
                 itemsHeading: MealDetailCopy.itemsHeading,
                 onBack: onClose,
-                onCycleLabel: model.cycleLabel,
+                onCycleLabel: cycleLabel,
                 onToggleFavourite: model.toggleFavourite,
                 onRemoveItem: model.removeItem,
                 onEditItem: model.editItem,
@@ -63,7 +73,7 @@ struct MealDetailView: View {
                 // No frozen frame behind it: the request is about the item
                 // list, and the meal's own photograph — if it had one — is not
                 // kept past the flow that took it.
-                AnalysisView(step: step, backdrop: .text, onCancel: model.cancelReanalysis)
+                AnalysisView(step: step, backdrop: .text, onCancel: cancelReanalysis)
             case .failed(let failure):
                 AnalysisFailureView(
                     failure: failure,
@@ -107,15 +117,62 @@ struct MealDetailView: View {
             isEnabled: model.stage == .detail && !model.draft.hasItemEdits,
             perform: onClose
         )
+        .onChange(of: model.stage) { previous, current in
+            reportOutcome(from: previous, to: current)
+        }
         .fuelAnimation(FuelMotion.emphasised, value: model.stage)
+    }
+
+    // MARK: - Editing
+
+    /// The label pill, which steps Breakfast → Lunch → Snack → Dinner and
+    /// wraps.
+    ///
+    /// The one control on this screen that gets a haptic on the tap itself: it
+    /// is a stepper through four values, and the click is what makes a stepper
+    /// read as one. The favourite mark beside it does not, because a star that
+    /// has just filled in has already said so.
+    private func cycleLabel() {
+        FuelHaptics.play(.selectionChanged)
+        model.cycleLabel()
+    }
+
+    // MARK: - Re-analysing
+
+    private func cancelReanalysis() {
+        isReanalysing = false
+        model.cancelReanalysis()
+    }
+
+    /// Answers a re-analysis that has finished, which is a wait of several
+    /// seconds the user is entitled to look away from.
+    private func reportOutcome(from previous: MealDetailModel.Stage, to current: MealDetailModel.Stage) {
+        switch (previous, current) {
+        case (_, .analysing):
+            isReanalysing = true
+        case (.analysing, .failed):
+            isReanalysing = false
+            FuelHaptics.play(.scanFailed)
+        case (.analysing, .detail):
+            guard isReanalysing else { return }
+            isReanalysing = false
+            FuelHaptics.play(.scanSucceeded)
+        default:
+            break
+        }
     }
 
     // MARK: - Deleting
 
     /// A store that refused leaves the screen where it is, with the meal still
     /// on it — the same shape as a commit that could not write.
+    ///
+    /// The haptic sits after that guard rather than on the confirmation's
+    /// button, so what is felt is the meal being gone rather than the dialog
+    /// being answered.
     private func delete() {
         guard model.delete() else { return }
+        FuelHaptics.play(.destructiveConfirmed)
         onClose()
     }
 }

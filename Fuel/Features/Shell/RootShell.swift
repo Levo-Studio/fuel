@@ -133,6 +133,19 @@ struct RootShell: View {
                         theme: preferences.theme
                     )
                 )
+                // A scan takes several seconds the user is entitled to look
+                // away from, which is what the two outcomes are felt for.
+                //
+                // Read here rather than inside the flow for the reason the
+                // chrome above it is: this is already where both models' stages
+                // are known, and a second place that had to be told what the
+                // flow was doing would be a second copy of it to drift.
+                .onChange(of: model.cameraLog.stage) { previous, current in
+                    reportCameraScan(from: previous, to: current)
+                }
+                .onChange(of: model.textLog.stage) { previous, current in
+                    reportTextScan(from: previous, to: current)
+                }
             case .mealDetail:
                 if let detail = model.mealDetail {
                     MealDetailView(model: detail, onClose: model.dismissDestination)
@@ -168,5 +181,41 @@ struct RootShell: View {
         // chrome — the status bar, the keyboard, the home indicator — is forced
         // to match it rather than left to invert against the app underneath.
         .preferredColorScheme(preferences.theme.colorScheme)
+    }
+
+    // MARK: - A finished scan
+
+    /// Both modes reach an estimate at `.result` and a failure at `.failed`,
+    /// and neither is where a cancelled scan lands — cancelling returns to the
+    /// viewfinder or to the field. So the outcome is read straight off the
+    /// stage here, with none of the bookkeeping the meal detail needs.
+    private func reportCameraScan(
+        from previous: CameraLogModel.Stage,
+        to current: CameraLogModel.Stage
+    ) {
+        guard case .analysing = previous else { return }
+        switch current {
+        case .result:
+            FuelHaptics.play(.scanSucceeded)
+        case .failed:
+            FuelHaptics.play(.scanFailed)
+        case .viewfinder, .noKey, .analysing:
+            break
+        }
+    }
+
+    private func reportTextScan(
+        from previous: TextLogModel.Stage,
+        to current: TextLogModel.Stage
+    ) {
+        guard case .analysing = previous else { return }
+        switch current {
+        case .result:
+            FuelHaptics.play(.scanSucceeded)
+        case .failed:
+            FuelHaptics.play(.scanFailed)
+        case .entry, .noKey, .analysing:
+            break
+        }
     }
 }
