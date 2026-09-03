@@ -366,11 +366,14 @@ struct FuelMotionTests {
         #expect(FuelMotion.resolvePacing(FuelMotion.placeholderExampleHold, reduceMotion: true) == nil)
     }
 
-    @Test("a dwell is long enough to read and short enough to notice")
-    func dwellsStayReadable() {
-        // Both dwells pace a sequence of states rather than an interpolation,
-        // and both have to clear the same two bars: long enough that the state
-        // can be taken in, short enough that the screen is not waiting on it.
+    @Test("a dwell stays inside the bounds a dwell has")
+    func dwellsStayInsideTheirBounds() {
+        // A bound, not a regression test. Neither dwell is anywhere near
+        // three seconds and no version of either has ever failed this — what
+        // it catches is a future value put in without the reasoning, the way
+        // `durationsStayTight` catches a curve that outlasts its interaction.
+        // The dwells themselves are the design layer's to justify, and
+        // `placeholderExampleHold` says on itself what it was chosen against.
         for hold in [FuelMotion.analysisStepHold, FuelMotion.placeholderExampleHold] {
             #expect(hold > .zero)
             #expect(hold <= .seconds(3))
