@@ -1652,13 +1652,13 @@
       }
     },
     "settings.labels.note" : {
-      "comment" : "The line under the automatic-labels heading.",
+      "comment" : "The line under the automatic-labels heading. Names the rule the rows cannot: the clock rows are the three main meals, and snack is what is left.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Entries are filed by time of day. Always overridable on the result screen."
+            "value" : "Breakfast, lunch and dinner are each given out once a day. Everything else is a snack, and every label is overridable on the result screen."
           }
         }
       }
