@@ -29,7 +29,8 @@ struct ScanIntentTests {
 
     private func makeModel(
         store: FuelStore,
-        keys: any MealKeyPresence = StoredKey()
+        keys: any MealKeyPresence = StoredKey(),
+        camera: @escaping @MainActor () -> any MealCamera = { CountingCamera() }
     ) -> RootShellModel {
         RootShellModel(
             store: store,
@@ -39,7 +40,7 @@ struct ScanIntentTests {
                 CameraLogModel(
                     store: store,
                     client: UnusedEstimator(),
-                    camera: CountingCamera(),
+                    camera: camera(),
                     keys: keys,
                     provider: provider
                 )
@@ -58,10 +59,13 @@ struct ScanIntentTests {
 
     /// A shell that has been through onboarding, which is the state every test
     /// but the onboarding one starts from.
-    private func makeTodayModel(keys: any MealKeyPresence = StoredKey()) throws -> RootShellModel {
+    private func makeTodayModel(
+        keys: any MealKeyPresence = StoredKey(),
+        camera: @escaping @MainActor () -> any MealCamera = { CountingCamera() }
+    ) throws -> RootShellModel {
         let store = try makeStore()
         try store.setCountingMode(.goal(.default))
-        return makeModel(store: store, keys: keys)
+        return makeModel(store: store, keys: keys, camera: camera)
     }
 
     // MARK: - The destination
@@ -154,17 +158,43 @@ struct ScanIntentTests {
 
     /// The destructive reading of "open the camera" is the one this rules out:
     /// a shortcut fired while a scan is being looked at must not throw the
-    /// scan away.
-    @Test("A flow already open keeps the camera half it had")
-    func scanKeepsTheCameraHalfOfAnOpenFlow() throws {
+    /// scan away. Both halves, because a rebuilt flow rebuilds both — the
+    /// sentence in the text field is as much the user's work as a captured
+    /// frame is.
+    @Test("A flow already open keeps both halves it had")
+    func scanKeepsBothHalvesOfAnOpenFlow() throws {
         let model = try makeTodayModel()
 
         model.openLogFlow()
+        model.textLog.typedText = "2 eggs with 200g cottage cheese and polenta"
         let camera = model.cameraLog
+        let text = model.textLog
 
         model.requestScan()
 
         #expect(model.cameraLog === camera)
+        #expect(model.textLog === text)
+        #expect(model.textLog.typedText == "2 eggs with 200g cottage cheese and polenta")
+    }
+
+    /// The case selecting the tab cannot answer, and the one the shortcut is
+    /// most easily got wrong on: the flow is open, the camera tab is already
+    /// the selected one, and the half behind it is showing something other
+    /// than the viewfinder. The right answer is that nothing happens — the
+    /// scan the user is looking at stays on screen.
+    @Test("A scan into a flow already on the camera tab leaves that screen alone")
+    func scanIntoTheCameraTabChangesNothing() async throws {
+        let model = try makeTodayModel(camera: { BrokenCamera() })
+
+        model.openLogFlow()
+        await model.cameraLog.capture()
+        #expect(model.cameraLog.stage == .failed(.retry))
+
+        model.requestScan()
+
+        #expect(model.destination == .logFlow)
+        #expect(model.logFlow.selectedTab == .camera)
+        #expect(model.cameraLog.stage == .failed(.retry))
     }
 
     /// Two covers cannot be presented over one another, and ignoring the user
