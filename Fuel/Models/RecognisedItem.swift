@@ -22,12 +22,37 @@ nonisolated struct RecognisedItem: Codable, Hashable, Sendable, Identifiable {
     var id: UUID
     var name: String
     var kilocalories: Int
+
+    /// This item's own protein, carbohydrate and fat, when they are known.
+    ///
+    /// **`nil` far more often than not, and that is not a gap to fill.** The
+    /// model is never asked for a per-item macro breakdown — `EstimateContract`
+    /// itemises `kilocalories` but only `protein_g`/`carbs_g`/`fat_g` at the
+    /// meal level — so this is empty for every item until something else
+    /// supplies it. Today, the one supplier is `FoodTableGrounding`: a food
+    /// resolved to a CIQUAL row with complete macro data gets its real
+    /// protein, carbs and fat here, priced from that row and the item's own
+    /// weight. A resolved row with a gap in its own data — CIQUAL has no fat
+    /// figure for cooked polenta — leaves this `nil` rather than writing a
+    /// zero no measurement backs; see `PortionNutrition.incompleteMacros`.
+    ///
+    /// **This doubles as the only marker this type needs.** A non-`nil` value
+    /// is a CIQUAL figure and is shown silently; a `nil` value is the model's
+    /// own estimate and whatever `note` already says about it —
+    /// `.unsure`/`.estimated` where the model said so — still applies exactly
+    /// as before. There is deliberately no second flag: `kilocalories` and
+    /// `macros` are always resolved together, from the same table row and the
+    /// same weight, so a reader never has to reconcile a kilocalorie figure
+    /// that came from one place with a macro figure that came from another.
+    var macros: MacroTotals?
+
     var note: Note
 
-    init(id: UUID = UUID(), name: String, kilocalories: Int, note: Note) {
+    init(id: UUID = UUID(), name: String, kilocalories: Int, macros: MacroTotals? = nil, note: Note) {
         self.id = id
         self.name = name
         self.kilocalories = kilocalories
+        self.macros = macros
         self.note = note
     }
 

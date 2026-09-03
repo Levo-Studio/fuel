@@ -7,7 +7,13 @@ import Foundation
 /// Whole grams, not a floating-point value: every figure the design draws is a
 /// whole number (`118/160`, `48 g`), and integers sum without drift, so a day's
 /// total is the same number however the entries are ordered.
-nonisolated struct MacroTotals: Hashable, Sendable {
+///
+/// `Codable` for the same reason `RecognisedItem` is: a per-item macro figure
+/// travels inside that type's own stored, `Codable` breakdown, and this is the
+/// value it is stored as. Conforming here adds no dependency on a file, a
+/// bundle or a store — `Codable` is a Foundation capability, not a SwiftData
+/// one, and this type still knows nothing about either.
+nonisolated struct MacroTotals: Hashable, Sendable, Codable {
 
     var protein: Int
     var carbs: Int
