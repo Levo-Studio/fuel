@@ -388,3 +388,110 @@ struct FuelMotionTests {
         }
     }
 }
+
+// MARK: - Back swipe
+
+@Suite("Back swipe")
+struct FuelBackSwipeTests {
+
+    @Test("a drag in from the left edge closes the screen")
+    func acrossFromTheEdge() {
+        #expect(
+            FuelBackSwipe.isBackSwipe(
+                startX: 0,
+                translation: CGSize(width: FuelBackSwipe.travel, height: 0)
+            )
+        )
+        #expect(
+            FuelBackSwipe.isBackSwipe(
+                startX: FuelBackSwipe.edgeWidth,
+                translation: CGSize(width: 120, height: 20)
+            )
+        )
+    }
+
+    @Test("a drag that starts away from the edge is content, not an exit")
+    func startingTooFarIn() {
+        #expect(
+            FuelBackSwipe.isBackSwipe(
+                startX: FuelBackSwipe.edgeWidth + 1,
+                translation: CGSize(width: 200, height: 0)
+            ) == false
+        )
+    }
+
+    @Test("a short drag is a hesitation")
+    func notFarEnough() {
+        #expect(
+            FuelBackSwipe.isBackSwipe(
+                startX: 0,
+                translation: CGSize(width: FuelBackSwipe.travel - 1, height: 0)
+            ) == false
+        )
+    }
+
+    @Test("a scroll down the left edge never closes the screen")
+    func mostlyVertical() {
+        // The case that would actually bite: a list dragged downwards with a
+        // thumb resting near the edge drifts sideways as it goes, and without
+        // the directionality check it would eventually pass the travel
+        // threshold under someone who is reading.
+        #expect(
+            FuelBackSwipe.isBackSwipe(startX: 4, translation: CGSize(width: 80, height: 300))
+                == false
+        )
+        #expect(
+            FuelBackSwipe.isBackSwipe(startX: 4, translation: CGSize(width: 80, height: -300))
+                == false
+        )
+    }
+
+    @Test("a drag the other way is not a back swipe")
+    func trailingDirection() {
+        #expect(
+            FuelBackSwipe.isBackSwipe(startX: 4, translation: CGSize(width: -200, height: 0))
+                == false
+        )
+    }
+}
+
+// MARK: - Haptics
+
+@Suite("Haptics")
+struct FuelHapticsTests {
+
+    @Test("every event has feedback on a device that can play it")
+    func everyEventPlays() {
+        for event in FuelHaptics.Event.allCases {
+            #expect(FuelHaptics.resolve(event, hapticsAvailable: true) != nil)
+        }
+    }
+
+    @Test("no event plays where there is no engine")
+    func nothingPlaysWithoutAnEngine() {
+        // The counterpart of `FuelMotion`'s reduced branch, and the reason the
+        // flag is a parameter rather than read inside: a call site that asked
+        // this question itself would be one `if` away from getting it wrong,
+        // and there would be no way to hold this to a rule without a device.
+        for event in FuelHaptics.Event.allCases {
+            #expect(FuelHaptics.resolve(event, hapticsAvailable: false) == nil)
+        }
+    }
+
+    @Test("the four events are four different things to feel")
+    func eventsAreDistinguishable() {
+        // Four events that all produced the same tap would be one event with
+        // four names, and the sparing list would have bought nothing.
+        let feedback = FuelHaptics.Event.allCases.map {
+            FuelHaptics.resolve($0, hapticsAvailable: true)
+        }
+        #expect(Set(feedback.compactMap { $0 }).count == FuelHaptics.Event.allCases.count)
+    }
+
+    @Test("a deletion is not congratulated")
+    func destructiveIsNotSuccess() {
+        #expect(FuelHaptics.resolve(.destructiveConfirmed, hapticsAvailable: true) == .warning)
+        #expect(FuelHaptics.resolve(.scanSucceeded, hapticsAvailable: true) == .success)
+        #expect(FuelHaptics.resolve(.scanFailed, hapticsAvailable: true) == .error)
+    }
+}
