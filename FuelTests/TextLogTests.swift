@@ -160,6 +160,33 @@ struct TextLogTests {
         #expect(model.draft?.isLabelUserSet == false)
     }
 
+    /// The case a clock stub cannot pass.
+    ///
+    /// 19:20 above is `.dinner` under the day rule *and* under a naive
+    /// `labelFor(hour)` — the stub the export ships for its click-through and
+    /// that `design/Fuel Design Notes.md` warns is not the spec — so that test
+    /// alone would stay green through exactly the fork it is named for. 16:00
+    /// sits in the gap between the lunch and dinner windows: a clock says
+    /// Snack, and the rule says Lunch, because the lunch window passed unused
+    /// and dinner has not been reached. See `design/Fuel Design Notes.md`,
+    /// "The meal label", second consequence.
+    ///
+    /// It proves the delegation, not the rule. The rule itself is
+    /// `MealLabeler`'s and is covered against it directly in `MealLabelTests`.
+    @Test("an entry at 16:00 on a day with no lunch is lunch, not a snack")
+    func provisionalLabelUsesTheDayRuleAndNotTheClock() async throws {
+        let model = makeModel(
+            store: try makeStore(),
+            client: ScriptedClient(answer: .success(Self.estimate)),
+            at: at(16, 0)
+        )
+        model.typedText = Self.sentence
+
+        await model.estimating()
+
+        #expect(model.draft?.label == .lunch)
+    }
+
     // MARK: - Failures
 
     @Test("each provider error maps to the state that is drawn for it", arguments: [
