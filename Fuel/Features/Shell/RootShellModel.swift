@@ -187,10 +187,19 @@ final class RootShellModel {
 
     // MARK: - Creation
 
+    /// Where the two models that hold a key write it.
+    ///
+    /// Injectable for one reason: without it no suite can drive onboarding
+    /// past the key screen, because the default store is the real service and
+    /// a test run would write into the key of whoever is on the machine — and
+    /// its cleanup would delete it. The provider a first launch chooses is
+    /// only observable at this level, so the seam is what makes it testable at
+    /// all.
     init(
         store: FuelStore,
         validator: KeyValidating,
         preferences: SettingsPreferences,
+        keychain: KeychainStore = KeychainStore(),
         makeCameraLog: @escaping CameraLogFactory = RootShellModel.liveCameraLog,
         makeTextLog: @escaping TextLogFactory = RootShellModel.liveTextLog
     ) {
@@ -208,10 +217,16 @@ final class RootShellModel {
         let provider = preferences.provider
         self.cameraLog = makeCameraLog(store, provider)
         self.textLog = makeTextLog(store, provider)
-        self.settingsKey = APIKeySettingsModel(validator: validator)
+        self.settingsKey = APIKeySettingsModel(keychain: keychain, validator: validator)
+        // The same `preferences` the log flow is built from, not a copy.
+        // Onboarding's provider segment writes straight into it, so the
+        // provider a user picks at first launch is the one the first scan is
+        // built for and the one screen 16 opens on.
         self.onboarding = OnboardingModel(
+            keychain: keychain,
             validator: validator,
             store: store,
+            preferences: preferences,
             onFinished: { [weak self] in self?.showToday() }
         )
     }

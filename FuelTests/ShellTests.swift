@@ -100,6 +100,19 @@ struct ShellTests {
         return SettingsPreferences(defaults: UserDefaults(suiteName: suite) ?? .standard)
     }
 
+    /// Never the app's service, for the reason `KeychainStore` gives at
+    /// length: a test that wrote to it would clobber the real key of whoever
+    /// is running the suite, and the cleanup below would delete it.
+    private func makeKeychain() -> KeychainStore {
+        KeychainStore(service: "apps.levo-studio.Fuel.tests.shell.\(UUID().uuidString)")
+    }
+
+    private func clear(_ keychain: KeychainStore) {
+        for provider in AIProvider.allCases {
+            try? keychain.deleteKey(for: provider)
+        }
+    }
+
     private func makeModel(
         store: FuelStore,
         preferences: SettingsPreferences? = nil,
@@ -438,6 +451,68 @@ struct ShellTests {
         model.openLogFlow()
 
         #expect(providers.providers.last == .mistral)
+    }
+
+    /// The whole product, broken at first launch, for anyone who picked
+    /// Mistral: onboarding stored the key under Mistral and kept the choice to
+    /// itself, so the flow was built for Claude, the presence check asked for
+    /// a Claude key that did not exist, and both the shutter and `Analyse`
+    /// went dead in front of a working account with nothing on screen to say
+    /// why.
+    ///
+    /// It drives the real path and it asks the question the user would: not
+    /// whether a preference was written, but whether the shutter works. The
+    /// camera half is built against the same Keychain onboarding wrote to, so
+    /// `refreshAvailability` answers from the stored item rather than from a
+    /// stand-in that says yes to everything.
+    @Test("The provider chosen during onboarding is the one the first scan is built for")
+    func onboardingProviderReachesTheFirstScan() async throws {
+        let keychain = makeKeychain()
+        defer { clear(keychain) }
+        let store = try makeStore()
+        let preferences = makePreferences()
+        let providers = ProviderLog()
+        let model = RootShellModel(
+            store: store,
+            validator: StubValidator(outcome: .passed),
+            preferences: preferences,
+            keychain: keychain,
+            makeCameraLog: { store, provider in
+                providers.record(provider)
+                return CameraLogModel(
+                    store: store,
+                    client: UnusedEstimator(),
+                    camera: CountingCamera(),
+                    keys: keychain,
+                    provider: provider
+                )
+            },
+            makeTextLog: ShellTests.stubTextLog
+        )
+
+        #expect(model.stage == .onboarding)
+
+        model.onboarding.selectProvider(.mistral)
+        model.onboarding.keyDraft = OnboardingTests.mistralKey
+        model.onboarding.submitKey()
+        await model.onboarding.validation?.value
+        model.onboarding.continueFromKeyTest()
+        model.onboarding.selectGoalMode()
+        #expect(model.onboarding.complete())
+
+        #expect(model.stage == .today)
+
+        model.openLogFlow()
+
+        #expect(providers.providers.last == .mistral)
+
+        // The question the user asks by pressing it.
+        model.cameraLog.refreshAvailability()
+        #expect(model.cameraLog.stage == .viewfinder)
+
+        // One entry per provider, and only the chosen one was written.
+        #expect(keychain.hasKey(for: .mistral))
+        #expect(!keychain.hasKey(for: .claude))
     }
 
     /// One flow, one provider. The two halves are built from a single read, so
