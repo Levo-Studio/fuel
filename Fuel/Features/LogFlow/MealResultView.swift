@@ -5,12 +5,23 @@ import SwiftUI
 /// Screens 14 and 15: what the model came back with, before any of it is
 /// written down.
 ///
-/// **One screen, drawn twice.** The export's two result frames differ in
-/// three things and in nothing else: what sits above the meal-label pill — the
+/// **One screen, drawn twice.** The export's two result frames differ in four
+/// things and in nothing else: what sits above the meal-label pill — the
 /// captured photo on 14, the typed sentence on 15 — the flow label top right,
-/// and the heading over the breakdown. Everything from the pill down is the
-/// same drawing, down to each padding. So the difference is a slot and two
-/// strings, and the screen is written once.
+/// the heading over the breakdown, and the second line of a breakdown row —
+/// a confidence and an approximate weight on 14, whether the amount was
+/// written down on 15 (`Screens2c.dc.html`, lines 336 to 338 against
+/// 376 to 378).
+///
+/// The first three are a slot and two strings, handed in by whichever screen
+/// this is. The fourth is not handed in at all: `RecognisedItem.Note` already
+/// carries which mode produced the item, so `MealResultCopy.itemNote` picks the
+/// line from the note's own shape. That is what keeps the row a shared drawing
+/// rather than a fork — the geometry, the type and the colour of that line are
+/// identical on both frames, and only the words under it differ.
+///
+/// Everything else from the pill down is the same drawing, down to each
+/// padding, so the screen is written once.
 ///
 /// It follows the theme rather than the camera surface — the export draws both
 /// on `bg`, not on `cam`, because the estimate is done and there is no
