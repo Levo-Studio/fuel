@@ -242,6 +242,81 @@ struct TextLogTests {
         #expect(model.typedText == Self.sentence)
     }
 
+    // MARK: - Two estimates at once
+
+    /// The bug this pins: cancelling a request does not stop the answer that
+    /// is already on its way. The socket stays open until the provider replies,
+    /// so a cancelled estimate comes back — late, and into a screen that has
+    /// moved on. Before the run guard, its `.cancelled` ran `dismissFailure()`,
+    /// which cancelled the estimate that had replaced it and dropped the user
+    /// back in the field with nothing said. On a real network, where a
+    /// cancelled request can hang around for the length of a timeout, that is
+    /// an analysis screen that vanishes for no visible reason.
+    @Test("an estimate the user cancelled cannot cancel the one that replaced it")
+    func cancelledEstimateDoesNotStopItsSuccessor() async throws {
+        let client = GatedClient(answers: [.success(Self.estimate), .success(Self.reestimate)])
+        let model = TextLogModel(
+            store: try makeStore(),
+            client: client,
+            keys: StoredKey(),
+            provider: .claude,
+            now: { at(19, 20) },
+            pace: {}
+        )
+        model.typedText = Self.sentence
+
+        model.analyse()
+        while client.requests < 1 { await Task.yield() }
+
+        // CANCEL, and then straight back in with a second go, while the first
+        // request is still open.
+        model.cancelEstimate()
+        model.analyse()
+        while client.requests < 2 { await Task.yield() }
+
+        // The abandoned request answers first, which is the whole point: it is
+        // the late arrival that used to do the damage.
+        client.release(0)
+        for _ in 0..<50 { await Task.yield() }
+        client.release(1)
+        while case .analysing = model.stage { await Task.yield() }
+
+        #expect(model.stage == .result)
+        #expect(model.draft?.kilocalories == Self.reestimate.kilocalories)
+    }
+
+    /// The same hazard the other way round: a superseded request that fails
+    /// must not put a failure over the estimate that replaced it.
+    @Test("a superseded estimate's failure never reaches the screen")
+    func supersededFailureIsNotShown() async throws {
+        let client = GatedClient(answers: [.failure(.network), .success(Self.estimate)])
+        let model = TextLogModel(
+            store: try makeStore(),
+            client: client,
+            keys: StoredKey(),
+            provider: .claude,
+            now: { at(19, 20) },
+            pace: {}
+        )
+        model.typedText = Self.sentence
+
+        model.analyse()
+        while client.requests < 1 { await Task.yield() }
+
+        model.analyse()
+        while client.requests < 2 { await Task.yield() }
+
+        // The one that is still wanted answers first, and the abandoned one
+        // arrives afterwards — the order in which a stale failure could land
+        // on a result the user is already looking at.
+        client.release(1)
+        while case .analysing = model.stage { await Task.yield() }
+        client.release(0)
+        for _ in 0..<50 { await Task.yield() }
+
+        #expect(model.stage == .result)
+    }
+
     @Test("a retry sends the same sentence again")
     func retrySendsTheSameSentence() async throws {
         let client = ScriptedClient(answer: .failure(.network))

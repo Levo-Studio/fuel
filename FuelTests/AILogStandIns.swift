@@ -149,3 +149,73 @@ final class BrokenCamera: MealCamera {
 
     func capturePhoto() async throws -> UIImage { throw MealCameraError.unavailable }
 }
+
+// MARK: - Overlapping requests
+
+/// A client that holds every request open until it is let go, one at a time.
+///
+/// `ScriptedClient` answers before the caller can do anything else, which
+/// makes two estimates in flight at once impossible to build — and two in
+/// flight at once is the only situation in which one of them can be stale.
+/// This is the same recorded-answer idea with the answer withheld: a test
+/// starts a request, does whatever the user would have done in the meantime,
+/// and then releases the answers in the order it wants them to arrive.
+///
+/// **Still nothing near a network.** The answers are values handed to the
+/// initialiser.
+final class GatedClient: AIClient, @unchecked Sendable {
+
+    let provider: AIProvider = .claude
+
+    private let lock = NSLock()
+    private let answers: [Result<MealEstimate, AIError>]
+    private var started = 0
+    private var waiting: [Int: CheckedContinuation<Void, Never>] = [:]
+
+    init(answers: [Result<MealEstimate, AIError>]) {
+        self.answers = answers
+    }
+
+    /// How many requests have been made and are waiting to be let go or have
+    /// already been.
+    var requests: Int {
+        lock.withLock { started }
+    }
+
+    /// Lets request number `index` answer, counting from zero. Does nothing if
+    /// it is not waiting.
+    ///
+    /// By index rather than in order, because the order the answers arrive in
+    /// is exactly what the stale-run tests are about: a request that was
+    /// abandoned can come back after the one that replaced it, and a queue
+    /// could only ever produce the other case.
+    func release(_ index: Int) {
+        let waiter: CheckedContinuation<Void, Never>? = lock.withLock {
+            waiting.removeValue(forKey: index)
+        }
+        waiter?.resume()
+    }
+
+    func checkKey(_ key: APIKey) async -> KeyCheckResult { .passed }
+
+    func estimate(photo: MealPhoto) async throws -> MealEstimate {
+        try await next()
+    }
+
+    func estimate(text: String) async throws -> MealEstimate {
+        try await next()
+    }
+
+    private func next() async throws -> MealEstimate {
+        let index: Int = lock.withLock {
+            defer { started += 1 }
+            return started
+        }
+
+        await withCheckedContinuation { continuation in
+            lock.withLock { waiting[index] = continuation }
+        }
+
+        return try answers[min(index, answers.count - 1)].get()
+    }
+}
