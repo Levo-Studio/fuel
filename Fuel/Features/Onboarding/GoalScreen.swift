@@ -69,6 +69,7 @@ struct GoalScreen: View {
                     Spacer(minLength: FuelMetrics.Space.s12)
                     OnboardingSelectionDot(isSelected: model.countsAgainstGoal)
                 }
+                .optionRowHitTarget()
             }
             .buttonStyle(.plain)
 
@@ -183,8 +184,41 @@ struct GoalScreen: View {
                 Spacer(minLength: FuelMetrics.Space.s12)
                 OnboardingSelectionDot(isSelected: !model.countsAgainstGoal)
             }
+            .optionRowHitTarget()
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - The region an option row answers in
+
+private extension View {
+
+    /// Makes a choice row answer to a tap anywhere along it, and to a finger
+    /// rather than to a stylus.
+    ///
+    /// Both halves fix something that was observed on the device. A row is a
+    /// title, a `Spacer` and the selection dot, and a `Spacer` is not
+    /// hit-testable: without the content shape the span between the two ends
+    /// responds to nothing, so the only targets are the glyphs of the title and
+    /// the 18pt dot, and the middle of a row the user is aiming at is dead.
+    ///
+    /// The height is the second half. The goal row draws a single 17pt line and
+    /// is 21.7pt tall — half a fingertip — and the export has nothing to say
+    /// about that, because a static render has no touches. `Color.clear` in an
+    /// **overlay** is what grows the region without moving anything: an overlay
+    /// is sized to its parent and takes no part in the parent's layout, so a
+    /// child given a larger minimum simply overhangs it, centred. The row keeps
+    /// the height, the position and the spacing the export draws; only what
+    /// answers is bigger. A `frame` or a `padding` on the row itself would have
+    /// pushed the calorie figure down.
+    func optionRowHitTarget() -> some View {
+        contentShape(Rectangle())
+            .overlay {
+                Color.clear
+                    .frame(minHeight: FuelMetrics.Control.minimumHitTarget)
+                    .contentShape(Rectangle())
+            }
     }
 }
 
