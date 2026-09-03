@@ -30,6 +30,14 @@ struct LogFlowView: View {
     /// The image the gallery picker handed back, held only until it is loaded.
     @State private var pickedPhoto: PhotosPickerItem?
 
+    /// Whether the text tab's field is holding the keyboard.
+    ///
+    /// Owned here rather than inside `TextTabView`, because what has to let it
+    /// go is a change of stage and the stage is what this view has. See
+    /// `LogFlowChrome.canHoldTextFocus` for why a field down in the scaffold
+    /// can outlive the screen it belongs to.
+    @FocusState private var isWritingMeal: Bool
+
     var body: some View {
         ZStack {
             flow
@@ -101,6 +109,12 @@ struct LogFlowView: View {
         }
         .fuelAnimation(FuelMotion.emphasised, value: camera.stage)
         .fuelAnimation(FuelMotion.emphasised, value: text.stage)
+        // Both halves of the rule, watched separately because either can move
+        // on its own: the stage when the sentence is submitted, an estimate
+        // comes back or a failure does, and the tab when the user walks to
+        // another log mode with the field still open.
+        .onChange(of: text.stage) { _, _ in releaseKeyboardIfUnreachable() }
+        .onChange(of: model.selectedTab) { _, _ in releaseKeyboardIfUnreachable() }
         .task(id: pickedPhoto) { await loadPickedPhoto() }
         .onAppear {
             model.reload()
@@ -114,7 +128,13 @@ struct LogFlowView: View {
     private var flow: some View {
         LogFlowScaffold(
             selection: $model.selectedTab,
-            onCancel: onCancel,
+            // The cover takes the field away with it, but not before its own
+            // dismissal has been animated; letting go first means the keyboard
+            // leaves with the flow rather than after it.
+            onCancel: {
+                isWritingMeal = false
+                onCancel()
+            },
             headerAccessory: { tab in
                 // Only the camera tab carries one, and only while a scan is
                 // possible at all — a picker that opened onto a keyless flow
@@ -135,6 +155,7 @@ struct LogFlowView: View {
                     TextTabView(
                         typedText: $text.typedText,
                         isEstimateAvailable: text.stage != .noKey,
+                        isWriting: $isWritingMeal,
                         onAnalyse: text.analyse
                     )
                 case .recent:
@@ -146,6 +167,13 @@ struct LogFlowView: View {
     }
 
     // MARK: - Actions
+
+    /// Lets the field go the moment the screen it belongs to is no longer the
+    /// one on show.
+    private func releaseKeyboardIfUnreachable() {
+        guard !LogFlowChrome.canHoldTextFocus(stage: text.stage, tab: model.selectedTab) else { return }
+        isWritingMeal = false
+    }
 
     private func log(_ meal: RecentMeal) {
         guard model.log(meal) else { return }

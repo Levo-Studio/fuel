@@ -131,7 +131,19 @@ struct CameraGalleryButton: View {
     private struct Glyph: View {
 
         var body: some View {
-            Text(CameraCopy.galleryGlyph)
+            // A symbol stands in for a character the bundled face cannot
+            // draw. The export sets this control's glyph as the text `\u{25A3}`
+            // and the browser satisfied it from a fallback font; neither Plus
+            // Jakarta Sans nor DM Mono carries that codepoint, so the drawn
+            // markup renders as tofu on the device. `photo.on.rectangle` is
+            // the platform's own mark for taking an existing image out of the
+            // library, which is what this control does, and its two nested
+            // rectangles are the nearest silhouette SF has to the drawn
+            // square-inside-a-square. `FuelMetrics.Line.Glyph`'s stroke weights
+            // do not apply to a symbol either — SF draws its own. The drawn
+            // 14pt size, the 34pt circle, its hairline and its colour are
+            // unchanged.
+            Image(systemName: "photo.on.rectangle")
                 .fuelStyle(FuelTypography.iconGlyph)
                 .foregroundStyle(FuelPalette.Camera.ink)
                 .frame(width: FuelMetrics.Control.circleButton, height: FuelMetrics.Control.circleButton)
@@ -139,7 +151,23 @@ struct CameraGalleryButton: View {
                     Circle()
                         .strokeBorder(FuelPalette.Camera.hair, lineWidth: FuelMetrics.Line.hairline)
                 }
-                .contentShape(.circle)
+                // The drawn circle is 34 and a finger is 44 — the same
+                // arithmetic Today's gear does, and for the same reason. The
+                // larger frame grows the region that answers around it, and
+                // the negative padding gives the layout its 34 back, so the
+                // circle keeps the size and the position the export puts it in
+                // and the header row is laid out as though nothing here were
+                // bigger than what is drawn.
+                .frame(
+                    width: FuelMetrics.Control.minimumHitTarget,
+                    height: FuelMetrics.Control.minimumHitTarget
+                )
+                .contentShape(Rectangle())
+                .padding(
+                    -FuelMetrics.Control.hitTargetOverhang(
+                        around: FuelMetrics.Control.circleButton
+                    )
+                )
         }
     }
 }

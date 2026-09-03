@@ -175,7 +175,7 @@ struct MealResultView<Lede: View>: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
+        ZStack {
             palette.background
                 .ignoresSafeArea()
 
@@ -192,14 +192,55 @@ struct MealResultView<Lede: View>: View {
                     }
                     .padding(.top, FuelMetrics.Space.s26)
                     .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
-                    // The footer floats over the list, so the last row has to
-                    // be able to clear it.
-                    .padding(.bottom, FuelMetrics.Space.s96)
                 }
-                .scrollBounceBehavior(.basedOnSize)
+                .fuelScrolling()
+                // The list ends above the footer, as the export draws it —
+                // and it ends above wherever the footer currently is, which is
+                // the whole point of taking the inset from the footer rather
+                // than writing a number for it.
+                //
+                // It used to be a fixed `s96` under a footer laid over the
+                // list in a bottom-aligned `ZStack`. That number stood for the
+                // footer's height at rest, and it was two things at once: a
+                // measurement of a view nobody had measured, and a promise the
+                // layout could not keep the moment the keyboard came up. The
+                // keyboard shrinks the safe area, the footer rises with it,
+                // and a bottom padding on the *content* rises with the list
+                // instead — so the two pass each other and the pills end up
+                // over the breakdown, mid-list, which is what the owner saw.
+                //
+                // `safeAreaInset` inverts that: the footer is the thing being
+                // placed, and the list is inset by exactly what the footer
+                // occupies, keyboard or no keyboard. Nothing drawn moves —
+                // the footer keeps its `s28` sides and its `s34` above the
+                // safe-area boundary, and it still sits over the list while
+                // one is being dragged past it.
+                //
+                // `spacing: .zero` because the gap is already drawn: the
+                // footer's own bottom padding is the export's `bottom:34`, and
+                // a spacing here would be a second, invented one.
+                .safeAreaInset(edge: .bottom, spacing: .zero) { footer }
             }
-
-            footer
+            // The second half of the same fix, and the half without which the
+            // first does nothing.
+            //
+            // Keyboard avoidance reaches the footer through the safe area but
+            // leaves the scroll view's own frame where it was, so the footer
+            // rises and the list does not follow — measured on a hosted render
+            // of this view with a real keyboard up, the pills landed across
+            // `2 eggs` and `200g cottage cheese` with the list unmoved beneath
+            // them. Insetting the list by the footer cannot answer that: the
+            // inset is correct and the footer is simply no longer where the
+            // inset says it is.
+            //
+            // So this screen does not dodge the keyboard at all, which is also
+            // the only reading of the export — screens 14 and 15 are a fixed
+            // layout with the footer at `bottom:34`, and there is no drawn
+            // second position for it. Nothing here needs the screen to move
+            // either: the one field this screen can open is the item editor,
+            // and it lives in a system alert, which the platform lifts clear
+            // of the keyboard itself.
+            .ignoresSafeArea(.keyboard, edges: .bottom)
         }
         // A system alert with one field, rather than a sheet drawn in the
         // app's own language. The export has no editor of any kind, so

@@ -39,4 +39,29 @@ nonisolated enum LogFlowChrome {
         }
         return .dark
     }
+
+    // MARK: - Keyboard
+
+    /// Whether the text tab's field is still on a screen the user can see.
+    ///
+    /// `LogFlowView` keeps the scaffold — and with it the text tab — in the
+    /// hierarchy underneath the analysis and result overlays, which is what
+    /// lets the flow cross-fade rather than swap. The cost is that a field left
+    /// focused down there goes on holding the keyboard up over screens 08 to
+    /// 11, 14 and 15, none of which draws a field at all. So focus is released
+    /// by the state change rather than by the user tapping somewhere, and this
+    /// is the rule that says when: the field is only reachable while the text
+    /// mode is showing its entry screen and the text tab is the selected one.
+    ///
+    /// A rule rather than a condition written at the call site, for the same
+    /// reason `colorScheme` is one — it is read off the state that already
+    /// exists, so a stage that stops drawing a field changes what this returns
+    /// in the same commit, and it can be checked without a simulator.
+    ///
+    /// `noKey` is not the entry screen: that tab draws the keyless notice, and
+    /// a key removed in Settings while the field is open is exactly the case a
+    /// clock-free rule has to catch.
+    static func canHoldTextFocus(stage: TextLogModel.Stage, tab: LogFlowTab) -> Bool {
+        stage == .entry && tab == .text
+    }
 }

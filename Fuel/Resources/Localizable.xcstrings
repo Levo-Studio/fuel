@@ -1,20 +1,8 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "camera.gallery.glyph" : {
-      "comment" : "Screen 07, the ▣ in the circle top right.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "▣"
-          }
-        }
-      }
-    },
     "camera.gallery.label" : {
-      "comment" : "The same control for VoiceOver, without the glyph. Not in the export.",
+      "comment" : "Accessibility label of the circular gallery button on screen 07. Not in the export.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {

@@ -285,4 +285,24 @@ extension View {
     func fuelAnimation<Value: Equatable>(_ curve: FuelMotion.Curve, value: Value) -> some View {
         modifier(FuelAnimationModifier(curve: curve, value: value))
     }
+
+    /// Every scrolling surface in Fuel, and the one decision they share: a drag
+    /// is always answered, even where the content already fits.
+    ///
+    /// **Owner's ruling, not a drawn value.** The export is a set of still
+    /// frames and says nothing about what a finger does to them. Left to
+    /// `.basedOnSize` — which is what each of these four surfaces used to carry
+    /// — a short screen is inert under a drag, and Fuel has several: a Today
+    /// with two entries, a result with three items, Recent on a fresh install,
+    /// Settings on a short phone. Nothing moves, and the screen reads as frozen
+    /// rather than as full. A bounce answers the finger and costs no drawn
+    /// geometry and no visible affordance.
+    ///
+    /// It lives here, beside the curves, for the reason Reduce Motion does: at
+    /// four call sites a rule is remembered at three of them, and the fourth is
+    /// the one the owner finds. A `ScrollView` in this app takes this modifier
+    /// and does not write a bounce behaviour of its own.
+    func fuelScrolling() -> some View {
+        scrollBounceBehavior(.always)
+    }
 }

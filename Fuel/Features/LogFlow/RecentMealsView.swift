@@ -49,7 +49,7 @@ struct RecentMealsView: View {
             // ordinary margin.
             .padding(.horizontal, FuelMetrics.Screen.logFlowHorizontalPadding)
         }
-        .scrollBounceBehavior(.basedOnSize)
+        .fuelScrolling()
     }
 }
 

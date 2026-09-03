@@ -49,7 +49,7 @@ struct SettingsScreen: View {
             }
             .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
         }
-        .scrollBounceBehavior(.basedOnSize)
+        .fuelScrolling()
         .background(palette.background.ignoresSafeArea())
         .environment(\.fuelPalette, palette)
         .preferredColorScheme(palette.theme.colorScheme)
