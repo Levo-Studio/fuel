@@ -312,6 +312,14 @@ struct RawWeightInstructionTests {
         #expect(EstimateContract.rawWeightConvention.contains("r2 eggs"))
         #expect(EstimateContract.rawWeightConvention.contains("Never invent a difference"))
     }
+
+    /// The raw amount is asked for in the item's name and forbidden in the
+    /// title, because `RecentMeals` groups repeats by an exact title match and
+    /// a weight that varies would split one meal into a row per weighing.
+    @Test("the convention keeps the raw amount out of the meal title")
+    func conventionProtectsTheTitle() {
+        #expect(EstimateContract.rawWeightConvention.contains("Never put it in the meal's title"))
+    }
 }
 
 // MARK: - Amount field

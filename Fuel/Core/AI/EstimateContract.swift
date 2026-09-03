@@ -80,13 +80,24 @@ nonisolated enum EstimateContract {
     /// the reply the result screen already draws as the model wrote it. A
     /// structured field would be the better home and is a change to
     /// `RecognisedItem` rather than to this file.
+    ///
+    /// **The title is told to stay out of it, and that sentence is load-
+    /// bearing.** `RecentMeals.list(from:limit:)` treats two meals as the same
+    /// meal when their titles match exactly, so a title carrying the raw
+    /// amount would make `Rice (raw 300 g)` and `Rice (raw 280 g)` two rows
+    /// and split the recents list into one entry per weighing. That comment
+    /// says the fix for varying titles is to make the titles stable rather
+    /// than to loosen the key; this is that fix, said to the model before it
+    /// writes one. An item name costs nothing when it varies — nothing groups
+    /// on it — and a title costs the user the list they log from.
     static let rawWeightConvention = """
         A weight written with a leading r — r300g, r 1.5 kg, r8oz — was \
         weighed raw or dry, before cooking. A weight without it is the amount \
         as eaten. Price a raw weight as the raw or dry food and not as the \
         cooked portion, and end that item's name with the raw amount in \
-        brackets, like "Rice (raw 300 g)". A raw weight is a stated amount, \
-        so that item's "amount" is "recognised".
+        brackets, like "Rice (raw 300 g)". Never put it in the meal's title. \
+        A raw weight is a stated amount, so that item's "amount" is \
+        "recognised".
 
         Read everything else as an ordinary amount, including a count such as \
         r2 eggs and any food whose weight does not change with cooking. Never \
