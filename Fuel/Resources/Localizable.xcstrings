@@ -1159,30 +1159,6 @@
         }
       }
     },
-    "result.photo.item.confident" : {
-      "comment" : "The confidence line under a recognised item after a photo. Drawn sicher · ca. 150 g.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "confident · approx. %lld g"
-          }
-        }
-      }
-    },
-    "result.photo.item.unsure" : {
-      "comment" : "The same line where the model was not sure. Drawn unsicher · ca. 90 g.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "unsure · approx. %lld g"
-          }
-        }
-      }
-    },
     "result.photo.label" : {
       "comment" : "The captured photo for VoiceOver. Not in the export.",
       "extractionState" : "manual",
@@ -1215,30 +1191,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Broken down"
-          }
-        }
-      }
-    },
-    "result.text.item.estimated" : {
-      "comment" : "Screen 15, under an item whose amount the model had to guess. Drawn Menge geschätzt.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Amount estimated"
-          }
-        }
-      }
-    },
-    "result.text.item.recognised" : {
-      "comment" : "Screen 15, under an item whose amount the user wrote down. Drawn Menge erkannt.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Amount recognised"
           }
         }
       }

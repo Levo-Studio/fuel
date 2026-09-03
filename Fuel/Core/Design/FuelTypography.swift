@@ -248,9 +248,6 @@ nonisolated enum FuelTypography {
     /// result thumbnail. Drawn already uppercase.
     static let overlayCaption = Style(.mono, weight: 400, size: 10.5, trackingEm: 0.1)
 
-    /// `400 10.5px`. The confidence line under a recognised item.
-    static let confidence = Style(.mono, weight: 400, size: 10.5)
-
     // MARK: - Sans styles
 
     /// `600 34px/1.14`, tracking `-.03em`. The headline on an onboarding step.
@@ -396,7 +393,7 @@ nonisolated enum FuelTypography {
         settingsValue, monoValue, listValue, listValueSmall, totalSuffix, unit, eyebrow,
         settingsRowTime,
         flowLabel, meta, macroRatio, monoNote, timestamp, macroSummary, overlayAction,
-        overlayCaption, confidence,
+        overlayCaption,
         display, displaySmall, screenTitle, sheetTitle, addGlyph, textEntry, analysisStep,
         optionTitle, buttonLabel, listTitle, listTitlePending, body, entryTitle,
         itemTitle, chipLabel, iconGlyph, lead, settingsRowLabel, segmentLabel, caption, hint,

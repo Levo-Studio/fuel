@@ -5,20 +5,16 @@ import SwiftUI
 /// Screens 14 and 15: what the model came back with, before any of it is
 /// written down.
 ///
-/// **One screen, drawn twice.** The export's two result frames differ in four
+/// **One screen, drawn twice.** The export's two result frames differ in three
 /// things and in nothing else: what sits above the meal-label pill — the
 /// captured photo on 14, the typed sentence on 15 — the flow label top right,
-/// the heading over the breakdown, and the second line of a breakdown row —
-/// a confidence and an approximate weight on 14, whether the amount was
-/// written down on 15 (`Screens2c.dc.html`, lines 336 to 338 against
-/// 376 to 378).
+/// and the heading over the breakdown. All three are a slot and two strings,
+/// handed in by whichever screen this is.
 ///
-/// The first three are a slot and two strings, handed in by whichever screen
-/// this is. The fourth is not handed in at all: `RecognisedItem.Note` already
-/// carries which mode produced the item, so `MealResultCopy.itemNote` picks the
-/// line from the note's own shape. That is what keeps the row a shared drawing
-/// rather than a fork — the geometry, the type and the colour of that line are
-/// identical on both frames, and only the words under it differ.
+/// The export draws a fourth difference, the second line of a breakdown row
+/// (`Screens2c.dc.html`, lines 336 to 338 against 376 to 378), and **the owner
+/// has removed it** — see `itemRow`. With it gone the two frames share the
+/// whole breakdown, not only its geometry.
 ///
 /// Everything else from the pill down is the same drawing, down to each
 /// padding, so the screen is written once.
@@ -280,23 +276,23 @@ struct MealResultView<Lede: View>: View {
         .padding(.top, FuelMetrics.Space.s18)
     }
 
+    /// One line of the breakdown: what it is, and what it costs.
+    ///
+    /// **The export draws a second line under the name** — `confident · approx.
+    /// 150 g` after a photo, `Amount recognised` after text — and the owner has
+    /// removed it. It was the one thing on these screens that differed by log
+    /// mode, so the row is now literally the same row on both frames.
+    ///
+    /// `RecognisedItem.Note` is untouched: it is stored with the entry and is
+    /// read outside this screen. Nothing draws it here any more.
     private func itemRow(_ item: RecognisedItem) -> some View {
         HStack(alignment: .center, spacing: FuelMetrics.Space.s14) {
-            VStack(alignment: .leading, spacing: .zero) {
-                // Model-written text, already capped at 120 characters at the
-                // parse boundary. Plain `Text`, so there is no markup path into
-                // the interface for a name that arrived from a provider.
-                Text(verbatim: item.name)
-                    .fuelStyle(FuelTypography.itemTitle)
-                    .foregroundStyle(palette.ink)
-
-                if let note = MealResultCopy.itemNote(item.note) {
-                    Text(note)
-                        .fuelStyle(FuelTypography.confidence)
-                        .foregroundStyle(palette.muted)
-                        .padding(.top, FuelMetrics.Space.s2)
-                }
-            }
+            // Model-written text, already capped at 120 characters at the parse
+            // boundary. Plain `Text`, so there is no markup path into the
+            // interface for a name that arrived from a provider.
+            Text(verbatim: item.name)
+                .fuelStyle(FuelTypography.itemTitle)
+                .foregroundStyle(palette.ink)
 
             Spacer(minLength: FuelMetrics.Space.s14)
 

@@ -76,34 +76,6 @@ nonisolated enum MealResultCopy {
         String(format: String(localized: "result.macro.grams"), value)
     }
 
-    // MARK: - Breakdown
-
-    /// The second line of a breakdown row.
-    ///
-    /// Chosen by the shape of the note rather than by which screen is asking,
-    /// because the note already carries the mode: a photo item knows a
-    /// confidence and an approximate weight, a typed item knows only whether
-    /// the amount was written down. A note this build cannot read draws
-    /// nothing, and the row keeps its name and its calories — the part the
-    /// user is reading.
-    static func itemNote(_ note: RecognisedItem.Note) -> String? {
-        switch note {
-        case .photo(let confidence, let grams):
-            let format = switch confidence {
-            case .confident: String(localized: "result.photo.item.confident")
-            case .unsure: String(localized: "result.photo.item.unsure")
-            }
-            return String(format: format, grams)
-        case .text(let amount):
-            return switch amount {
-            case .recognised: String(localized: "result.text.item.recognised")
-            case .estimated: String(localized: "result.text.item.estimated")
-            }
-        case .unknown:
-            return nil
-        }
-    }
-
     // MARK: - Footer
 
     static var new: String {
