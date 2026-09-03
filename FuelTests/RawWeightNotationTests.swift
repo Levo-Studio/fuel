@@ -180,3 +180,51 @@ struct RawWeightNotationTests {
         #expect(!RawWeightNotation.isUsed(in: sentence))
     }
 }
+
+// MARK: - Instruction
+
+/// What the contract actually sends once the shorthand has been found.
+@Suite("Raw-weight instruction")
+struct RawWeightInstructionTests {
+
+    @Test("a sentence using the shorthand carries the convention")
+    func conventionIsAppended() {
+        let instruction = EstimateContract.textInstruction(for: "r300g rice, 200g chicken")
+        #expect(instruction.contains(EstimateContract.rawWeightConvention))
+    }
+
+    @Test("a sentence without the shorthand carries none of it")
+    func conventionIsWithheld() {
+        let instruction = EstimateContract.textInstruction(for: "300g rice, 200g chicken")
+        #expect(!instruction.contains(EstimateContract.rawWeightConvention))
+        #expect(!instruction.contains("raw"))
+    }
+
+    /// The convention goes before the user's own words, like everything else
+    /// Fuel has to say — a paragraph after the description would be a
+    /// paragraph a typed sentence could imitate.
+    @Test("the convention is said before the description begins")
+    func conventionPrecedesTheDescription() throws {
+        let instruction = EstimateContract.textInstruction(for: "r300g rice")
+        let convention = try #require(instruction.range(of: EstimateContract.rawWeightConvention))
+        let description = try #require(instruction.range(of: "Description: r300g rice"))
+        #expect(convention.upperBound < description.lowerBound)
+    }
+
+    @Test("the sentence itself is passed through untouched")
+    func descriptionIsUnchanged() {
+        #expect(
+            EstimateContract.textInstruction(for: "r300g rice")
+                .hasSuffix("Description: r300g rice")
+        )
+    }
+
+    /// The convention names the ambiguous case in the instruction itself, so a
+    /// sentence that mixes a raw weight with a count does not get a raw
+    /// reading of the count for free.
+    @Test("the convention tells the model not to invent a distinction")
+    func conventionNamesTheAmbiguousCase() {
+        #expect(EstimateContract.rawWeightConvention.contains("r2 eggs"))
+        #expect(EstimateContract.rawWeightConvention.contains("Never invent a difference"))
+    }
+}
