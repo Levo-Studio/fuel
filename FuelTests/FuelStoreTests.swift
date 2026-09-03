@@ -120,6 +120,24 @@ struct FuelStoreTests {
         #expect(recents.map(\.title) == ["Third", "Second"])
     }
 
+    @Test("nothing has ever been logged until something is")
+    func hasAnyEntry() throws {
+        let store = try makeStore()
+        #expect(try store.hasAnyEntry() == false)
+
+        try store.log(title: "Porridge", kilocalories: 420, macros: .zero, loggedAt: at(8, 14), source: .photo)
+        #expect(try store.hasAnyEntry())
+    }
+
+    @Test("a meal logged on another day still counts as ever logged")
+    func hasAnyEntryIsNotScopedToADay() throws {
+        let store = try makeStore()
+        try store.log(title: "Yesterday", kilocalories: 500, macros: .zero, loggedAt: at(20, 0, day: 0), source: .text)
+
+        #expect(try store.nutritionEntries(on: at(12, 0, day: 1)).isEmpty)
+        #expect(try store.hasAnyEntry())
+    }
+
     @Test("there are no goal settings until onboarding answers")
     func goalSettingsAreCreatedOnDemand() throws {
         let store = try makeStore()
