@@ -43,11 +43,34 @@ nonisolated enum AIError: Error, Equatable {
     /// response body is a link an attacker could choose.
     case noCredit(provider: AIProvider, billingPage: URL)
 
-    /// The request never reached the provider, the response never came back,
-    /// or the provider answered with something Fuel cannot act on — a `429`,
-    /// a `500`, a `400` that is not about credit. The design's plain retry
-    /// state, and in every one of those cases the correct advice.
+    /// The request never reached the provider, or the answer never came back:
+    /// no route to host, a connection dropped mid-flight, a timeout, a
+    /// response that is not HTTP at all.
+    ///
+    /// **Nothing was learned about the key, the account or the meal**, which
+    /// is what separates it from `providerRefused` below. The two used to be
+    /// one case, and collapsing them meant the interface could not tell a
+    /// phone with no signal from a provider having a bad morning — and said
+    /// "the answer did not come back" for both, which is only true of one.
+    /// Both are still a retry to the user; the difference is that Fuel now
+    /// knows which one it is saying.
     case network
+
+    /// The provider answered, and the answer was a refusal Fuel cannot act
+    /// on: a `429`, a `500`, Anthropic's `529 overloaded_error`, a `404` for a
+    /// model id, a `400` that is not about credit.
+    ///
+    /// The round trip completed. Whatever went wrong is at the far end, and
+    /// waiting is still the right advice — the design draws no fourth state
+    /// and inventing one for "the provider is busy" would be a deviation. It
+    /// is named separately because the *cause* is worth telling apart even
+    /// where the *remedy* is not: an intermittent failure that is all
+    /// `providerRefused` is a different investigation from one that is all
+    /// `network`.
+    ///
+    /// It carries no status and no body, for the reason at the top of this
+    /// file.
+    case providerRefused
 
     /// The user backed out. Not a failure, and **not** the retry state.
     ///
@@ -67,6 +90,23 @@ nonisolated enum AIError: Error, Equatable {
     /// macros looks like a real meal in the day's total and is worse than a
     /// visible failure.
     case malformedResponse
+
+    /// The provider's answer stops in the middle, because the model ran into
+    /// the token ceiling the request set — Anthropic says so with
+    /// `stop_reason: "max_tokens"`, Mistral with `finish_reason: "length"`.
+    ///
+    /// A special case of `malformedResponse` and named separately because it
+    /// is the one unreadable reply Fuel caused itself: the ceiling is Fuel's
+    /// number, not the model's mistake, and a scan that fails this way fails
+    /// for a reason a `max_tokens` in this repository could fix. Folded in
+    /// with prose and wrong field names, it would be invisible — and a
+    /// truncation rate is exactly the kind of thing that shows up as "roughly
+    /// every second attempt" and nothing more specific.
+    ///
+    /// Raised only when the reply also fails to parse. A model that finished
+    /// its object and was cut off writing the newline after it has still
+    /// answered, and the user has already paid for it.
+    case truncatedReply
 
     /// The photo is still over the provider's request limit after compression.
     /// Raised before any request is built, so the user is not billed for a

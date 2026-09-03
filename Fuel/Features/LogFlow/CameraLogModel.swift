@@ -78,6 +78,24 @@ final class CameraLogModel {
     /// The running scan, so `CANCEL` can stop it.
     private var scan: Task<Void, Never>?
 
+    /// Which scan the model is currently listening to.
+    ///
+    /// **Cancelling a `Task` does not stop the answer it is already waiting
+    /// on.** A request suspended inside `URLSession` keeps its socket open
+    /// until the provider replies or the connection drops, so a scan the user
+    /// cancelled goes on running for as long as the network takes — and then
+    /// comes back and writes to `stage`. If a second scan has been started in
+    /// the meantime, the first one's late arrival lands on it: its `.cancelled`
+    /// runs `dismissFailure()`, which throws the new frame away and cancels the
+    /// request that replaced it, and its `.network` puts a failure over a scan
+    /// that is still in flight.
+    ///
+    /// Every run takes a number, and `present`, `represent` and `fail` refuse
+    /// to act for a number that is no longer the current one. Cheap, and it is
+    /// the only thing that can tell two runs apart — a `Task` handle cannot,
+    /// because the stale one is the handle that was overwritten.
+    private var currentRun = 0
+
     /// Whether the request in flight is a re-estimate of an edited breakdown
     /// rather than a scan of the frame.
     ///
@@ -136,7 +154,9 @@ final class CameraLogModel {
         do {
             analyse(try await camera.capturePhoto())
         } catch {
-            stage = .failed(.retry)
+            // `.device`: the shutter never produced a frame, so nothing was
+            // sent and nothing is owed to the provider.
+            stage = .failed(.retry(.device))
         }
     }
 
@@ -151,16 +171,50 @@ final class CameraLogModel {
         photo = image
         capturedAt = now()
         stage = .analysing(.analysingMeal)
-        scan = Task { [weak self] in await self?.run(image) }
+        scan = start { [weak self] run in await self?.run(image, as: run) }
+    }
+
+    /// Starts a run, retires whatever was running before it, and hands the new
+    /// run its number.
+    ///
+    /// The previous task is cancelled as well as retired. Retiring alone would
+    /// keep it from writing anything, which is the correctness half; cancelling
+    /// is the half that stops the user paying for an answer nobody will read.
+    private func start(_ work: @escaping @MainActor (Int) async -> Void) -> Task<Void, Never> {
+        scan?.cancel()
+        currentRun += 1
+        let run = currentRun
+        return Task { await work(run) }
+    }
+
+    /// Whether `run` is still the scan the screen is waiting for.
+    private func isCurrent(_ run: Int) -> Bool {
+        run == currentRun
+    }
+
+    /// Retires whatever is running, so nothing it comes back with is acted on.
+    private func retireRun() {
+        scan?.cancel()
+        currentRun += 1
     }
 
     /// The `CANCEL` control under the progress bar.
     ///
-    /// Cancelling the task is enough: the request comes back as
-    /// `AIError.cancelled`, which `AnalysisFailure` refuses to build, and the
-    /// flow returns to the viewfinder without saying anything.
+    /// **Cancelling the task is not enough, and relying on it was a hole in
+    /// the run numbering.** `Task.cancel()` does not stop a request that is
+    /// already waiting on a socket, so the old code left the run current and
+    /// waited for it to come back as `AIError.cancelled`. A request that
+    /// happened to complete in the window between the tap and the
+    /// continuation resuming still passed `isCurrent`, and presented a result
+    /// over a cancel the user had just made.
+    ///
+    /// Retiring the run closes that window: from the tap onwards nothing that
+    /// request comes back with is acted on, whichever way it lands. Where the
+    /// user goes next is the same question as where dismissing a failure
+    /// takes them, and has the same answer.
     func cancelScan() {
-        scan?.cancel()
+        retireRun()
+        dismissFailure()
     }
 
     // MARK: - Re-analysing
@@ -196,34 +250,34 @@ final class CameraLogModel {
 
         isReanalysing = true
         stage = .analysing(.analysingMeal)
-        scan = Task { [weak self] in await self?.rerun(described) }
+        scan = start { [weak self] run in await self?.rerun(described, as: run) }
     }
 
     // MARK: - The scan
 
-    private func run(_ image: UIImage) async {
+    private func run(_ image: UIImage, as run: Int) async {
         do {
             // Compression happens before anything is sent, and before the
             // steps start walking, so an unsendable photo costs no request.
             let compressed = try MealPhotoCompressor.compress(image)
 
-            let estimate = try await stepping { try await self.client.estimate(photo: compressed) }
+            let estimate = try await stepping(as: run) { try await self.client.estimate(photo: compressed) }
 
             try Task.checkCancellation()
-            present(estimate)
+            present(estimate, as: run)
         } catch {
-            fail(with: error)
+            fail(with: error, as: run)
         }
     }
 
-    private func rerun(_ described: String) async {
+    private func rerun(_ described: String, as run: Int) async {
         do {
-            let estimate = try await stepping { try await self.client.estimate(text: described) }
+            let estimate = try await stepping(as: run) { try await self.client.estimate(text: described) }
 
             try Task.checkCancellation()
-            represent(estimate)
+            represent(estimate, as: run)
         } catch {
-            fail(with: error)
+            fail(with: error, as: run)
         }
     }
 
@@ -231,8 +285,8 @@ final class CameraLogModel {
     ///
     /// Shared by the scan and the re-analysis because the export draws one set
     /// of four states and says nothing about what is being waited on.
-    private func stepping(_ request: () async throws -> MealEstimate) async throws -> MealEstimate {
-        let stepper = Task { [weak self] in await self?.walkSteps() }
+    private func stepping(as run: Int, _ request: () async throws -> MealEstimate) async throws -> MealEstimate {
+        let stepper = Task { [weak self] in await self?.walkSteps(as: run) }
         do {
             let estimate = try await request()
             // Awaited rather than only cancelled, so a step cannot land on the
@@ -249,15 +303,34 @@ final class CameraLogModel {
 
     /// Walks steps two to four. The first is set the moment the shutter fires,
     /// and the fourth is held until the answer arrives.
-    private func walkSteps() async {
+    ///
+    /// **Guarded by run identity, not only by its own cancellation.** This
+    /// task is unstructured — `stepping()` creates it with a bare `Task { }`,
+    /// not a child task — so cancelling the scan that owns it does not cancel
+    /// it. The only thing that reliably stops it is `stepper.cancel()` in
+    /// `stepping()`, called once that scan's request has resolved, and there
+    /// is a window before that where a superseded run's stepper is still
+    /// ticking. `isCurrent(run)` is checked separately from `Task.isCancelled`
+    /// for that window: `currentRun` is bumped synchronously the moment a run
+    /// is superseded, before any cancellation has had a chance to propagate,
+    /// so it closes the window the other check cannot. Both are kept —
+    /// `Task.isCancelled` still stops a stepper whose own request has simply
+    /// finished.
+    ///
+    /// Bounded and cosmetic on its own — every stage this can still write is
+    /// an analysing step, and both the run it belongs to and the one that
+    /// replaced it are showing the same four screens — but it was the one
+    /// stage writer the run numbering elsewhere in this file did not reach.
+    private func walkSteps(as run: Int) async {
         for step in AnalysisStep.allCases.dropFirst() {
             await pace()
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, isCurrent(run) else { return }
             stage = .analysing(step)
         }
     }
 
-    private func present(_ estimate: MealEstimate) {
+    private func present(_ estimate: MealEstimate, as run: Int) {
+        guard isCurrent(run) else { return }
         draft = MealResultDraft(
             title: estimate.title,
             kilocalories: estimate.kilocalories,
@@ -272,15 +345,20 @@ final class CameraLogModel {
 
     /// Puts a re-estimate over the draft, keeping the label and the favourite
     /// mark the user set on it.
-    private func represent(_ estimate: MealEstimate) {
-        guard var draft else { return present(estimate) }
+    private func represent(_ estimate: MealEstimate, as run: Int) {
+        guard isCurrent(run) else { return }
+        guard var draft else { return present(estimate, as: run) }
         draft.replaceEstimate(with: estimate)
         self.draft = draft
         isReanalysing = false
         stage = .result
     }
 
-    private func fail(with error: any Error) {
+    private func fail(with error: any Error, as run: Int) {
+        // A run that is no longer the current one says nothing at all. Its
+        // failure belongs to a request the user has already left behind, and
+        // acting on it here would take the one that replaced it with it.
+        guard isCurrent(run) else { return }
         // The clients throw `AIError` already; `transportFailure` is here for
         // the structured-concurrency cancellation that can arrive around them.
         let aiError = (error as? AIError) ?? AIError.transportFailure(error)
@@ -394,7 +472,7 @@ final class CameraLogModel {
     /// The frame is released here. That is the whole lifetime of the photo:
     /// captured, sent, drawn, gone.
     func discard() {
-        scan?.cancel()
+        retireRun()
         scan = nil
         isReanalysing = false
         photo = nil

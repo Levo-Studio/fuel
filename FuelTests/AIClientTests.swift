@@ -111,7 +111,17 @@ private enum Reply {
         )!
         // `escaped` is `["…"]`; drop the brackets to get the quoted string.
         let quoted = String(escaped.dropFirst().dropLast())
-        return #"{"content":[{"type":"text","text":\#(quoted)}]}"#
+        return #"{"content":[{"type":"text","text":\#(quoted)}],"stop_reason":"end_turn"}"#
+    }
+
+    /// The same envelope with the answer cut off at the request's own token
+    /// ceiling, which is how a real `max_tokens` reply comes back: status 200,
+    /// well-formed envelope, half a JSON object inside it.
+    static func anthropicOutOfTokens(_ text: String) -> String {
+        anthropic(text).replacingOccurrences(
+            of: #""stop_reason":"end_turn""#,
+            with: #""stop_reason":"max_tokens""#
+        )
     }
 
     static func mistral(_ text: String) -> String {
@@ -120,7 +130,16 @@ private enum Reply {
             encoding: .utf8
         )!
         let quoted = String(escaped.dropFirst().dropLast())
-        return #"{"choices":[{"message":{"role":"assistant","content":\#(quoted)}}]}"#
+        return #"{"choices":[{"message":{"role":"assistant","content":\#(quoted)},"finish_reason":"stop"}]}"#
+    }
+
+    /// Mistral's word for the same thing, on the choice rather than on the
+    /// envelope.
+    static func mistralOutOfTokens(_ text: String) -> String {
+        mistral(text).replacingOccurrences(
+            of: #""finish_reason":"stop""#,
+            with: #""finish_reason":"length""#
+        )
     }
 }
 
@@ -428,7 +447,9 @@ struct AIErrorMappingTests {
         )
         let client = AnthropicClient(transport: transport, keys: keys.source)
 
-        await #expect(throws: AIError.network) {
+        // `providerRefused` rather than `network`: the answer did come back,
+        // and it said to wait. The user still sees the retry state.
+        await #expect(throws: AIError.providerRefused) {
             _ = try await client.estimate(text: "an apple")
         }
     }
@@ -441,7 +462,7 @@ struct AIErrorMappingTests {
         let transport = RecordingTransport(status: 429, body: "{}")
         let client = MistralClient(transport: transport, keys: keys.source)
 
-        await #expect(throws: AIError.network) {
+        await #expect(throws: AIError.providerRefused) {
             _ = try await client.estimate(text: "an apple")
         }
     }
@@ -519,6 +540,46 @@ struct AIErrorMappingTests {
         }
     }
 
+    /// The strongest candidate for an intermittent failure on a real device:
+    /// `URLSession` pools its connections, and a pooled connection the far end
+    /// closed while it sat idle still looks usable, so the next request is
+    /// written into a socket that is already gone. It comes back as `-1005`
+    /// without ever having been delivered.
+    @Test("a connection the system had already dropped is tried once more")
+    func lostConnectionIsRetriedOnce() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let transport = RecordingTransport([
+            .failure(URLError(.networkConnectionLost)),
+            .success(HTTPResponse(statusCode: 200, body: Data(Reply.anthropic(Reply.goodEstimate).utf8))),
+        ])
+        let client = AnthropicClient(transport: transport, keys: keys.source)
+
+        let estimate = try await client.estimate(text: "porridge with berries")
+
+        #expect(estimate.kilocalories == 420)
+        #expect(transport.requests.count == 2)
+    }
+
+    /// The bound on the paragraph above. Everything else is answered once and
+    /// reported, because a second attempt would spend the user's credit on a
+    /// failure that is not going to change its mind.
+    @Test("no other transport failure buys a second request")
+    func otherFailuresAreNotRetried() async throws {
+        let keys = try KeyFixture(provider: .mistral, secret: "0123456789abcdefghij")
+        defer { keys.tearDown(provider: .mistral) }
+
+        let transport = RecordingTransport.offline()
+        let client = MistralClient(transport: transport, keys: keys.source)
+
+        await #expect(throws: AIError.network) {
+            _ = try await client.estimate(text: "an apple")
+        }
+
+        #expect(transport.requests.count == 1)
+    }
+
     @Test("a cancelled scan is cancelled, not a retry")
     func cancelledScan() async throws {
         let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
@@ -588,8 +649,33 @@ struct AIErrorMappingTests {
             keys: keys.source
         )
 
-        await #expect(throws: AIError.network) {
+        await #expect(throws: AIError.providerRefused) {
             _ = try await client.estimate(text: "an apple")
+        }
+    }
+
+    /// The distinction the retry state used to hide. Both of these are a
+    /// retry to the user and the design draws one screen for them, but Fuel
+    /// now knows which it is looking at — and the sentence under that screen
+    /// claims the answer never came back, which is only true of one of them.
+    @Test("a provider that refused is told apart from an answer that never came")
+    func refusalIsNotSilence() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        // Anthropic's own "we are busy" status. The round trip completed.
+        let refused = AnthropicClient(
+            transport: RecordingTransport(status: 529, body: #"{"error":{"type":"overloaded_error"}}"#),
+            keys: keys.source
+        )
+        await #expect(throws: AIError.providerRefused) {
+            _ = try await refused.estimate(text: "an apple")
+        }
+
+        // A train tunnel. Nothing came back at all.
+        let silent = AnthropicClient(transport: RecordingTransport.offline(), keys: keys.source)
+        await #expect(throws: AIError.network) {
+            _ = try await silent.estimate(text: "an apple")
         }
     }
 
@@ -646,6 +732,68 @@ struct ReplyParsingTests {
         await #expect(throws: AIError.malformedResponse) {
             _ = try await client.estimate(text: "an apple")
         }
+    }
+
+    /// The finding behind this: a reply cut off at `max_tokens` is a 200 with
+    /// a well-formed envelope and half an object in it, so brace counting sees
+    /// no object and reports prose. The user is then told the answer did not
+    /// come back — when it did, and when the reason it is unusable is a number
+    /// in this repository rather than anything the model got wrong.
+    @Test("a reply cut off at the token ceiling says so, rather than reading as prose")
+    func truncationIsNamed() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let client = AnthropicClient(
+            transport: RecordingTransport(
+                status: 200,
+                body: Reply.anthropicOutOfTokens(#"{"title":"Porridge","kilocalories":420,"#)
+            ),
+            keys: keys.source
+        )
+
+        await #expect(throws: AIError.truncatedReply) {
+            _ = try await client.estimate(text: "an apple")
+        }
+    }
+
+    @Test("Mistral's own word for the token ceiling is read the same way")
+    func mistralTruncationIsNamed() async throws {
+        let keys = try KeyFixture(provider: .mistral, secret: "0123456789abcdefghij")
+        defer { keys.tearDown(provider: .mistral) }
+
+        let client = MistralClient(
+            transport: RecordingTransport(
+                status: 200,
+                body: Reply.mistralOutOfTokens(#"{"title":"Porridge","kilocalories":420,"#)
+            ),
+            keys: keys.source
+        )
+
+        await #expect(throws: AIError.truncatedReply) {
+            _ = try await client.estimate(text: "an apple")
+        }
+    }
+
+    /// The other half of the rule: a model that finished its object and was
+    /// cut off writing the newline after it has still answered, and the user
+    /// has already paid for it. The signal never overrides a reply that parses.
+    @Test("a complete answer that reports the ceiling is still an estimate")
+    func truncationSignalDoesNotDiscardAGoodAnswer() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let client = AnthropicClient(
+            transport: RecordingTransport(
+                status: 200,
+                body: Reply.anthropicOutOfTokens(Reply.goodEstimate)
+            ),
+            keys: keys.source
+        )
+
+        let estimate = try await client.estimate(text: "porridge with berries")
+
+        #expect(estimate.kilocalories == 420)
     }
 
     @Test("missing macros are reported rather than silently zeroed")
@@ -975,6 +1123,7 @@ struct RequestShapeTests {
         let body = try #require(request.httpBody)
         let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
         #expect(json["model"] as? String == "claude-sonnet-5")
+        #expect(json["max_tokens"] as? Int == EstimateContract.maxTokens)
     }
 
     @Test("Mistral gets a bearer token and no x-api-key")
@@ -994,6 +1143,10 @@ struct RequestShapeTests {
         #expect(request.url?.absoluteString == "https://api.mistral.ai/v1/chat/completions")
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer \(Self.mistralSecret)")
         #expect(request.value(forHTTPHeaderField: "x-api-key") == nil)
+
+        let body = try #require(request.httpBody)
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(json["max_tokens"] as? Int == EstimateContract.maxTokens)
     }
 
     /// The regression this whole suite is most worth having.
@@ -1175,7 +1328,7 @@ struct KeyCheckTests {
             )
         )
 
-        #expect(await client.checkKey(APIKey("0123456789abcdefghij")) == .failed(.network))
+        #expect(await client.checkKey(APIKey("0123456789abcdefghij")) == .failed(.providerRefused))
     }
 
     @Test("a lost connection fails the check as a retry, not as a verdict")

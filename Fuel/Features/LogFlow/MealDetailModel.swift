@@ -86,6 +86,18 @@ final class MealDetailModel {
 
     private var estimation: Task<Void, Never>?
 
+    /// Which re-analysis the screen is currently listening to.
+    ///
+    /// **Cancelling a `Task` does not stop the answer it is already waiting
+    /// on.** A request suspended inside `URLSession` keeps its socket open
+    /// until the provider replies, so a re-analysis the user cancelled comes
+    /// back whenever the network is done with it — and writes to `stage`. If a
+    /// second one has been started in the meantime, the first one's late
+    /// arrival lands on it: it puts the screen back on the meal, or a failure
+    /// over a request that is still in flight. The same guard is in both log
+    /// modes, for the same reason.
+    private var currentRun = 0
+
     /// `nil` when there is no such meal — it was deleted on another screen, or
     /// the store cannot be read. A failable initialiser rather than an empty
     /// screen, because there is no drawn state for a detail screen with no
@@ -197,14 +209,25 @@ final class MealDetailModel {
         }
 
         stage = .analysing(.analysingMeal)
-        estimation = Task { [weak self] in await self?.rerun(described) }
+        estimation?.cancel()
+        currentRun += 1
+        let run = currentRun
+        estimation = Task { [weak self] in await self?.rerun(described, as: run) }
     }
 
-    /// The `CANCEL` under the progress bar. The request comes back as
-    /// `AIError.cancelled`, which `AnalysisFailure` refuses to build, and the
-    /// screen returns to the meal with its edits intact.
+    /// The `CANCEL` under the progress bar.
+    ///
+    /// **Cancelling the task is not enough.** `Task.cancel()` does not stop a
+    /// request already waiting on a socket, so leaving the run current meant a
+    /// request that completed in the window between the tap and the
+    /// continuation resuming still passed `isCurrent` — and wrote a fresh
+    /// estimate over a meal the user had just stopped re-analysing. Retiring
+    /// the run closes that window; the screen returns to the meal with its
+    /// edits intact either way.
     func cancelReanalysis() {
         estimation?.cancel()
+        currentRun += 1
+        stage = .detail
     }
 
     /// The retry state's action: the same request from the top.
@@ -221,14 +244,14 @@ final class MealDetailModel {
 
     // MARK: - The request
 
-    private func rerun(_ described: String) async {
+    private func rerun(_ described: String, as run: Int) async {
         do {
-            let estimate = try await stepping(described)
+            let estimate = try await stepping(described, as: run)
 
             try Task.checkCancellation()
-            writeBack(estimate)
+            writeBack(estimate, as: run)
         } catch {
-            fail(with: error)
+            fail(with: error, as: run)
         }
     }
 
@@ -239,8 +262,8 @@ final class MealDetailModel {
     /// the pacing out into something all three share would rewrite both of
     /// them, and both are being reviewed by someone else. It is a refactor for
     /// the owner to call, not one to slip into a feature.
-    private func stepping(_ described: String) async throws -> MealEstimate {
-        let stepper = Task { [weak self] in await self?.walkSteps() }
+    private func stepping(_ described: String, as run: Int) async throws -> MealEstimate {
+        let stepper = Task { [weak self] in await self?.walkSteps(as: run) }
         do {
             let estimate = try await client.estimate(text: described)
             // Awaited rather than only cancelled, so a step cannot land on the
@@ -257,10 +280,20 @@ final class MealDetailModel {
 
     /// Walks steps two to four. The first is set the moment `Re-analyse` is
     /// tapped, and the fourth is held until the answer arrives.
-    private func walkSteps() async {
+    ///
+    /// **Guarded by run identity, not only by its own cancellation.** This
+    /// task is unstructured — `stepping()` creates it with a bare `Task { }`,
+    /// not a child task — so cancelling the re-analysis that owns it does not
+    /// cancel it. `isCurrent(run)` closes the window `Task.isCancelled` alone
+    /// cannot: `currentRun` is bumped synchronously the moment a run is
+    /// superseded or the user cancels, before any cancellation has had a
+    /// chance to propagate to this task. Both checks are kept — the other one
+    /// still stops a stepper whose own request has simply finished. The same
+    /// guard is in both log modes, for the same reason.
+    private func walkSteps(as run: Int) async {
         for step in AnalysisStep.allCases.dropFirst() {
             await pace()
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, isCurrent(run) else { return }
             stage = .analysing(step)
         }
     }
@@ -274,7 +307,8 @@ final class MealDetailModel {
     /// Today. A refused write lands on the retry state with the edits still in
     /// place, so the footer still reads `Re-analyse` and nothing has been lost
     /// — at the cost of a second request if they take it.
-    private func writeBack(_ estimate: MealEstimate) {
+    private func writeBack(_ estimate: MealEstimate, as run: Int) {
+        guard isCurrent(run) else { return }
         do {
             try store.update(
                 entry,
@@ -284,7 +318,9 @@ final class MealDetailModel {
                 items: estimate.items
             )
         } catch {
-            stage = .failed(.retry)
+            // `.device`: the estimate arrived and it is the store that
+            // refused it. Nothing about the request went wrong.
+            stage = .failed(.retry(.device))
             return
         }
         // Keeps the label, whether the user set it, and the favourite mark.
@@ -292,7 +328,16 @@ final class MealDetailModel {
         stage = .detail
     }
 
-    private func fail(with error: any Error) {
+    /// Whether `run` is still the re-analysis the screen is waiting for.
+    private func isCurrent(_ run: Int) -> Bool {
+        run == currentRun
+    }
+
+    private func fail(with error: any Error, as run: Int) {
+        // A run that is no longer the current one says nothing at all. Its
+        // failure belongs to a request the user has already left behind, and
+        // acting on it here would take the one that replaced it with it.
+        guard isCurrent(run) else { return }
         // The clients throw `AIError` already; `transportFailure` is here for
         // the structured-concurrency cancellation that can arrive around them.
         let aiError = (error as? AIError) ?? AIError.transportFailure(error)
@@ -321,6 +366,7 @@ final class MealDetailModel {
     func delete() -> Bool {
         // A re-analysis in flight is about to be about a meal that is gone.
         estimation?.cancel()
+        currentRun += 1
         estimation = nil
         do {
             try store.delete(entry)

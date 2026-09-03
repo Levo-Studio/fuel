@@ -41,10 +41,52 @@ nonisolated enum AnalysisFailure: Equatable, Sendable {
     /// response body.
     case noCredit(billingPage: URL)
 
-    /// Everything else worth showing: a lost connection, a reply Fuel could
-    /// not read, a photo too large to send, a camera that did not deliver a
-    /// frame.
-    case retry
+    /// Everything else worth showing: a lost connection, a provider that
+    /// refused, a reply Fuel could not read, a photo too large to send, a
+    /// camera that did not deliver a frame.
+    ///
+    /// **It carries where it died, and the title above it now says so.** The
+    /// export draws one generic retry state with one wording, in the theme's
+    /// ordinary ink; the owner asked for the title in `FuelPalette.error` and
+    /// a plain-language cause line under it once this case existed to make
+    /// that honest. `AnalysisCopy.failureHint` reads the origin and chooses
+    /// one of four fixed sentences — never a provider's own words, never a
+    /// status code — so what used to be a single undifferentiated screen for
+    /// four different failures is now telling the user which of the four it
+    /// was, in words a non-technical reader can act on.
+    case retry(Origin)
+
+    // MARK: - Origin
+
+    /// How far a retryable failure got before it died.
+    ///
+    /// Four, because they are four different investigations, and because the
+    /// one sentence the design draws is honest about exactly one of them.
+    nonisolated enum Origin: Equatable, Sendable {
+
+        /// It never left the device: a photo too large to send, a camera that
+        /// did not deliver a frame, a store that refused a write.
+        ///
+        /// **Reachable, and not by the rare one of the three.** A photo over
+        /// `MealPhotoCompressor.maximumBytes` is the pathological case the
+        /// type itself says it is, but the camera failing to deliver a frame
+        /// — `CameraLogModel.capture()`'s own catch — and a re-analysis the
+        /// store refused to write — `MealDetailModel.writeBack()`'s — are
+        /// ordinary hardware and disk failures with nothing rare about them.
+        case device
+
+        /// It was sent and nothing came back — no route, a dropped
+        /// connection, a timeout.
+        case transport
+
+        /// The provider answered and refused: a `429`, a `500`, an
+        /// `overloaded_error`, a `404` for a model id.
+        case provider
+
+        /// The provider answered with an estimate Fuel could not read —
+        /// prose, a wrong shape, or a reply cut off at the token ceiling.
+        case reply
+    }
 
     /// `nil` for a cancelled scan.
     ///
@@ -62,8 +104,14 @@ nonisolated enum AnalysisFailure: Equatable, Sendable {
             self = .invalidKey
         case .noCredit(_, let billingPage):
             self = .noCredit(billingPage: billingPage)
-        case .network, .malformedResponse, .imageTooLarge:
-            self = .retry
+        case .network:
+            self = .retry(.transport)
+        case .providerRefused:
+            self = .retry(.provider)
+        case .malformedResponse, .truncatedReply:
+            self = .retry(.reply)
+        case .imageTooLarge:
+            self = .retry(.device)
         }
     }
 }

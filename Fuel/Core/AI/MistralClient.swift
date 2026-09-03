@@ -36,7 +36,6 @@ nonisolated struct MistralClient: AIClient {
 
     private static let baseURL = URL(string: "https://api.mistral.ai")!
 
-    private static let maxTokens = 1024
 
     private let transport: any HTTPTransport
     private let keys: ProviderKeySource
@@ -76,7 +75,7 @@ nonisolated struct MistralClient: AIClient {
         Self.authorise(&request, with: key)
 
         do {
-            let response = try await transport.send(request)
+            let response = try await transport.sendRetryingALostConnection(request)
             guard (200..<300).contains(response.statusCode) else {
                 return .failed(
                     AIError.from(status: response.statusCode, body: response.body, provider: provider)
@@ -119,7 +118,7 @@ nonisolated struct MistralClient: AIClient {
     private func complete(userContent: [[String: Any]], mode: AILogMode) async throws -> MealEstimate {
         let body: [String: Any] = [
             "model": Self.model,
-            "max_tokens": Self.maxTokens,
+            "max_tokens": EstimateContract.maxTokens,
             // Asked for as well as prompted for. It is not a guarantee — the
             // parser assumes nothing — but it costs nothing and removes the
             // most common way a reply arrives unusable, which is a code fence.
@@ -148,7 +147,7 @@ nonisolated struct MistralClient: AIClient {
 
         let response: HTTPResponse
         do {
-            response = try await transport.send(request)
+            response = try await transport.sendRetryingALostConnection(request)
         } catch {
             throw AIError.transportFailure(error)
         }
@@ -157,7 +156,13 @@ nonisolated struct MistralClient: AIClient {
             throw AIError.from(status: response.statusCode, body: response.body, provider: provider)
         }
 
-        return try EstimateContract.estimate(from: Self.replyText(in: response.body), mode: mode)
+        do {
+            return try EstimateContract.estimate(from: Self.replyText(in: response.body), mode: mode)
+        } catch {
+            // Same reasoning as the Anthropic client: asked only once the reply
+            // has already failed to parse.
+            throw Self.ranOutOfTokens(response.body) ? AIError.truncatedReply : error
+        }
     }
 
     // MARK: - Request
@@ -169,6 +174,19 @@ nonisolated struct MistralClient: AIClient {
     }
 
     // MARK: - Response
+
+    /// Whether the model stopped because it hit `max_tokens` rather than
+    /// because it had finished. Mistral's word for it is `length`, on the
+    /// choice rather than on the envelope.
+    private static func ranOutOfTokens(_ body: Data) -> Bool {
+        guard
+            let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
+            let choices = object["choices"] as? [[String: Any]]
+        else {
+            return false
+        }
+        return choices.first?["finish_reason"] as? String == "length"
+    }
 
     /// Pulls the assistant's text out of a chat-completions response.
     ///

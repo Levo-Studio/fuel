@@ -24,10 +24,6 @@ nonisolated struct AnthropicClient: AIClient {
 
     private static let messagesURL = URL(string: "https://api.anthropic.com/v1/messages")!
 
-    /// Enough for one meal's JSON with a generous breakdown, and short enough
-    /// that a model which starts writing prose instead runs out rather than
-    /// billing the user for an essay.
-    private static let maxTokens = 1024
 
     private let transport: any HTTPTransport
     private let keys: ProviderKeySource
@@ -73,7 +69,7 @@ nonisolated struct AnthropicClient: AIClient {
         }
 
         do {
-            let response = try await transport.send(request)
+            let response = try await transport.sendRetryingALostConnection(request)
             guard (200..<300).contains(response.statusCode) else {
                 return .failed(
                     AIError.from(status: response.statusCode, body: response.body, provider: provider)
@@ -121,7 +117,7 @@ nonisolated struct AnthropicClient: AIClient {
     private func complete(content: [[String: Any]], mode: AILogMode) async throws -> MealEstimate {
         let body: [String: Any] = [
             "model": Self.model,
-            "max_tokens": Self.maxTokens,
+            "max_tokens": EstimateContract.maxTokens,
             "system": EstimateContract.systemPrompt,
             "messages": [["role": "user", "content": content]]
         ]
@@ -136,7 +132,7 @@ nonisolated struct AnthropicClient: AIClient {
 
         let response: HTTPResponse
         do {
-            response = try await transport.send(request)
+            response = try await transport.sendRetryingALostConnection(request)
         } catch {
             throw AIError.transportFailure(error)
         }
@@ -145,7 +141,14 @@ nonisolated struct AnthropicClient: AIClient {
             throw AIError.from(status: response.statusCode, body: response.body, provider: provider)
         }
 
-        return try EstimateContract.estimate(from: Self.replyText(in: response.body), mode: mode)
+        do {
+            return try EstimateContract.estimate(from: Self.replyText(in: response.body), mode: mode)
+        } catch {
+            // Asked only once the reply has already failed to parse. A model
+            // that finished its object and was cut off writing the newline
+            // after it has still answered, and the user has paid for it.
+            throw Self.ranOutOfTokens(response.body) ? AIError.truncatedReply : error
+        }
     }
 
     // MARK: - Request
@@ -171,6 +174,20 @@ nonisolated struct AnthropicClient: AIClient {
     }
 
     // MARK: - Response
+
+    /// Whether the model stopped because it hit `max_tokens` rather than
+    /// because it had finished.
+    ///
+    /// A truncated reply is unbalanced JSON, so `EstimateContract` reports it
+    /// as prose or a wrong shape — the two things it cannot be. `stop_reason`
+    /// is the one field that says which, and it was being thrown away with the
+    /// rest of the envelope.
+    private static func ranOutOfTokens(_ body: Data) -> Bool {
+        guard let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else {
+            return false
+        }
+        return object["stop_reason"] as? String == "max_tokens"
+    }
 
     /// Pulls the assistant's text out of a Messages response.
     ///

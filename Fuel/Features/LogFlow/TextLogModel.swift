@@ -97,6 +97,24 @@ final class TextLogModel {
     /// The running estimate, so `CANCEL` can stop it.
     private var estimation: Task<Void, Never>?
 
+    /// Which estimate the model is currently listening to.
+    ///
+    /// **Cancelling a `Task` does not stop the answer it is already waiting
+    /// on.** A request suspended inside `URLSession` keeps its socket open
+    /// until the provider replies or the connection drops, so a scan the user
+    /// cancelled goes on running for as long as the network takes — and then
+    /// comes back and writes to `stage`. If a second estimate has been started
+    /// in the meantime, the first one's late arrival lands on it: its
+    /// `.cancelled` runs `dismissFailure()`, which cancels the request that
+    /// replaced it and puts the user back in the field with no explanation, and
+    /// its `.network` puts a failure over an estimate that is still in flight.
+    ///
+    /// Every run takes a number, and `present`, `represent` and `fail` refuse
+    /// to act for a number that is no longer the current one. Cheap, and it is
+    /// the only thing that can tell two runs apart — a `Task` handle cannot,
+    /// because the stale one is the handle that was overwritten.
+    private var currentRun = 0
+
     /// Whether the request in flight is a re-estimate of an edited breakdown
     /// rather than the sentence the user typed.
     ///
@@ -166,17 +184,50 @@ final class TextLogModel {
 
         enteredAt = now()
         stage = .analysing(.analysingMeal)
-        estimation = Task { [weak self] in await self?.run(described) }
+        estimation = start { [weak self] run in await self?.run(described, as: run) }
+    }
+
+    /// Starts a run, retires whatever was running before it, and hands the new
+    /// run its number.
+    ///
+    /// The previous task is cancelled as well as retired. Retiring alone would
+    /// keep it from writing anything, which is the correctness half; cancelling
+    /// is the half that stops the user paying for an answer nobody will read.
+    private func start(_ work: @escaping @MainActor (Int) async -> Void) -> Task<Void, Never> {
+        estimation?.cancel()
+        currentRun += 1
+        let run = currentRun
+        return Task { await work(run) }
+    }
+
+    /// Whether `run` is still the estimate the screen is waiting for.
+    private func isCurrent(_ run: Int) -> Bool {
+        run == currentRun
+    }
+
+    /// Retires whatever is running, so nothing it comes back with is acted on.
+    private func retireRun() {
+        estimation?.cancel()
+        currentRun += 1
     }
 
     /// The `CANCEL` control under the progress bar.
     ///
-    /// Cancelling the task is enough: the request comes back as
-    /// `AIError.cancelled`, which `AnalysisFailure` refuses to build, and the
-    /// flow returns to the field without saying anything. The sentence is
-    /// still in it.
+    /// **Cancelling the task is not enough, and relying on it was a hole in
+    /// the run numbering.** `Task.cancel()` does not stop a request that is
+    /// already waiting on a socket, so the old code left the run current and
+    /// waited for it to come back as `AIError.cancelled`. A request that
+    /// happened to complete in the window between the tap and the
+    /// continuation resuming still passed `isCurrent`, and presented a result
+    /// over a cancel the user had just made.
+    ///
+    /// Retiring the run closes that window: from the tap onwards nothing that
+    /// request comes back with is acted on, whichever way it lands. Where the
+    /// user goes next is the same question as where dismissing a failure
+    /// takes them, and has the same answer.
     func cancelEstimate() {
-        estimation?.cancel()
+        retireRun()
+        dismissFailure()
     }
 
     /// The retry state's action: the same request as the one that failed, from
@@ -222,30 +273,30 @@ final class TextLogModel {
 
         isReanalysing = true
         stage = .analysing(.analysingMeal)
-        estimation = Task { [weak self] in await self?.rerun(described) }
+        estimation = start { [weak self] run in await self?.rerun(described, as: run) }
     }
 
     // MARK: - The estimate
 
-    private func run(_ described: String) async {
+    private func run(_ described: String, as run: Int) async {
         do {
-            let estimate = try await stepping(described)
+            let estimate = try await stepping(described, as: run)
 
             try Task.checkCancellation()
-            present(estimate)
+            present(estimate, as: run)
         } catch {
-            fail(with: error)
+            fail(with: error, as: run)
         }
     }
 
-    private func rerun(_ described: String) async {
+    private func rerun(_ described: String, as run: Int) async {
         do {
-            let estimate = try await stepping(described)
+            let estimate = try await stepping(described, as: run)
 
             try Task.checkCancellation()
-            represent(estimate)
+            represent(estimate, as: run)
         } catch {
-            fail(with: error)
+            fail(with: error, as: run)
         }
     }
 
@@ -254,8 +305,8 @@ final class TextLogModel {
     /// Shared by the first estimate and the re-analysis because the export
     /// draws one set of four states and says nothing about what is being
     /// waited on.
-    private func stepping(_ described: String) async throws -> MealEstimate {
-        let stepper = Task { [weak self] in await self?.walkSteps() }
+    private func stepping(_ described: String, as run: Int) async throws -> MealEstimate {
+        let stepper = Task { [weak self] in await self?.walkSteps(as: run) }
         do {
             let estimate = try await client.estimate(text: described)
             // Awaited rather than only cancelled, so a step cannot land on the
@@ -272,15 +323,34 @@ final class TextLogModel {
 
     /// Walks steps two to four. The first is set the moment `Analyse` is
     /// tapped, and the fourth is held until the answer arrives.
-    private func walkSteps() async {
+    ///
+    /// **Guarded by run identity, not only by its own cancellation.** This
+    /// task is unstructured — `stepping()` creates it with a bare `Task { }`,
+    /// not a child task — so cancelling the estimate that owns it does not
+    /// cancel it. The only thing that reliably stops it is `stepper.cancel()`
+    /// in `stepping()`, called once that estimate's request has resolved, and
+    /// there is a window before that where a superseded run's stepper is
+    /// still ticking. `isCurrent(run)` is checked separately from
+    /// `Task.isCancelled` for that window: `currentRun` is bumped
+    /// synchronously the moment a run is superseded, before any cancellation
+    /// has had a chance to propagate, so it closes the window the other check
+    /// cannot. Both are kept — `Task.isCancelled` still stops a stepper whose
+    /// own request has simply finished.
+    ///
+    /// Bounded and cosmetic on its own — every stage this can still write is
+    /// an analysing step, and both the run it belongs to and the one that
+    /// replaced it are showing the same four screens — but it was the one
+    /// stage writer the run numbering elsewhere in this file did not reach.
+    private func walkSteps(as run: Int) async {
         for step in AnalysisStep.allCases.dropFirst() {
             await pace()
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, isCurrent(run) else { return }
             stage = .analysing(step)
         }
     }
 
-    private func present(_ estimate: MealEstimate) {
+    private func present(_ estimate: MealEstimate, as run: Int) {
+        guard isCurrent(run) else { return }
         draft = MealResultDraft(
             title: estimate.title,
             kilocalories: estimate.kilocalories,
@@ -295,15 +365,20 @@ final class TextLogModel {
 
     /// Puts a re-estimate over the draft, keeping the label and the favourite
     /// mark the user set on it.
-    private func represent(_ estimate: MealEstimate) {
-        guard var draft else { return present(estimate) }
+    private func represent(_ estimate: MealEstimate, as run: Int) {
+        guard isCurrent(run) else { return }
+        guard var draft else { return present(estimate, as: run) }
         draft.replaceEstimate(with: estimate)
         self.draft = draft
         isReanalysing = false
         stage = .result
     }
 
-    private func fail(with error: any Error) {
+    private func fail(with error: any Error, as run: Int) {
+        // A run that is no longer the current one says nothing at all. Its
+        // failure belongs to a request the user has already left behind, and
+        // acting on it here would take the one that replaced it with it.
+        guard isCurrent(run) else { return }
         // The clients throw `AIError` already; `transportFailure` is here for
         // the structured-concurrency cancellation that can arrive around them.
         let aiError = (error as? AIError) ?? AIError.transportFailure(error)
@@ -409,7 +484,7 @@ final class TextLogModel {
     /// `‹ Back` from the result, and a cancelled estimate: the draft goes, the
     /// sentence stays, and the user is back in the field they wrote it in.
     func returnToEntry() {
-        estimation?.cancel()
+        retireRun()
         estimation = nil
         isReanalysing = false
         draft = nil
