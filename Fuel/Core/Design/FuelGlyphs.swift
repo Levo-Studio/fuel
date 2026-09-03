@@ -7,10 +7,12 @@ import SwiftUI
 /// done row of Today's get-started checklist carries.
 ///
 /// It lives in the design layer rather than beside one of its call sites
-/// because two screens now draw it — the key test on screen 03, and the
-/// get-started checklist that stands in for an empty day on Today — and a mark
-/// copied into a second feature is a mark that can be corrected in one place
-/// and left wrong in the other.
+/// because two things now carry it — a completed key-test step, and a done row
+/// of the get-started checklist Today draws in place of an empty day — and a
+/// mark copied into a second feature is a mark that can be corrected in one
+/// place and left wrong in the other. Only the first of the two is a drawn
+/// screen: the export has no empty state, so the checklist recomposes this
+/// mark rather than reproducing a frame that uses it.
 ///
 /// The three points are the path's own coordinates, which is why they sit here
 /// as numbers rather than in `FuelMetrics`: they describe the shape of a mark,

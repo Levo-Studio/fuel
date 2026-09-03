@@ -22,8 +22,8 @@ private nonisolated func checklist(
 
 /// The get-started checklist's rules, one at a time.
 ///
-/// Each done state is pinned on its own rather than through a single "all four"
-/// case, because the failure worth catching is one answer wired to the wrong
+/// Each done state is pinned on its own rather than through a single "all
+/// three" case, because the failure worth catching is one answer wired to the
 /// row — which an all-true and an all-false case would both pass.
 @Suite("Today getting started")
 struct TodayGettingStartedTests {

@@ -122,11 +122,11 @@ final class RootShellModel {
 
     /// What Today draws in the day list's place while the day is empty.
     ///
-    /// Recomputed with `today` and never separately. Its four answers are read
-    /// from four different places — the Keychain, the store twice, and the
-    /// preferences — and every one of them can be changed behind a presented
-    /// cover, so the moment they are all read is the moment the cover goes
-    /// away.
+    /// Recomputed with `today` and never separately. Its three answers come
+    /// from two places — the preferences hold the theme and the accent, and the
+    /// store answers whether a meal was ever logged — and all three can change
+    /// behind a presented cover, so the moment they are read is the moment the
+    /// cover goes away.
     private(set) var gettingStarted: TodayGettingStarted
 
     /// The onboarding flow's own state, built once so a re-render of the shell
