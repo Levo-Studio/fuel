@@ -63,4 +63,39 @@ struct LogFlowChromeTests {
         #expect(LogFlowChrome.colorScheme(camera: .viewfinder, text: .result, theme: .light) == .light)
         #expect(LogFlowChrome.colorScheme(camera: .viewfinder, text: .result, theme: .dark) == .dark)
     }
+
+    // MARK: - Keyboard
+
+    /// The one arrangement in which a field is on screen: the text mode's own
+    /// entry screen, in the text tab.
+    @Test("the entry screen in its own tab is the one place the field is reachable")
+    func entryHoldsFocus() {
+        #expect(LogFlowChrome.canHoldTextFocus(stage: .entry, tab: .text))
+    }
+
+    /// The owner's report: the keyboard stood over screens 08 to 11 and over
+    /// the result. Every one of these stages draws a screen with no field on
+    /// it, so none of them may go on holding one.
+    @Test(
+        "no stage past the entry screen may hold the keyboard",
+        arguments: [
+            TextLogModel.Stage.analysing(.analysingMeal),
+            .analysing(.identifyingIngredients),
+            .analysing(.estimatingAmounts),
+            .analysing(.calculatingNutrition),
+            .failed(.retry),
+            .result,
+            .noKey
+        ]
+    )
+    func onlyTheEntryScreenHoldsFocus(stage: TextLogModel.Stage) {
+        #expect(LogFlowChrome.canHoldTextFocus(stage: stage, tab: .text) == false)
+    }
+
+    /// Walking to another log mode with the field still open. The entry screen
+    /// is still the text mode's stage; it is simply no longer on show.
+    @Test("another tab does not hold the keyboard", arguments: [LogFlowTab.camera, .recent])
+    func anotherTabDoesNotHoldFocus(tab: LogFlowTab) {
+        #expect(LogFlowChrome.canHoldTextFocus(stage: .entry, tab: tab) == false)
+    }
 }

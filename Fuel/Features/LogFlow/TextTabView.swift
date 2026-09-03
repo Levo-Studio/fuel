@@ -17,6 +17,14 @@ struct TextTabView: View {
     /// buys, so the field goes with it and the tab says why.
     let isEstimateAvailable: Bool
 
+    /// Whether the field is holding the keyboard.
+    ///
+    /// Bound rather than held here: the field outlives its own screen — the
+    /// scaffold stays in the hierarchy under the analysis and result overlays
+    /// — so whoever knows the stage has to be able to let it go. See
+    /// `LogFlowChrome.canHoldTextFocus`.
+    @FocusState.Binding var isWriting: Bool
+
     let onAnalyse: () -> Void
 
     /// Which example the empty field is showing. View state, and it never
@@ -81,6 +89,7 @@ struct TextTabView: View {
         TextField("", text: $typedText, prompt: prompt, axis: .vertical)
             .fuelStyle(FuelTypography.textEntry)
             .foregroundStyle(FuelPalette.Camera.ink)
+            .focused($isWriting)
             // The caret, not a drawn value: the export renders no cursor. The
             // camera surface stays dark in both themes, so the theme's accent
             // is not guaranteed to be legible on it and the surface's own ink
@@ -177,33 +186,51 @@ struct TextTabView: View {
 
 #Preview("Text entry") {
     @Previewable @State var typedText = ""
+    @Previewable @FocusState var isWriting: Bool
 
     ZStack {
         FuelPalette(theme: .dark, accent: .mono).camera
             .ignoresSafeArea()
 
-        TextTabView(typedText: $typedText, isEstimateAvailable: true, onAnalyse: {})
+        TextTabView(
+            typedText: $typedText,
+            isEstimateAvailable: true,
+            isWriting: $isWriting,
+            onAnalyse: {}
+        )
     }
 }
 
 #Preview("Text entry, written in") {
     @Previewable @State var typedText = "2 eggs with 200g cottage cheese and polenta"
+    @Previewable @FocusState var isWriting: Bool
 
     ZStack {
         FuelPalette(theme: .dark, accent: .mono).camera
             .ignoresSafeArea()
 
-        TextTabView(typedText: $typedText, isEstimateAvailable: true, onAnalyse: {})
+        TextTabView(
+            typedText: $typedText,
+            isEstimateAvailable: true,
+            isWriting: $isWriting,
+            onAnalyse: {}
+        )
     }
 }
 
 #Preview("Text entry without a key") {
     @Previewable @State var typedText = ""
+    @Previewable @FocusState var isWriting: Bool
 
     ZStack {
         FuelPalette(theme: .light, accent: .mono).camera
             .ignoresSafeArea()
 
-        TextTabView(typedText: $typedText, isEstimateAvailable: false, onAnalyse: {})
+        TextTabView(
+            typedText: $typedText,
+            isEstimateAvailable: false,
+            isWriting: $isWriting,
+            onAnalyse: {}
+        )
     }
 }
