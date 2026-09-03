@@ -373,7 +373,12 @@ struct TextLogTests {
         model.addItem("Olive oil, 1 tbsp")
         // The key goes away in Settings while the result screen is up.
         keys.hasKey = false
-        model.reanalyse()
+        // Driven through the helper, not through a bare `reanalyse()`: that
+        // returns before its task would have run, so the request count below
+        // would read 1 whether the guard was there or not and could never go
+        // red. Waiting the way a real re-analysis is waited on is what makes it
+        // an assertion.
+        await model.reanalysing()
 
         #expect(client.requests == 1)
         #expect(model.stage == .failed(.invalidKey))
