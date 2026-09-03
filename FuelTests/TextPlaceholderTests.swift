@@ -10,8 +10,9 @@ import UIKit
 /// not, and what advancing does.
 ///
 /// The examples are handed in rather than read from the catalog, so these are
-/// about the rules and not about English wording — with one exception, which
-/// says so.
+/// about the rules and not about English wording — except for the two that are
+/// rules about the copy itself, and say so: every example names an amount, and
+/// every example fits the drawn line at the largest text size.
 @Suite("Text entry placeholder")
 struct TextPlaceholderTests {
 
