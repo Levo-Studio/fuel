@@ -83,6 +83,22 @@ private nonisolated struct UnusedEstimator: AIClient {
     func estimate(text: String) async throws -> MealEstimate { throw AIError.cancelled }
 }
 
+/// A client whose estimate fails, which is how a test drives the text half into
+/// a stage the entry field is not.
+///
+/// It is the text mode's `FailingCamera`: what the shell is asked about is
+/// whether a flow reopens on that stage, never what the failure says.
+private nonisolated struct FailingEstimator: AIClient {
+
+    let provider: AIProvider = .claude
+
+    func checkKey(_ key: APIKey) async -> KeyCheckResult { .failed(.network) }
+
+    func estimate(photo: MealPhoto) async throws -> MealEstimate { throw AIError.network }
+
+    func estimate(text: String) async throws -> MealEstimate { throw AIError.network }
+}
+
 /// A camera that opens nothing and counts the one thing this suite asks about.
 ///
 /// Only `stop()` is counted. The shell never starts a session — the flow does
@@ -147,13 +163,15 @@ struct ShellTests {
     private func makeModel(
         store: FuelStore,
         preferences: SettingsPreferences? = nil,
-        makeCameraLog: @escaping RootShellModel.CameraLogFactory = ShellTests.stubCameraLog
+        makeCameraLog: @escaping RootShellModel.CameraLogFactory = ShellTests.stubCameraLog,
+        makeTextLog: @escaping RootShellModel.TextLogFactory = ShellTests.stubTextLog
     ) -> RootShellModel {
         RootShellModel(
             store: store,
             validator: UnusedValidator(),
             preferences: preferences ?? makePreferences(),
-            makeCameraLog: makeCameraLog
+            makeCameraLog: makeCameraLog,
+            makeTextLog: makeTextLog
         )
     }
 
@@ -166,6 +184,19 @@ struct ShellTests {
             camera: StubCamera(),
             keys: StubKeys(),
             provider: provider
+        )
+    }
+
+    /// The text half, with nothing behind it that could reach a provider or a
+    /// keychain. The steps are walked instantly: what this suite asks about is
+    /// which stage a reopened flow is on, not how long the bar takes.
+    private static let stubTextLog: RootShellModel.TextLogFactory = { store, provider in
+        TextLogModel(
+            store: store,
+            client: UnusedEstimator(),
+            keys: StubKeys(),
+            provider: provider,
+            pace: {}
         )
     }
 
@@ -330,6 +361,41 @@ struct ShellTests {
         #expect(model.cameraLog.photo == nil)
     }
 
+    /// The text half is rebuilt with the flow for the camera half's reason and
+    /// one more: it carries the sentence the user typed. A flow abandoned on a
+    /// failed estimate would otherwise reopen onto that failure, with the
+    /// abandoned meal still in the field.
+    @Test("A reopened flow is back at the text entry, with nothing left in the field")
+    func reopenedFlowResetsTheTextHalf() async throws {
+        let (store, _) = try makeTodayModel()
+        let model = makeModel(store: store) { store, provider in
+            ShellTests.stubCameraLog(store, provider)
+        } makeTextLog: { store, provider in
+            TextLogModel(
+                store: store,
+                client: FailingEstimator(),
+                keys: StubKeys(),
+                provider: provider,
+                pace: {}
+            )
+        }
+
+        model.openLogFlow()
+        model.textLog.typedText = "2 eggs with 200g cottage cheese and polenta"
+        model.textLog.analyse()
+        while case .analysing = model.textLog.stage {
+            await Task.yield()
+        }
+        #expect(model.textLog.stage == .failed(.retry))
+
+        model.dismissDestination()
+        model.openLogFlow()
+
+        #expect(model.textLog.stage == .entry)
+        #expect(model.textLog.typedText.isEmpty)
+        #expect(model.textLog.draft == nil)
+    }
+
     /// What this pins is the read: the provider a flow is built for is taken
     /// when the flow opens, not held from launch, so switching the segment on
     /// screen 16 and scanning straight afterwards is built for the provider
@@ -358,6 +424,33 @@ struct ShellTests {
         model.openLogFlow()
 
         #expect(providers.providers.last == .mistral)
+    }
+
+    /// One flow, one provider. The two halves are built from a single read, so
+    /// there is no window in which a camera tab talks to one provider and the
+    /// text tab beside it to another.
+    @Test("Both halves of a flow are built for the same provider")
+    func bothHalvesShareOneProvider() throws {
+        let (store, _) = try makeTodayModel()
+        let preferences = makePreferences()
+        let cameraProviders = ProviderLog()
+        let textProviders = ProviderLog()
+        let model = makeModel(store: store, preferences: preferences) { store, provider in
+            cameraProviders.record(provider)
+            return ShellTests.stubCameraLog(store, provider)
+        } makeTextLog: { store, provider in
+            textProviders.record(provider)
+            return ShellTests.stubTextLog(store, provider)
+        }
+
+        #expect(cameraProviders.providers == [.claude])
+        #expect(textProviders.providers == [.claude])
+
+        preferences.provider = .mistral
+        model.openLogFlow()
+
+        #expect(cameraProviders.providers == [.claude, .mistral])
+        #expect(textProviders.providers == cameraProviders.providers)
     }
 
     /// The session outliving the cover is the bug this closes: the flow stops
