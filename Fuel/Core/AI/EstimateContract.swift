@@ -352,7 +352,7 @@ private nonisolated struct EstimatePayload: Decodable {
                     approximateGrams: max(0, grams)
                 )
             case .text:
-                note = .text(amount: amount == "recognised" ? .recognised : .estimated)
+                note = .text(amount: Self.amountOrigin(from: amount))
             }
 
             return RecognisedItem(
@@ -360,6 +360,35 @@ private nonisolated struct EstimatePayload: Decodable {
                 kilocalories: max(0, kilocalories),
                 note: note
             )
+        }
+
+        /// Reads the `amount` field into the two states a typed row has.
+        ///
+        /// The question the field answers is only "was the amount written
+        /// down", and the default is `estimated` because claiming the user
+        /// stated something they did not is the worse of the two mistakes.
+        ///
+        /// Everything else here is spelling. Case and surrounding space are
+        /// not a different answer, and neither is the American `recognized`,
+        /// which a model writes without being asked. **`raw` is the one that
+        /// is new and the one that matters**: since the text instruction
+        /// began explaining raw weights, a model has an obvious word to reach
+        /// for, and the previous test — equality with `recognised` — would
+        /// have filed the most precisely stated amount in the sentence as an
+        /// estimate. A raw weight is an amount the user wrote down.
+        ///
+        /// It is deliberately *not* a third case on `RecognisedItem`. That is
+        /// where a raw amount belongs, so the row could say `raw 300 g` and
+        /// the user could see the shorthand was read rather than infer it —
+        /// but the row that would draw it lives in `Fuel/Features/LogFlow`,
+        /// and this branch does not touch that folder.
+        private static func amountOrigin(from raw: String?) -> RecognisedItem.AmountOrigin {
+            switch raw?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            case "recognised", "recognized", "raw", "raw weight", "raw_weight":
+                return .recognised
+            default:
+                return .estimated
+            }
         }
     }
 }

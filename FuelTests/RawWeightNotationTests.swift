@@ -228,3 +228,58 @@ struct RawWeightInstructionTests {
         #expect(EstimateContract.rawWeightConvention.contains("Never invent a difference"))
     }
 }
+
+// MARK: - Amount field
+
+/// How the `amount` field is read once the instruction has put the word `raw`
+/// in front of the model.
+@Suite("Stated amounts")
+struct StatedAmountTests {
+
+    private static func reply(amount: String) -> String {
+        """
+        {"title":"Rice","kilocalories":330,"protein_g":7,"carbs_g":73,"fat_g":1,\
+        "items":[{"name":"Rice (raw 100 g)","kilocalories":330,\
+        "amount":\(amount)}]}
+        """
+    }
+
+    private static func note(amount: String) throws -> RecognisedItem.Note {
+        let estimate = try EstimateContract.estimate(from: reply(amount: amount), mode: .text)
+        return try #require(estimate.items.first).note
+    }
+
+    /// The regression the instruction would otherwise have introduced: a model
+    /// that answers `raw` has been told the amount more precisely than
+    /// `recognised` ever said it, and reading that as an estimate would put
+    /// the least guessed row on the screen under the word for guessing.
+    @Test(
+        "a stated amount stays stated, however the model spells it",
+        arguments: [
+            "\"recognised\"",
+            "\"recognized\"",
+            "\"Recognised\"",
+            "\" recognised \"",
+            "\"raw\"",
+            "\"RAW\"",
+            "\"raw weight\"",
+            "\"raw_weight\""
+        ]
+    )
+    func statedAmounts(_ amount: String) throws {
+        #expect(try Self.note(amount: amount) == .text(amount: .recognised))
+    }
+
+    @Test(
+        "anything that does not say the amount was given reads as estimated",
+        arguments: [
+            "\"estimated\"",
+            "\"guessed\"",
+            "\"\"",
+            "null"
+        ]
+    )
+    func unstatedAmounts(_ amount: String) throws {
+        #expect(try Self.note(amount: amount) == .text(amount: .estimated))
+    }
+}
