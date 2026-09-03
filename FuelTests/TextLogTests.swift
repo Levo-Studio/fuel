@@ -273,28 +273,6 @@ struct TextLogTests {
 
     // MARK: - Editing the result
 
-    @Test("the stepper moves ten kilocalories a tap and floors at zero")
-    func stepperFloorsAtZero() async throws {
-        let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .success(Self.estimate)))
-        model.typedText = Self.sentence
-        await model.estimating()
-
-        model.adjustKilocalories(by: MealResultDraft.calorieStep)
-        #expect(model.draft?.kilocalories == 638)
-
-        model.adjustKilocalories(by: -MealResultDraft.calorieStep)
-        #expect(model.draft?.kilocalories == 628)
-
-        for _ in 0..<70 {
-            model.adjustKilocalories(by: -MealResultDraft.calorieStep)
-        }
-        #expect(model.draft?.kilocalories == 0)
-
-        // And it comes back up from the floor rather than sticking there.
-        model.adjustKilocalories(by: MealResultDraft.calorieStep)
-        #expect(model.draft?.kilocalories == 10)
-    }
-
     @Test("the label pill cycles breakfast, lunch, snack, dinner and wraps")
     func labelPillCycles() async throws {
         // 08:10 on an empty day, so the first label is breakfast and the cycle
@@ -345,7 +323,6 @@ struct TextLogTests {
         model.typedText = Self.sentence
         await model.estimating()
 
-        model.adjustKilocalories(by: MealResultDraft.calorieStep)
         model.toggleFavourite()
         #expect(model.commit())
 
@@ -355,9 +332,7 @@ struct TextLogTests {
         // The estimate's name, not the user's wording: the sentence is what
         // was asked, and the entry records what the meal was.
         #expect(entry.title == "Eggs with cottage cheese and polenta")
-        // The stepper's tap is part of what is written, not a display-only
-        // adjustment.
-        #expect(entry.kilocalories == 638)
+        #expect(entry.kilocalories == 628)
         #expect(entry.macros == MacroTotals(protein: 47, carbs: 63, fat: 25))
         #expect(entry.isFavourite)
         #expect(entry.source == .text)

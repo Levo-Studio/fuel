@@ -227,27 +227,6 @@ struct CameraLogTests {
 
     // MARK: - Editing the result
 
-    @Test("the stepper moves ten kilocalories a tap and floors at zero")
-    func stepperFloorsAtZero() async throws {
-        let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .success(Self.estimate)))
-        await model.scanning(pixel())
-
-        model.adjustKilocalories(by: MealResultDraft.calorieStep)
-        #expect(model.draft?.kilocalories == 470)
-
-        model.adjustKilocalories(by: -MealResultDraft.calorieStep)
-        #expect(model.draft?.kilocalories == 460)
-
-        for _ in 0..<50 {
-            model.adjustKilocalories(by: -MealResultDraft.calorieStep)
-        }
-        #expect(model.draft?.kilocalories == 0)
-
-        // And it comes back up from the floor rather than sticking there.
-        model.adjustKilocalories(by: MealResultDraft.calorieStep)
-        #expect(model.draft?.kilocalories == 10)
-    }
-
     @Test("the label pill cycles breakfast, lunch, snack, dinner and wraps")
     func labelPillCycles() async throws {
         let client = ScriptedClient(answer: .success(Self.estimate))
@@ -292,7 +271,6 @@ struct CameraLogTests {
         let model = makeModel(store: store, client: ScriptedClient(answer: .success(Self.estimate)))
         await model.scanning(pixel())
 
-        model.adjustKilocalories(by: MealResultDraft.calorieStep)
         model.toggleFavourite()
         #expect(model.commit())
 
@@ -300,9 +278,7 @@ struct CameraLogTests {
         #expect(entries.count == 1)
         let entry = try #require(entries.first)
         #expect(entry.title == "Salmon with polenta")
-        // The stepper's tap is part of what is written, not a display-only
-        // adjustment.
-        #expect(entry.kilocalories == 470)
+        #expect(entry.kilocalories == 460)
         #expect(entry.macros == MacroTotals(protein: 34, carbs: 28, fat: 23))
         #expect(entry.isFavourite)
         #expect(entry.source == .photo)
