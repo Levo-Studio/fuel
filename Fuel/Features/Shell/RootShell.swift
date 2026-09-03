@@ -84,10 +84,26 @@ struct RootShell: View {
                     onCancel: model.dismissDestination,
                     onLogged: model.dismissDestination
                 )
-                // The camera surface is `--cam` in both themes — Settings says
-                // so in words — so the status bar over it is forced light
-                // whatever the app's theme is. Without this a light-theme user
-                // gets dark status text on a near-black screen.
+                // The status bar is forced light because the export draws it
+                // light on exactly these screens. Every theme-following frame
+                // draws it `color:var(--ink)`; the three log-flow screens
+                // hard-code `#fafafa` over their `var(--cam)` frame — 07 the
+                // camera, 12 the text entry, 13 Recent. That is the export
+                // refusing to let the status bar follow the theme here, not an
+                // inference from the surface colour underneath it.
+                //
+                // Blanket over the whole cover, which is right only while the
+                // cover hosts flow chrome. Screens 14 and 15 draw
+                // `color:var(--ink)` on `var(--bg)` and carry `‹ Back` rather
+                // than `✕ Cancel` — they are result screens, not chrome — so
+                // the moment the result screen lands inside `LogFlowView` this
+                // becomes a light-theme bug, and it has to move in with the
+                // tabs that actually draw dark.
+                //
+                // It sits at this call site rather than beside `palette.camera`
+                // in `LogFlowScaffold`, where it belongs, only because that
+                // file is another branch's. Move it there once the two are in
+                // one tree; do not tidy it anywhere else.
                 .preferredColorScheme(.dark)
             case .settings:
                 if let counting = model.settingsCounting {
