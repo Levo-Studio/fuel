@@ -176,13 +176,13 @@ final class CameraLogModel {
     /// estimate the typed mode uses. There is no second request shape.
     ///
     /// **It only ever runs from a tap.** Nothing here is called when a draft
-    /// changes, and the guard on `hasItemEdits` means a second press after a
-    /// successful re-analysis is refused rather than charged for.
+    /// changes, and the guard on `canReanalyse` means a second press after a
+    /// successful re-analysis — or a press over a list with nothing left in it
+    /// — is refused rather than charged for.
     func reanalyse() {
-        guard let draft, draft.hasItemEdits else { return }
+        guard let draft, draft.canReanalyse else { return }
 
         let described = draft.itemSentence
-        guard !described.isEmpty else { return }
 
         // No key, no request — and the draft survives, because the failure
         // state this lands on returns to the result screen rather than

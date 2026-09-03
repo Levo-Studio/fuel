@@ -518,7 +518,17 @@ struct MealResultView<Lede: View>: View {
             .accessibilityValue(Text(MealResultCopy.kilocaloriesValue(item.kilocalories)))
             .accessibilityHint(Text(MealResultCopy.itemEditHint))
 
-            removeControl(item)
+            // Not drawn on the last remaining row, because there it cannot do
+            // anything — see `MealResultDraft.canRemoveItems`. **Hidden rather
+            // than inert**, and the choice is the one this screen has just been
+            // through: a control that is drawn and does nothing is the dead
+            // `Re-analyse` again, and the export gives no dimmed state to draw
+            // instead. Hiding it needs no value the design does not carry — the
+            // mark is an addition to a drawn row, so a row without it is the row
+            // the export actually draws, name and figure and nothing else.
+            if draft.canRemoveItems {
+                removeControl(item)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(alignment: .bottom) {

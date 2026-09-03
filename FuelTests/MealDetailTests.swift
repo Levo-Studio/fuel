@@ -23,27 +23,43 @@ struct MealDetailTests {
 
     /// A meal in the store, logged the way a photo scan logs one.
     @discardableResult
-    private func logMeal(in store: FuelStore, at moment: Date = at(19, 20)) throws -> FoodEntry {
+    private func logMeal(
+        in store: FuelStore,
+        at moment: Date = at(19, 20),
+        items: [RecognisedItem] = MealDetailTests.twoItems
+    ) throws -> FoodEntry {
         try store.log(
             title: "Salmon with polenta",
             kilocalories: 460,
             macros: MacroTotals(protein: 34, carbs: 28, fat: 23),
             loggedAt: moment,
             source: .photo,
-            items: [
-                RecognisedItem(
-                    name: "Salmon fillet, fried",
-                    kilocalories: 240,
-                    note: .photo(confidence: .confident, approximateGrams: 150)
-                ),
-                RecognisedItem(
-                    name: "Polenta",
-                    kilocalories: 150,
-                    note: .photo(confidence: .confident, approximateGrams: 180)
-                ),
-            ]
+            items: items
         )
     }
+
+    private static let twoItems = [
+        RecognisedItem(
+            name: "Salmon fillet, fried",
+            kilocalories: 240,
+            note: .photo(confidence: .confident, approximateGrams: 150)
+        ),
+        RecognisedItem(
+            name: "Polenta",
+            kilocalories: 150,
+            note: .photo(confidence: .confident, approximateGrams: 180)
+        ),
+    ]
+
+    /// A meal the model priced without splitting it much — the case where the
+    /// remove mark has nothing it is allowed to do.
+    private static let oneItem = [
+        RecognisedItem(
+            name: "Salmon fillet, fried",
+            kilocalories: 240,
+            note: .photo(confidence: .confident, approximateGrams: 150)
+        )
+    ]
 
     private func makeModel(
         entry: FoodEntry,
@@ -356,29 +372,61 @@ struct MealDetailTests {
         #expect(MealDetailCopy.discardEditsConfirmation.confirm != MealResultCopy.discardConfirmation.confirm)
     }
 
-    // MARK: - An emptied breakdown
+    // MARK: - The last row
 
-    /// The one the finding is about: removing every row used to leave a footer
-    /// reading `Re-analyse` that did nothing, with `Delete` — the whole point
-    /// of this screen — no longer on it.
+    /// The last row of a breakdown cannot be thrown out, so the state the
+    /// previous finding was about — an emptied list, a dead `Re-analyse`, and
+    /// `Delete` gone from the screen with it — cannot be reached at all.
     ///
-    /// `canReanalyse` is what the footer reads, so `false` here is `Delete`
-    /// being drawn. The request count is the other half: an emptied list is not
-    /// a list to send.
-    @Test("with every item removed the footer offers Delete and it works")
-    func emptiedListStillOffersDelete() async throws {
+    /// A refused removal marks nothing: the estimate is not stale, because
+    /// nothing happened to it.
+    @Test("the last row of a breakdown cannot be thrown out")
+    func theLastRowCannotBeRemoved() throws {
+        let store = try makeStore()
+        let entry = try logMeal(in: store, items: Self.oneItem)
+        let model = try makeModel(entry: entry, store: store, client: ScriptedClient(answer: .success(Self.reestimate)))
+
+        // What the row reads to decide whether to draw the remove mark at all.
+        #expect(model.draft.canRemoveItems == false)
+
+        let only = try #require(model.draft.items.first?.id)
+        model.removeItem(only)
+
+        #expect(model.draft.items.count == 1)
+        #expect(model.draft.hasItemEdits == false)
+        #expect(model.draft.canReanalyse == false)
+    }
+
+    @Test("the mark comes back as soon as there is more than one row")
+    func removingIsOfferedAgainWithTwoRows() throws {
         let store = try makeStore()
         let entry = try logMeal(in: store)
+        let model = try makeModel(entry: entry, store: store, client: ScriptedClient(answer: .success(Self.reestimate)))
+        #expect(model.draft.items.count == 2)
+        #expect(model.draft.canRemoveItems)
+
+        let polenta = try #require(model.draft.items.last?.id)
+        model.removeItem(polenta)
+
+        #expect(model.draft.items.count == 1)
+        #expect(model.draft.hasItemEdits)
+        // One row left, so the mark is gone and the list cannot go to nothing.
+        #expect(model.draft.canRemoveItems == false)
+    }
+
+    /// The reachability the finding asked for, from the other end: a meal whose
+    /// breakdown nobody has touched offers `Delete`, and it works.
+    @Test("a meal with one row still offers Delete and it works")
+    func singleRowMealStillOffersDelete() async throws {
+        let store = try makeStore()
+        let entry = try logMeal(in: store, items: Self.oneItem)
         let client = ScriptedClient(answer: .success(Self.reestimate))
         let model = try makeModel(entry: entry, store: store, client: client)
 
-        for item in model.draft.items {
-            model.removeItem(item.id)
-        }
-        #expect(model.draft.items.isEmpty)
-        #expect(model.draft.hasItemEdits)
+        let only = try #require(model.draft.items.first?.id)
+        model.removeItem(only)
 
-        // The footer is the caller's own action again, not the dead swap.
+        // The footer is the caller's own action, not the swap.
         #expect(model.draft.canReanalyse == false)
 
         // And a press that got through anyway sends nothing.
@@ -386,7 +434,6 @@ struct MealDetailTests {
         #expect(client.requests == 0)
         #expect(model.stage == .detail)
 
-        // Which leaves Delete reachable, and it works.
         #expect(model.delete())
         #expect(try store.entry(withID: entry.entryID) == nil)
     }
