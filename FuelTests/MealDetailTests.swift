@@ -468,6 +468,22 @@ struct MealDetailTests {
         #expect(MealDetailCopy.discardEditsConfirmation.confirm != MealResultCopy.discardConfirmation.confirm)
     }
 
+    // MARK: - Deleting the meal
+
+    /// The corner button's own confirmation — one sentence and two words, not
+    /// the edit-discard dialog's wording. The two are easy to reach for
+    /// interchangeably since both sit behind a destructive-looking control on
+    /// this same screen; this is what goes red if `deleteCorner` is ever
+    /// pointed at `discardEditsConfirmation` instead, or the other way round.
+    @Test("the delete confirmation is one sentence, with Delete and Keep as the two answers")
+    func deleteConfirmationCopy() {
+        #expect(MealDetailCopy.deleteTitle == "Delete this meal?")
+        #expect(MealDetailCopy.deleteConfirm == "Delete")
+        #expect(MealDetailCopy.deleteCancel == "Keep")
+        #expect(MealDetailCopy.deleteTitle != MealDetailCopy.discardEditsConfirmation.title)
+        #expect(MealDetailCopy.deleteCancel != MealDetailCopy.discardEditsConfirmation.cancel)
+    }
+
     // MARK: - The last row
 
     /// The last row of a breakdown cannot be thrown out, so the state the
