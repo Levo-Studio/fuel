@@ -2,21 +2,25 @@ import Foundation
 
 // MARK: - Copy
 
-/// Every word the camera half of the log flow prints: screen 07, the four
-/// analysis states, and the photo result.
+/// Every word screen 07 prints, and the two labels that make a result screen
+/// the photo one.
+///
+/// The analysis states and the failure states used to sit here too. They are
+/// not camera words — the text mode walks the same four steps and can fail the
+/// same three ways — so they live in `AnalysisCopy` beside the views that
+/// print them.
 ///
 /// Nothing here holds English text — each entry names a key in
 /// `Localizable.xcstrings`. Where a value is already uppercase it is because
 /// the export draws it uppercase and the style it is set in does *not*
-/// transform: `FuelTypography.overlayAction` and `overlayCaption` both say so.
-/// The keys whose style does transform — `eyebrow`, `flowLabel`,
-/// `sectionLabel` — keep their natural case here.
+/// transform: `FuelTypography.overlayCaption` says so. The keys whose style
+/// does transform — `flowLabel`, `sectionLabel` — keep their natural case
+/// here.
 ///
-/// Three groups of words have no counterpart in the export and are marked
-/// `Not in the export` in the catalog, the way Onboarding and Settings marked
-/// theirs: the keyless state, the analysis failures, and the accessibility
-/// labels. The export draws no disabled camera and no failed scan; both are
-/// built in its visual language because the app has to answer for them.
+/// The keyless state and the accessibility labels have no counterpart in the
+/// export and are marked `Not in the export` in the catalog, the way
+/// Onboarding and Settings marked theirs. The export draws no disabled camera;
+/// it is built in its visual language because the app has to answer for it.
 nonisolated enum CameraCopy {
 
     // MARK: - Screen 07
@@ -44,62 +48,6 @@ nonisolated enum CameraCopy {
 
     static var noKeyHint: String {
         String(localized: "camera.noKey.hint")
-    }
-
-    // MARK: - Screens 08 to 11
-
-    static func analysisStep(_ step: AnalysisStep) -> String {
-        switch step {
-        case .analysingMeal: String(localized: "camera.analysis.step.meal")
-        case .identifyingIngredients: String(localized: "camera.analysis.step.ingredients")
-        case .estimatingAmounts: String(localized: "camera.analysis.step.amounts")
-        case .calculatingNutrition: String(localized: "camera.analysis.step.nutrition")
-        }
-    }
-
-    static var analysisCancel: String {
-        String(localized: "camera.analysis.cancel")
-    }
-
-    /// What the bar is worth, spoken. The drawn quarter says nothing on its
-    /// own once it is read out away from the label under it.
-    static func analysisProgress(_ step: AnalysisStep) -> String {
-        let position = (AnalysisStep.allCases.firstIndex(of: step) ?? 0) + 1
-        return String(
-            format: String(localized: "camera.analysis.progress.value"),
-            position,
-            AnalysisStep.allCases.count
-        )
-    }
-
-    // MARK: - Failures
-
-    static func failureTitle(_ failure: AnalysisFailure) -> String {
-        switch failure {
-        case .invalidKey: String(localized: "camera.failure.invalidKey.title")
-        case .noCredit: String(localized: "camera.failure.noCredit.title")
-        case .retry: String(localized: "camera.failure.retry.title")
-        }
-    }
-
-    static func failureHint(_ failure: AnalysisFailure) -> String {
-        switch failure {
-        case .invalidKey: String(localized: "camera.failure.invalidKey.hint")
-        case .noCredit: String(localized: "camera.failure.noCredit.hint")
-        case .retry: String(localized: "camera.failure.retry.hint")
-        }
-    }
-
-    static var failureBilling: String {
-        String(localized: "camera.failure.noCredit.action")
-    }
-
-    static var failureRetry: String {
-        String(localized: "camera.failure.action.retry")
-    }
-
-    static var failureDismiss: String {
-        String(localized: "camera.failure.action.dismiss")
     }
 
     // MARK: - Screen 14

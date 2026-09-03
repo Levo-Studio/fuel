@@ -1,9 +1,38 @@
 import SwiftUI
 
+// MARK: - Backdrop
+
+/// What an analysis state is drawn over, and by the same token which log mode
+/// is being waited on.
+///
+/// The export draws the four analysis screens over the frozen photo, because
+/// the only mode that had run by screen 08 is the camera one. The bar, the
+/// step labels and the `CANCEL` under them say nothing about a photograph —
+/// they describe the work — so the text mode walks the same four states with
+/// nothing behind them but the surface screen 12 already sits on. What the
+/// export does not draw is a picture where there is none.
+enum AnalysisBackdrop {
+
+    /// The camera mode: the frame being analysed. `nil` in a preview, where
+    /// the hatch the export itself draws stands in.
+    case photo(UIImage?)
+
+    /// The text mode, which has no picture to freeze.
+    case text
+
+    var mode: AILogMode {
+        switch self {
+        case .photo: .photo
+        case .text: .text
+        }
+    }
+}
+
 // MARK: - Analysis
 
-/// Screens 08 to 11: the frozen frame, dimmed, with a quarter-filled bar and
-/// the current step over it.
+/// Screens 08 to 11: a quarter-filled bar and the current step, over whatever
+/// the backdrop puts behind them — the frozen frame, dimmed, after a photo;
+/// the bare camera surface after a typed sentence.
 ///
 /// **One screen rendered four times.** The export draws four frames, and the
 /// only difference between them is how much of the 120×2 bar is painted and
@@ -18,26 +47,24 @@ struct AnalysisView: View {
 
     let step: AnalysisStep
 
-    /// The frame being analysed. `nil` in a preview, where the hatch the
-    /// export itself draws stands in.
-    let photo: UIImage?
+    let backdrop: AnalysisBackdrop
 
     let onCancel: () -> Void
 
     var body: some View {
-        AnalysisSurface(photo: photo) {
+        AnalysisSurface(backdrop: backdrop) {
             VStack(alignment: .center, spacing: FuelMetrics.Progress.labelGap) {
                 progressBar
 
-                Text(CameraCopy.analysisStep(step))
+                Text(AnalysisCopy.step(step))
                     .fuelStyle(FuelTypography.analysisStep)
                     .foregroundStyle(FuelPalette.Camera.ink)
                     .multilineTextAlignment(.center)
             }
             .accessibilityElement(children: .combine)
-            .accessibilityValue(Text(CameraCopy.analysisProgress(step)))
+            .accessibilityValue(Text(AnalysisCopy.progress(step)))
         } footer: {
-            AnalysisAction(title: CameraCopy.analysisCancel, action: onCancel)
+            AnalysisAction(title: AnalysisCopy.cancel, action: onCancel)
         }
     }
 
@@ -64,26 +91,27 @@ struct AnalysisView: View {
 ///
 /// **Not in the export.** The design draws the four analysis states and the
 /// result, and nothing between them, so this is assembled from what those
-/// screens already use: the same dimmed frame, the step label's own type for
-/// the headline, and the `CANCEL` row's type for the actions. No provider
-/// message reaches it — `AnalysisFailure` carries three cases and no text.
+/// screens already use: the same backdrop, the step label's own type for the
+/// headline, and the `CANCEL` row's type for the actions. No provider message
+/// reaches it — `AnalysisFailure` carries three cases and no text, and the one
+/// thing the mode changes is which of two hints is printed.
 struct AnalysisFailureView: View {
 
     let failure: AnalysisFailure
-    let photo: UIImage?
+    let backdrop: AnalysisBackdrop
     let onRetry: () -> Void
     let onDismiss: () -> Void
 
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        AnalysisSurface(photo: photo) {
+        AnalysisSurface(backdrop: backdrop) {
             VStack(alignment: .center, spacing: FuelMetrics.Space.s8) {
-                Text(CameraCopy.failureTitle(failure))
+                Text(AnalysisCopy.failureTitle(failure))
                     .fuelStyle(FuelTypography.analysisStep)
                     .foregroundStyle(FuelPalette.Camera.ink)
 
-                Text(CameraCopy.failureHint(failure))
+                Text(AnalysisCopy.failureHint(failure, mode: backdrop.mode))
                     .fuelStyle(FuelTypography.hintWrapping)
                     .foregroundStyle(FuelPalette.Camera.muted)
             }
@@ -95,7 +123,7 @@ struct AnalysisFailureView: View {
                     AnalysisAction(title: action.title, action: action.perform)
                 }
 
-                AnalysisAction(title: CameraCopy.failureDismiss, action: onDismiss)
+                AnalysisAction(title: AnalysisCopy.failureDismiss, action: onDismiss)
             }
         }
     }
@@ -109,20 +137,20 @@ struct AnalysisFailureView: View {
         case .invalidKey:
             nil
         case .noCredit(let billingPage):
-            (CameraCopy.failureBilling, { openURL(billingPage) })
+            (AnalysisCopy.failureBilling, { openURL(billingPage) })
         case .retry:
-            (CameraCopy.failureRetry, onRetry)
+            (AnalysisCopy.failureRetry, onRetry)
         }
     }
 }
 
 // MARK: - Shared surface
 
-/// The frame every analysis state is drawn on: the captured photo, a scrim over
-/// it, a block at the export's drop from the top, and a foot.
+/// What every analysis state is drawn on: the backdrop, a block at the
+/// export's drop from the top, and a foot.
 private struct AnalysisSurface<Content: View, Footer: View>: View {
 
-    let photo: UIImage?
+    let backdrop: AnalysisBackdrop
     @ViewBuilder let content: () -> Content
     @ViewBuilder let footer: () -> Footer
 
@@ -140,12 +168,18 @@ private struct AnalysisSurface<Content: View, Footer: View>: View {
 
             VStack(alignment: .center, spacing: .zero) {
                 ZStack(alignment: .top) {
-                    frozenFrame
+                    // The text mode has nothing to freeze and nothing to dim:
+                    // both the frame and the scrim over it belong to the
+                    // photograph, and drawing the hatch without one would claim
+                    // a picture that was never taken.
+                    if case .photo(let photo) = backdrop {
+                        frozenFrame(photo)
 
-                    // The scrim is what makes the bar and the label readable on
-                    // any photograph, which is why it is a fixed camera ink
-                    // rather than an opacity on the image.
-                    FuelPalette.Camera.scrim
+                        // The scrim is what makes the bar and the label
+                        // readable on any photograph, which is why it is a
+                        // fixed camera ink rather than an opacity on the image.
+                        FuelPalette.Camera.scrim
+                    }
 
                     content()
                         .padding(.top, FuelMetrics.Progress.topOffset)
@@ -161,7 +195,7 @@ private struct AnalysisSurface<Content: View, Footer: View>: View {
         }
     }
 
-    private var frozenFrame: some View {
+    private func frozenFrame(_ photo: UIImage?) -> some View {
         Group {
             if let photo {
                 Image(uiImage: photo)
@@ -202,13 +236,17 @@ private struct AnalysisAction: View {
 // MARK: - Previews
 
 #Preview("Analysis · state 2") {
-    AnalysisView(step: .identifyingIngredients, photo: nil, onCancel: {})
+    AnalysisView(step: .identifyingIngredients, backdrop: .photo(nil), onCancel: {})
+}
+
+#Preview("Analysis · state 2 after text") {
+    AnalysisView(step: .identifyingIngredients, backdrop: .text, onCancel: {})
 }
 
 #Preview("Analysis · no credit") {
     AnalysisFailureView(
         failure: .noCredit(billingPage: AIError.billingPage(for: .claude)),
-        photo: nil,
+        backdrop: .photo(nil),
         onRetry: {},
         onDismiss: {}
     )

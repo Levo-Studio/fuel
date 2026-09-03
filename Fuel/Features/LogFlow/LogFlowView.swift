@@ -35,11 +35,11 @@ struct LogFlowView: View {
 
             switch camera.stage {
             case .analysing(let step):
-                AnalysisView(step: step, photo: camera.photo, onCancel: camera.cancelScan)
+                AnalysisView(step: step, backdrop: .photo(camera.photo), onCancel: camera.cancelScan)
             case .failed(let failure):
                 AnalysisFailureView(
                     failure: failure,
-                    photo: camera.photo,
+                    backdrop: .photo(camera.photo),
                     onRetry: camera.retry,
                     onDismiss: camera.discard
                 )

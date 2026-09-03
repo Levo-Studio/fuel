@@ -1,186 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "camera.analysis.cancel" : {
-      "comment" : "Screens 08 to 11, the control under the progress bar. Drawn ABBRECHEN and already uppercase, because overlayAction does not transform.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CANCEL"
-          }
-        }
-      }
-    },
-    "camera.analysis.progress.value" : {
-      "comment" : "The analysis bar, spoken. The drawn quarter says nothing on its own. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Step %1$lld of %2$lld"
-          }
-        }
-      }
-    },
-    "camera.analysis.step.amounts" : {
-      "comment" : "Screen 10. Drawn Schätze Mengen …",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Estimating amounts …"
-          }
-        }
-      }
-    },
-    "camera.analysis.step.ingredients" : {
-      "comment" : "Screen 09. Drawn Erkenne Zutaten …",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Identifying ingredients …"
-          }
-        }
-      }
-    },
-    "camera.analysis.step.meal" : {
-      "comment" : "Screen 08. Drawn Analysiere Mahlzeit …",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Analysing meal …"
-          }
-        }
-      }
-    },
-    "camera.analysis.step.nutrition" : {
-      "comment" : "Screen 11. Drawn Berechne Nährwerte …",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Calculating nutrition …"
-          }
-        }
-      }
-    },
-    "camera.failure.action.dismiss" : {
-      "comment" : "Leaves a failed scan without retrying it. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CANCEL"
-          }
-        }
-      }
-    },
-    "camera.failure.action.retry" : {
-      "comment" : "Sends the same photo again after a failed scan. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "TRY AGAIN"
-          }
-        }
-      }
-    },
-    "camera.failure.invalidKey.hint" : {
-      "comment" : "Under the invalid-key title. Never carries a provider message. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enter a different key in Settings, then take the photo again."
-          }
-        }
-      }
-    },
-    "camera.failure.invalidKey.title" : {
-      "comment" : "A scan the provider refused the key for. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Key not accepted"
-          }
-        }
-      }
-    },
-    "camera.failure.noCredit.action" : {
-      "comment" : "Opens the provider's own billing page after an exhausted balance. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OPEN BILLING"
-          }
-        }
-      }
-    },
-    "camera.failure.noCredit.hint" : {
-      "comment" : "Under the no-credit title. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The key works. The account behind it cannot pay for this request."
-          }
-        }
-      }
-    },
-    "camera.failure.noCredit.title" : {
-      "comment" : "A scan the provider signalled an exhausted balance for. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No credit left"
-          }
-        }
-      }
-    },
-    "camera.failure.retry.hint" : {
-      "comment" : "Under the retry title. Covers a lost connection, an unreadable reply and a frame the camera did not deliver. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The photo did not reach the model, or the answer did not come back."
-          }
-        }
-      }
-    },
-    "camera.failure.retry.title" : {
-      "comment" : "A scan that failed for a reason worth trying again. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "That did not work"
-          }
-        }
-      }
-    },
     "camera.gallery.glyph" : {
       "comment" : "Screen 07, the ▣ in the circle top right.",
       "extractionState" : "manual",
@@ -253,6 +73,78 @@
         }
       }
     },
+    "logFlow.analysis.cancel" : {
+      "comment" : "Screens 08 to 11, the control under the progress bar. Drawn ABBRECHEN and already uppercase, because overlayAction does not transform.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CANCEL"
+          }
+        }
+      }
+    },
+    "logFlow.analysis.progress.value" : {
+      "comment" : "The analysis bar, spoken. The drawn quarter says nothing on its own. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Step %1$lld of %2$lld"
+          }
+        }
+      }
+    },
+    "logFlow.analysis.step.amounts" : {
+      "comment" : "Screen 10. Drawn Schätze Mengen …",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estimating amounts …"
+          }
+        }
+      }
+    },
+    "logFlow.analysis.step.ingredients" : {
+      "comment" : "Screen 09. Drawn Erkenne Zutaten …",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identifying ingredients …"
+          }
+        }
+      }
+    },
+    "logFlow.analysis.step.meal" : {
+      "comment" : "Screen 08. Drawn Analysiere Mahlzeit …",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Analysing meal …"
+          }
+        }
+      }
+    },
+    "logFlow.analysis.step.nutrition" : {
+      "comment" : "Screen 11. Drawn Berechne Nährwerte …",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calculating nutrition …"
+          }
+        }
+      }
+    },
     "logFlow.cancel" : {
       "comment" : "The control top left on every log screen. Drawn as ✕ Abbrechen; the style uppercases it.",
       "extractionState" : "manual",
@@ -273,6 +165,138 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cancel"
+          }
+        }
+      }
+    },
+    "logFlow.failure.action.dismiss" : {
+      "comment" : "Leaves a failed estimate without retrying it. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CANCEL"
+          }
+        }
+      }
+    },
+    "logFlow.failure.action.retry" : {
+      "comment" : "Sends the same photo or the same sentence again after a failed estimate. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TRY AGAIN"
+          }
+        }
+      }
+    },
+    "logFlow.failure.invalidKey.hint.photo" : {
+      "comment" : "Under the invalid-key title. Never carries a provider message. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter a different key in Settings, then take the photo again."
+          }
+        }
+      }
+    },
+    "logFlow.failure.invalidKey.hint.text" : {
+      "comment" : "Under the invalid-key title after a text entry. Never carries a provider message. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter a different key in Settings, then describe the meal again."
+          }
+        }
+      }
+    },
+    "logFlow.failure.invalidKey.title" : {
+      "comment" : "An estimate the provider refused the key for. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key not accepted"
+          }
+        }
+      }
+    },
+    "logFlow.failure.noCredit.action" : {
+      "comment" : "Opens the provider's own billing page after an exhausted balance. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OPEN BILLING"
+          }
+        }
+      }
+    },
+    "logFlow.failure.noCredit.hint" : {
+      "comment" : "Under the no-credit title, in both log modes. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The key works. The account behind it cannot pay for this request."
+          }
+        }
+      }
+    },
+    "logFlow.failure.noCredit.title" : {
+      "comment" : "An estimate the provider signalled an exhausted balance for. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No credit left"
+          }
+        }
+      }
+    },
+    "logFlow.failure.retry.hint.photo" : {
+      "comment" : "Under the retry title. Covers a lost connection, an unreadable reply and a frame the camera did not deliver. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The photo did not reach the model, or the answer did not come back."
+          }
+        }
+      }
+    },
+    "logFlow.failure.retry.hint.text" : {
+      "comment" : "Under the retry title after a text entry. Covers a lost connection and an unreadable reply. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The description did not reach the model, or the answer did not come back."
+          }
+        }
+      }
+    },
+    "logFlow.failure.retry.title" : {
+      "comment" : "An estimate that failed for a reason worth trying again. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That did not work"
           }
         }
       }
