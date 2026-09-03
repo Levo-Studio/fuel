@@ -43,7 +43,7 @@ final class CameraLogModel {
     /// The captured frame, kept only while it is being analysed and shown.
     private(set) var photo: UIImage?
 
-    private(set) var draft: PhotoResultDraft?
+    private(set) var draft: MealResultDraft?
 
     /// When the shutter was pressed. Fixed there rather than read again at
     /// `commit()`, so a result screen left open for ten minutes still files
@@ -205,7 +205,7 @@ final class CameraLogModel {
     }
 
     private func present(_ estimate: MealEstimate) {
-        draft = PhotoResultDraft(
+        draft = MealResultDraft(
             title: estimate.title,
             kilocalories: estimate.kilocalories,
             macros: estimate.macros,

@@ -17,7 +17,7 @@ import SwiftUI
 /// in a preview without a store, a client or a camera.
 struct PhotoResultView: View {
 
-    let draft: PhotoResultDraft
+    let draft: MealResultDraft
 
     /// The captured frame. `nil` in a preview, where the export's own
     /// `CAPTURED PHOTO` stand-in is what is drawn.

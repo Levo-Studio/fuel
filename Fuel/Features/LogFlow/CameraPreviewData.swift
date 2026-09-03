@@ -17,7 +17,7 @@ enum CameraPreviewData {
 
     /// `nonisolated` so the stand-in client below, which is not on the main
     /// actor, can hand it back.
-    nonisolated static let draft = PhotoResultDraft(
+    nonisolated static let draft = MealResultDraft(
         title: "Salmon with polenta",
         kilocalories: 460,
         macros: MacroTotals(protein: 34, carbs: 28, fat: 23),
