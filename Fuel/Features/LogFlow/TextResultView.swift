@@ -17,7 +17,6 @@ struct TextResultView: View {
     let onBack: () -> Void
     let onCycleLabel: () -> Void
     let onToggleFavourite: () -> Void
-    let onAdjustCalories: (Int) -> Void
     let onNew: () -> Void
     let onAdd: () -> Void
 
@@ -31,7 +30,6 @@ struct TextResultView: View {
             onBack: onBack,
             onCycleLabel: onCycleLabel,
             onToggleFavourite: onToggleFavourite,
-            onAdjustCalories: onAdjustCalories,
             onNew: onNew,
             onAdd: onAdd,
             lede: { quote }
@@ -77,7 +75,6 @@ struct TextResultView: View {
         onBack: {},
         onCycleLabel: {},
         onToggleFavourite: {},
-        onAdjustCalories: { _ in },
         onNew: {},
         onAdd: {}
     )

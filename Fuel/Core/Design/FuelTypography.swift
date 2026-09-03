@@ -311,9 +311,6 @@ nonisolated enum FuelTypography {
     /// `600 17px`. The title of an onboarding choice card.
     static let optionTitle = Style(.sans, weight: 600, size: 17, scalesRelativeTo: .headline)
 
-    /// `400 17px`. The `−` and `+` of the calorie stepper.
-    static let stepperGlyph = Style(.sans, weight: 400, size: 17)
-
     /// `600 15px`. The label inside a filled or outlined button.
     static let buttonLabel = Style(.sans, weight: 600, size: 15, scalesRelativeTo: .body)
 
@@ -401,7 +398,7 @@ nonisolated enum FuelTypography {
         flowLabel, meta, macroRatio, monoNote, timestamp, macroSummary, overlayAction,
         overlayCaption, confidence,
         display, displaySmall, screenTitle, sheetTitle, addGlyph, textEntry, analysisStep,
-        optionTitle, stepperGlyph, buttonLabel, listTitle, listTitlePending, body, entryTitle,
+        optionTitle, buttonLabel, listTitle, listTitlePending, body, entryTitle,
         itemTitle, chipLabel, iconGlyph, lead, settingsRowLabel, segmentLabel, caption, hint,
         hintWrapping, footnote, inlineAction, sectionLabel, tabLabel, macroLabel,
         macroLabelSmall, swatchLabel

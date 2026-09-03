@@ -47,7 +47,6 @@ struct MealResultView<Lede: View>: View {
     let onBack: () -> Void
     let onCycleLabel: () -> Void
     let onToggleFavourite: () -> Void
-    let onAdjustCalories: (Int) -> Void
     let onNew: () -> Void
     let onAdd: () -> Void
 
@@ -65,7 +64,6 @@ struct MealResultView<Lede: View>: View {
         onBack: @escaping () -> Void,
         onCycleLabel: @escaping () -> Void,
         onToggleFavourite: @escaping () -> Void,
-        onAdjustCalories: @escaping (Int) -> Void,
         onNew: @escaping () -> Void,
         onAdd: @escaping () -> Void,
         @ViewBuilder lede: @escaping () -> Lede
@@ -76,7 +74,6 @@ struct MealResultView<Lede: View>: View {
         self.onBack = onBack
         self.onCycleLabel = onCycleLabel
         self.onToggleFavourite = onToggleFavourite
-        self.onAdjustCalories = onAdjustCalories
         self.onNew = onNew
         self.onAdd = onAdd
         self.lede = lede
@@ -207,56 +204,34 @@ struct MealResultView<Lede: View>: View {
 
     // MARK: - Calories
 
+    /// The figure and its unit, on the row the export puts them on.
+    ///
+    /// **The export also draws a `−` and a `+` in circles at the trailing end
+    /// of this row** — a ±10 kcal stepper, `Screens2c.dc.html` lines 328 to 331
+    /// and 368 to 371, with the step in `design/Fuel Design Notes.md` under
+    /// "Result stepper". The owner has removed it: a figure the user nudges ten
+    /// at a time is guesswork on top of the model's guess, and the way to
+    /// correct an estimate is now to correct the items it was made from and ask
+    /// again.
+    ///
+    /// The figure still animates, because it still changes — a re-analysis
+    /// replaces it.
     private var caloriesRow: some View {
-        HStack(alignment: .bottom, spacing: FuelMetrics.Space.s14) {
-            HStack(alignment: .lastTextBaseline, spacing: FuelMetrics.Space.s8) {
-                Text(LogFlowFormat.figure(draft.kilocalories))
-                    .fuelStyle(FuelTypography.resultCalories)
-                    .foregroundStyle(palette.ink)
-                    .contentTransition(.numericText())
+        HStack(alignment: .lastTextBaseline, spacing: FuelMetrics.Space.s8) {
+            Text(LogFlowFormat.figure(draft.kilocalories))
+                .fuelStyle(FuelTypography.resultCalories)
+                .foregroundStyle(palette.ink)
+                .contentTransition(.numericText())
 
-                Text(MealResultCopy.unit)
-                    .fuelStyle(FuelTypography.unit)
-                    .foregroundStyle(palette.muted)
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(Text(MealResultCopy.kilocaloriesValue(draft.kilocalories)))
-
-            Spacer(minLength: FuelMetrics.Space.s14)
-
-            HStack(alignment: .center, spacing: FuelMetrics.Space.s8) {
-                stepper(
-                    glyph: MealResultCopy.stepperDecrease,
-                    label: MealResultCopy.stepperDecreaseLabel,
-                    delta: -MealResultDraft.calorieStep
-                )
-                stepper(
-                    glyph: MealResultCopy.stepperIncrease,
-                    label: MealResultCopy.stepperIncreaseLabel,
-                    delta: MealResultDraft.calorieStep
-                )
-            }
+            Text(MealResultCopy.unit)
+                .fuelStyle(FuelTypography.unit)
+                .foregroundStyle(palette.muted)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(MealResultCopy.kilocaloriesValue(draft.kilocalories)))
         .padding(.top, FuelMetrics.Space.s22)
         .fuelAnimation(FuelMotion.value, value: draft.kilocalories)
-    }
-
-    private func stepper(glyph: String, label: String, delta: Int) -> some View {
-        Button {
-            onAdjustCalories(delta)
-        } label: {
-            Text(glyph)
-                .fuelStyle(FuelTypography.stepperGlyph)
-                .foregroundStyle(palette.ink)
-                .frame(width: FuelMetrics.Control.circleButton, height: FuelMetrics.Control.circleButton)
-                .overlay {
-                    Circle()
-                        .strokeBorder(palette.hair, lineWidth: FuelMetrics.Line.hairline)
-                }
-                .contentShape(.circle)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(label))
     }
 
     // MARK: - Macros

@@ -18,7 +18,6 @@ struct PhotoResultView: View {
     let onBack: () -> Void
     let onCycleLabel: () -> Void
     let onToggleFavourite: () -> Void
-    let onAdjustCalories: (Int) -> Void
     let onNew: () -> Void
     let onAdd: () -> Void
 
@@ -32,7 +31,6 @@ struct PhotoResultView: View {
             onBack: onBack,
             onCycleLabel: onCycleLabel,
             onToggleFavourite: onToggleFavourite,
-            onAdjustCalories: onAdjustCalories,
             onNew: onNew,
             onAdd: onAdd,
             lede: { thumbnail }
@@ -76,7 +74,6 @@ struct PhotoResultView: View {
         onBack: {},
         onCycleLabel: {},
         onToggleFavourite: {},
-        onAdjustCalories: { _ in },
         onNew: {},
         onAdd: {}
     )

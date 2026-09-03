@@ -235,14 +235,6 @@ final class TextLogModel {
 
     // MARK: - Editing the result
 
-    /// The `−` and `+` beside the calorie figure. Floored at zero: a negative
-    /// meal is not a thing, and the day total would quietly absorb it.
-    func adjustKilocalories(by delta: Int) {
-        guard var draft else { return }
-        draft.kilocalories = max(0, draft.kilocalories + delta)
-        self.draft = draft
-    }
-
     /// The label pill. Cycles Breakfast → Lunch → Snack → Dinner and wraps,
     /// through `MealLabel.dayOrder`, and marks the label as the user's so
     /// nothing re-derives it back.

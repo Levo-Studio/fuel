@@ -60,22 +60,6 @@ nonisolated enum MealResultCopy {
         String(format: String(localized: "result.kilocalories.value"), kilocalories)
     }
 
-    static var stepperDecrease: String {
-        String(localized: "result.stepper.decrease")
-    }
-
-    static var stepperIncrease: String {
-        String(localized: "result.stepper.increase")
-    }
-
-    static var stepperDecreaseLabel: String {
-        String(localized: "result.stepper.decrease.label")
-    }
-
-    static var stepperIncreaseLabel: String {
-        String(localized: "result.stepper.increase.label")
-    }
-
     static var macroProtein: String {
         String(localized: "result.macro.protein")
     }

@@ -1195,54 +1195,6 @@
         }
       }
     },
-    "result.stepper.decrease" : {
-      "comment" : "Screens 14 and 15, the − of the calorie stepper.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "−"
-          }
-        }
-      }
-    },
-    "result.stepper.decrease.label" : {
-      "comment" : "The same control for VoiceOver. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ten fewer calories"
-          }
-        }
-      }
-    },
-    "result.stepper.increase" : {
-      "comment" : "Screens 14 and 15, the + of the calorie stepper.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "+"
-          }
-        }
-      }
-    },
-    "result.stepper.increase.label" : {
-      "comment" : "The same control for VoiceOver. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ten more calories"
-          }
-        }
-      }
-    },
     "result.text.flow" : {
       "comment" : "Screen 15, the label top right. Drawn Text-Eintrag; the style uppercases it.",
       "extractionState" : "manual",

@@ -6,9 +6,9 @@ import Foundation
 /// entry.
 ///
 /// A value rather than a `FoodEntry`, because screens 14 and 15 are a
-/// decision. The user can move the calories, cycle the label and mark it a
-/// favourite, and none of that should exist in the database until they tap
-/// `Add` — an estimate they walk away from must leave nothing behind.
+/// decision. The user can cycle the label and mark it a favourite, and none of
+/// that should exist in the database until they tap `Add` — an estimate they
+/// walk away from must leave nothing behind.
 ///
 /// One type for both AI log modes. A photo and a typed sentence produce the
 /// same thing — a priced meal with a breakdown — and the only difference the
@@ -35,12 +35,4 @@ nonisolated struct MealResultDraft: Equatable, Sendable {
     var isLabelUserSet: Bool
 
     var isFavourite: Bool
-
-    /// What one tap of the result stepper is worth, floored at zero.
-    ///
-    /// From `design/Fuel Design Notes.md`, "Result stepper": ±10 kcal per tap.
-    /// It is behaviour rather than geometry, which is why it sits here and not
-    /// in `FuelMetrics`, and it belongs to the draft rather than to either
-    /// model because both result screens draw the same two buttons.
-    static let calorieStep = 10
 }

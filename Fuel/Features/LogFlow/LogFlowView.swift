@@ -52,7 +52,6 @@ struct LogFlowView: View {
                         onBack: camera.discard,
                         onCycleLabel: camera.cycleLabel,
                         onToggleFavourite: camera.toggleFavourite,
-                        onAdjustCalories: camera.adjustKilocalories,
                         onNew: camera.discard,
                         onAdd: add
                     )
@@ -84,7 +83,6 @@ struct LogFlowView: View {
                         onBack: text.returnToEntry,
                         onCycleLabel: text.cycleLabel,
                         onToggleFavourite: text.toggleFavourite,
-                        onAdjustCalories: text.adjustKilocalories,
                         onNew: text.discard,
                         onAdd: addTypedMeal
                     )
