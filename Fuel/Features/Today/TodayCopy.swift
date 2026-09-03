@@ -21,10 +21,6 @@ nonisolated enum TodayCopy {
         String(localized: "today.title")
     }
 
-    static var settingsGlyph: String {
-        String(localized: "today.settings.glyph")
-    }
-
     static var settingsLabel: String {
         String(localized: "today.settings.label")
     }
