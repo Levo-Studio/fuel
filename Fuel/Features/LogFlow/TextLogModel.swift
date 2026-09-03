@@ -56,11 +56,15 @@ final class TextLogModel {
     /// What the user has typed. Bound straight to the field on screen 12.
     ///
     /// Kept after the estimate rather than cleared, because screen 15 quotes
-    /// it back and `‹ Back` returns to the field the user wrote in. `New`
-    /// clears it — that is what makes it a new entry rather than a second go
-    /// at the same one. The export draws neither transition; a photo cannot be
-    /// edited on the way back, so the camera mode had no version of this
-    /// question to answer.
+    /// it back and `‹ Back` returns to the field the user wrote in.
+    /// Discarding clears it — that is what makes the next one a new entry
+    /// rather than a second go at the same one. The export draws neither
+    /// transition; a photo cannot be edited on the way back, so the camera
+    /// mode had no version of this question to answer.
+    ///
+    /// A re-analysis does not touch it. What it sends is the edited item list,
+    /// and overwriting the user's own sentence with a list Fuel assembled
+    /// would put words in the quote that they never typed.
     var typedText: String = ""
 
     private(set) var draft: MealResultDraft?
@@ -412,8 +416,9 @@ final class TextLogModel {
         stage = keys.hasKey(for: provider) ? .entry : .noKey
     }
 
-    /// `New` on the result screen, and what a commit leaves behind: an empty
-    /// field, ready for the next meal.
+    /// The result screen's discard control once its confirmation is answered,
+    /// and what a commit leaves behind: an empty field, ready for the next
+    /// meal.
     func discard() {
         typedText = ""
         returnToEntry()

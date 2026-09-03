@@ -383,8 +383,13 @@ final class CameraLogModel {
         }
     }
 
-    /// Throws the scan away and returns to the viewfinder — `New` on the
-    /// result screen, the retry state's dismissal, a cancelled analysis.
+    /// Throws the scan away and returns to the viewfinder: the result screen's
+    /// discard control once its confirmation is answered, and a commit that
+    /// has just written the meal down.
+    ///
+    /// A failure state reaches this too, but through `dismissFailure()` rather
+    /// than directly — leaving one only throws the scan away when there is no
+    /// draft behind it to go back to.
     ///
     /// The frame is released here. That is the whole lifetime of the photo:
     /// captured, sent, drawn, gone.

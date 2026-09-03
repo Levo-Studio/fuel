@@ -6,7 +6,10 @@ import Foundation
 /// shows.
 ///
 /// The figures are the export's — 460 kcal, three macros, three recognised
-/// items with their confidence lines — and only the words are translated. The
+/// items — and only the words are translated. The items still carry the notes
+/// the export writes under them, because `RecognisedItem` still stores one and
+/// a preview that dropped them would not be the export's data; the result
+/// screen no longer draws that line. The
 /// title is the export's own name for the meal even though screen 14 does not
 /// print it, because the draft carries one and a placeholder here would be a
 /// value nobody could check against the design.
