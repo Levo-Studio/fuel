@@ -3,24 +3,22 @@ import SwiftUI
 // MARK: - Screen frame
 
 /// The shell all four onboarding screens sit in: the background, the drop from
-/// the top of the frame, the 28pt side margin, and the footer pinned to the
-/// bottom.
+/// the top safe area, the 28pt side margin, and the footer held above the
+/// bottom one.
 ///
-/// The two edges read the export differently, and they agree on hardware.
+/// Both edges read the export the same way, because the mockup has no safe
+/// areas of its own. Its status bar is a stand-in for the device's and is drawn
+/// as a sibling row *before* the container that carries `padding:88px 28px 0`,
+/// so the drawn 88 is a distance below the bar rather than from the frame edge
+/// — which makes it 88 below the real top safe area. The mockup draws no home
+/// indicator at all, so the drawn `bottom:34px` is measured to an edge the
+/// device does not have there: it becomes 34 above the bottom safe area.
 ///
-/// The top padding extends into the status-bar area. The export draws its own
-/// mock status bar inside the 390×844 frame and measures every screen's first
-/// line from the *frame* edge, so 88 and 96 are real distances from the top of
-/// the screen; taken from the safe area instead they would push the headline
-/// down by the height of a status bar iOS is already drawing for us.
-///
-/// The footer sits on the safe-area boundary with nothing added under it. The
-/// export's `bottom:34px` is not a margin the designer wanted — 34pt is exactly
-/// the iPhone's bottom safe inset, and the mockup has no home indicator, so he
-/// drew by hand the clearance the device provides for free. Adding the drawn 34
-/// on top of the inset would double it to about 68 on all four screens. Read
-/// either way the button lands in the same place: 34pt up from the bottom of
-/// the screen is the safe-area boundary.
+/// An earlier reading put the footer flat on the safe-area boundary, on the
+/// grounds that 34 is exactly the iPhone's bottom inset and the designer had
+/// drawn by hand the clearance hardware gives for free. That was wrong in the
+/// same way the top was: the mockup omits the chrome the device draws, and a
+/// button 34 above the glass sits in the home indicator.
 struct OnboardingScreen<Content: View, Footer: View>: View {
 
     @Environment(\.fuelPalette) private var palette
@@ -39,13 +37,13 @@ struct OnboardingScreen<Content: View, Footer: View>: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(.top, topPadding)
             .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
-            .ignoresSafeArea(.container, edges: .top)
         }
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 0) {
                 footer
             }
             .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
+            .padding(.bottom, FuelMetrics.Space.s34)
         }
     }
 }
