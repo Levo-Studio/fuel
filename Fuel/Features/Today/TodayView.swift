@@ -12,6 +12,12 @@ struct TodayView: View {
 
     let presentation: TodayPresentation
 
+    /// What stands in the day list's place while the day has no entries. The
+    /// export draws nothing there, and a first run showed the header over five
+    /// hundred points of empty, which reads as a fault rather than as a
+    /// beginning.
+    let gettingStarted: TodayGettingStarted
+
     let onOpenSettings: () -> Void
     let onAddEntry: () -> Void
 
@@ -34,7 +40,7 @@ struct TodayView: View {
                     )
                     .padding(.top, FuelMetrics.Space.s34)
 
-                    TodayDayList(groups: presentation.groups)
+                    dayOrEmptyState
                         .padding(.top, listTopPadding)
                 }
                 .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
@@ -50,6 +56,26 @@ struct TodayView: View {
             TodayAddButton(action: onAddEntry)
                 .padding(.trailing, FuelMetrics.Control.addButtonTrailingInset)
                 .padding(.bottom, FuelMetrics.Control.addButtonBottomInset)
+        }
+    }
+
+    /// The day, or what stands in for it.
+    ///
+    /// Three states rather than two. A day with entries is the drawn one; an
+    /// empty day gets the checklist, and an empty day with nothing left to
+    /// suggest gets a single line, because a list of four permanent ticks is
+    /// not a beginning.
+    @ViewBuilder private var dayOrEmptyState: some View {
+        if presentation.hasEntries {
+            TodayDayList(groups: presentation.groups)
+        } else if gettingStarted.isComplete {
+            TodayEmptyDayNote()
+        } else {
+            TodayGettingStartedView(
+                checklist: gettingStarted,
+                onOpenSettings: onOpenSettings,
+                onAddEntry: onAddEntry
+            )
         }
     }
 
@@ -215,6 +241,7 @@ private struct TodayListFade: View {
             mode: .goal(.default),
             date: TodayPreviewData.date
         ),
+        gettingStarted: TodayPreviewData.finishedChecklist,
         onOpenSettings: {},
         onAddEntry: {}
     )
@@ -228,14 +255,61 @@ private struct TodayListFade: View {
             mode: .countOnly,
             date: TodayPreviewData.date
         ),
+        gettingStarted: TodayPreviewData.finishedChecklist,
         onOpenSettings: {},
         onAddEntry: {}
     )
     .environment(\.fuelPalette, FuelPalette(theme: .light, accent: .green))
 }
 
+#Preview("First run") {
+    TodayView(
+        presentation: TodayPresentation(
+            entries: [],
+            mode: .countOnly,
+            date: TodayPreviewData.date
+        ),
+        gettingStarted: TodayPreviewData.firstRunChecklist,
+        onOpenSettings: {},
+        onAddEntry: {}
+    )
+    .environment(\.fuelPalette, FuelPalette(theme: .dark, accent: .mono))
+}
+
+#Preview("Empty day, nothing left to suggest") {
+    TodayView(
+        presentation: TodayPresentation(
+            entries: [],
+            mode: .goal(.default),
+            date: TodayPreviewData.date
+        ),
+        gettingStarted: TodayPreviewData.finishedChecklist,
+        onOpenSettings: {},
+        onAddEntry: {}
+    )
+    .environment(\.fuelPalette, FuelPalette(theme: .light, accent: .mono))
+}
+
 /// The day the export draws, so a preview shows the screen the design shows.
 private enum TodayPreviewData {
+
+    /// A first run: a key was asked for before Today was ever reached, so that
+    /// row is the one thing already done.
+    static let firstRunChecklist = TodayGettingStarted(
+        hasProviderKey: true,
+        isGoalMode: false,
+        hasCustomisedAppearance: false,
+        hasLoggedMeal: false
+    )
+
+    /// Everything answered, which is what a day with entries in it has by
+    /// definition — the last row asks for the first meal.
+    static let finishedChecklist = TodayGettingStarted(
+        hasProviderKey: true,
+        isGoalMode: true,
+        hasCustomisedAppearance: true,
+        hasLoggedMeal: true
+    )
 
     /// Local midnight, because the rows print `TimeZone.current`. Anchoring to
     /// UTC would slide every drawn time by the machine's offset and the

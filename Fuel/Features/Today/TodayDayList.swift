@@ -102,7 +102,10 @@ private struct TodayEntryRow: View {
 ///
 /// A `Rectangle` rather than `Divider`, because `Divider` takes its thickness
 /// and its colour from the system and the export states both.
-private struct TodayHairline: View {
+///
+/// Shared with the get-started checklist, which stands in the same place and
+/// draws the same two rules — `hair` under a heading, `hairSoft` between rows.
+struct TodayHairline: View {
 
     let color: Color
 

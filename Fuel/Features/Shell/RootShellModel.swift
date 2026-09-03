@@ -109,6 +109,14 @@ final class RootShellModel {
     /// the real composition points a client at a provider's endpoint.
     private let makeTextLog: TextLogFactory
 
+    /// Whether a key is stored, for the get-started checklist's first row.
+    ///
+    /// `MealKeyPresence` rather than `KeychainStore`, which is the whole point:
+    /// the checklist asks whether an item exists and is not able to read one.
+    /// Nothing on Today has any business holding the user's key, and a tick is
+    /// drawn from presence alone.
+    private let keys: any MealKeyPresence
+
     // MARK: - State
 
     private(set) var stage: Stage
@@ -119,6 +127,15 @@ final class RootShellModel {
     /// with it: it is recomputed whenever the stage becomes `today`, which is
     /// the only moment its inputs can have changed while no log flow exists.
     private(set) var today: TodayPresentation
+
+    /// What Today draws in the day list's place while the day is empty.
+    ///
+    /// Recomputed with `today` and never separately. Its four answers are read
+    /// from four different places — the Keychain, the store twice, and the
+    /// preferences — and every one of them can be changed behind a presented
+    /// cover, so the moment they are all read is the moment the cover goes
+    /// away.
+    private(set) var gettingStarted: TodayGettingStarted
 
     /// The onboarding flow's own state, built once so a re-render of the shell
     /// cannot drop a half-typed key or restart the key test.
@@ -183,14 +200,17 @@ final class RootShellModel {
         validator: KeyValidating,
         preferences: SettingsPreferences,
         makeCameraLog: @escaping CameraLogFactory = RootShellModel.liveCameraLog,
-        makeTextLog: @escaping TextLogFactory = RootShellModel.liveTextLog
+        makeTextLog: @escaping TextLogFactory = RootShellModel.liveTextLog,
+        keys: any MealKeyPresence = KeychainStore()
     ) {
         self.store = store
         self.preferences = preferences
         self.makeCameraLog = makeCameraLog
         self.makeTextLog = makeTextLog
+        self.keys = keys
         self.stage = Self.launchStage(for: store)
         self.today = Self.presentation(for: store)
+        self.gettingStarted = Self.checklist(store: store, preferences: preferences, keys: keys)
         self.logFlow = LogFlowModel(store: store)
         // One read, spent on both halves. Two reads could not disagree today —
         // nothing runs between them — but they are two sources for a value the
@@ -219,6 +239,35 @@ final class RootShellModel {
         return settings == nil ? .onboarding : .today
     }
 
+    /// The four answers, each read from whatever actually holds it.
+    ///
+    /// Static and taking its three sources, so it can run inside `init` before
+    /// every stored property has a value — the same reason `presentation` is.
+    private static func checklist(
+        store: FuelStore,
+        preferences: SettingsPreferences,
+        keys: any MealKeyPresence
+    ) -> TodayGettingStarted {
+        // A store that cannot be read is not a store that has been logged to,
+        // and a first row that cannot be answered is not a row to tick. Both
+        // readings fail towards "still to do", which is recoverable: the worst
+        // it costs is a suggestion the user has already acted on, against a
+        // tick that would have been a lie.
+        let mode = try? store.countingMode()
+        return TodayGettingStarted(
+            hasProviderKey: keys.hasKey(for: preferences.provider),
+            // `targets` is the presence of a goal — count-only carries none,
+            // which is what the type exists to say.
+            isGoalMode: mode?.targets != nil,
+            // "Differs from what Fuel ships with", not "has been visited".
+            // A user who opens screen 16 and picks the theme it already had
+            // has changed nothing, and the row says the look, not the visit.
+            hasCustomisedAppearance: preferences.theme != SettingsPreferences.Default.theme
+                || preferences.accent != SettingsPreferences.Default.accent,
+            hasLoggedMeal: (try? store.hasAnyEntry()) ?? false
+        )
+    }
+
     private static func presentation(for store: FuelStore) -> TodayPresentation {
         let now = Date()
         return TodayPresentation(
@@ -234,8 +283,19 @@ final class RootShellModel {
     /// truth, so the presentation is read back from the store rather than
     /// assembled from what the flow happened to hold.
     private func showToday() {
-        today = Self.presentation(for: store)
+        refreshToday()
         stage = .today
+    }
+
+    /// Re-reads everything Today draws.
+    ///
+    /// One call rather than two at each site: the checklist and the day are
+    /// read from the same store at the same moment, and a site that refreshed
+    /// only one of them would show a day with an entry in it beside a row still
+    /// asking for the first meal.
+    private func refreshToday() {
+        today = Self.presentation(for: store)
+        gettingStarted = Self.checklist(store: store, preferences: preferences, keys: keys)
     }
 
     // MARK: - Leaving and returning to Today
@@ -305,7 +365,7 @@ final class RootShellModel {
             cameraLog.camera.stop()
         }
 
-        today = Self.presentation(for: store)
+        refreshToday()
         destination = nil
     }
 
