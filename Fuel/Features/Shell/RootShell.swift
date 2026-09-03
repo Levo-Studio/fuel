@@ -85,27 +85,24 @@ struct RootShell: View {
                     onCancel: model.dismissDestination,
                     onLogged: model.dismissDestination
                 )
-                // The status bar is forced light because the export draws it
-                // light on exactly these screens. Every theme-following frame
-                // draws it `color:var(--ink)`; the three log-flow screens
-                // hard-code `#fafafa` over their `var(--cam)` frame — 07 the
-                // camera, 12 the text entry, 13 Recent. That is the export
-                // refusing to let the status bar follow the theme here, not an
-                // inference from the surface colour underneath it.
+                // The cover hosts two kinds of screen and the export inks the
+                // status bar differently on each, so the scheme is per stage
+                // rather than blanket: `LogFlowChrome` holds which is which and
+                // why, read off the two AI models' own stages.
                 //
-                // Blanket over the whole cover, which is right only while the
-                // cover hosts flow chrome. Screens 14 and 15 draw
-                // `color:var(--ink)` on `var(--bg)` and carry `‹ Back` rather
-                // than `✕ Cancel` — they are result screens, not chrome — so
-                // the moment the result screen lands inside `LogFlowView` this
-                // becomes a light-theme bug, and it has to move in with the
-                // tabs that actually draw dark.
-                //
-                // It sits at this call site rather than beside `palette.camera`
-                // in `LogFlowScaffold`, where it belongs, only because that
-                // file is another branch's. Move it there once the two are in
-                // one tree; do not tidy it anywhere else.
-                .preferredColorScheme(.dark)
+                // It stays at this call site rather than moving into
+                // `LogFlowScaffold` beside `palette.camera`. `LogFlowView`
+                // keeps the scaffold in the hierarchy underneath the result
+                // overlay, so a modifier there would still apply while screens
+                // 14 and 15 are up — which is the one case this has to stop
+                // applying to.
+                .preferredColorScheme(
+                    LogFlowChrome.colorScheme(
+                        camera: model.cameraLog.stage,
+                        text: model.textLog.stage,
+                        theme: preferences.theme
+                    )
+                )
             case .settings:
                 if let counting = model.settingsCounting {
                     SettingsScreen(
