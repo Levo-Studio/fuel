@@ -104,10 +104,16 @@ struct CameraTabView: View {
 /// The circle top right on screen 07, which opens the photo picker.
 ///
 /// `PhotosPicker` rather than a permission prompt and a library read: the
-/// picker runs outside the app, hands back one image and grants no access to
-/// anything else, so Fuel never holds the library and needs no usage
-/// description for it. The picked image goes the same way a captured one does
-/// — compressed, sent, released, never written down.
+/// picker runs outside the app and hands back one image, so Fuel never
+/// enumerates the library and never holds it. The picked image goes the same
+/// way a captured one does — compressed, sent, released, never written down.
+///
+/// This deliberately makes no claim about whether the `photoLibrary:` form
+/// needs `NSPhotoLibraryUsageDescription`; an earlier version of this comment
+/// asserted it does not, which could not be confirmed from Apple's own pages.
+/// `Fuel/Info.plist` declares the description either way, which is the safe
+/// side of a question the documentation does not settle, and its wording is
+/// what the user actually sees.
 struct CameraGalleryButton: View {
 
     @Binding var selection: PhotosPickerItem?
