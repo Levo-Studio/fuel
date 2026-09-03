@@ -41,14 +41,42 @@ nonisolated enum RawWeightNotation {
     /// and a raw one is not a different count. Millilitres are left out for the
     /// same reason — a volume of a liquid does not change by being warmed —
     /// and so is a bare number, which would make `r2 eggs` a raw weight and it
-    /// is not one.
+    /// is not one. Volume stays out even where a dry measure would be
+    /// meaningful, as a cup of rice is: `ml`, `l`, `cup`, `tbsp` and their
+    /// neighbours would widen the same rule into liquids, which have no raw
+    /// form at all. A count in any language — `st`, `Stück`, `slices` — is out
+    /// for the reason the eggs are.
     ///
-    /// Both the abbreviation and the written word, because a person types
-    /// either. Ordered longest first so `r50 grams` matches `grams` rather than
-    /// stopping at the `g`.
+    /// A word that merely starts like a unit is still not one. `r300gg` and
+    /// `r50 grammar` match nothing here, because a unit has to end where the
+    /// word does.
+    ///
+    /// **The list is not English-only, because the sentence is not.** The
+    /// contract's own comment says the user's typed meal may be in any
+    /// language, and a table of English abbreviations quietly excludes the
+    /// people most likely to weigh their rice: `r300 Gramm Reis` and the very
+    /// common German short form `r300gr` both used to fall straight through.
+    /// The asymmetry that governs the rest of this type governs the table too
+    /// — an unfamiliar word here costs the user a threefold error with nothing
+    /// on screen to say so, and an over-familiar one costs a few dozen tokens
+    /// of instruction that then does nothing.
+    ///
+    /// So: the abbreviation and the written word, in English, German and
+    /// French, plus `Pfund`, which a German speaker uses for 500 g the way an
+    /// English speaker uses a pound.
+    ///
+    /// **Order does not matter.** An earlier version claimed the array was
+    /// sorted longest first so `r50 grams` would not stop at the `g`, and that
+    /// was never what did it — `unitFollows(_:from:)` requires the unit to end
+    /// at a word boundary, so `g` followed by `r` is rejected on its own and
+    /// the loop simply carries on to `grams`. The array is alphabetical
+    /// because a list somebody has to add a word to is easier to read that
+    /// way.
     private static let units = [
-        "kilograms", "kilogram", "ounces", "pounds", "grams", "ounce",
-        "pound", "gram", "lbs", "kg", "oz", "lb", "g"
+        "g", "gr", "gram", "gramm", "gramme", "grammes", "grams", "grs",
+        "kg", "kgs", "kilo", "kilogram", "kilogramm", "kilogramme",
+        "kilogrammes", "kilograms", "kilos", "lb", "lbs", "ounce", "ounces",
+        "oz", "pfund", "pound", "pounds", "unze", "unzen"
     ]
 
     // MARK: - Reading

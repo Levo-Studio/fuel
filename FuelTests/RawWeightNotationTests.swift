@@ -74,6 +74,63 @@ struct RawWeightNotationTests {
         #expect(RawWeightNotation.isUsed(in: sentence))
     }
 
+    /// The sentence may be in any language, so the units are too.
+    ///
+    /// These are the ones that used to fall through: a German speaker writes
+    /// `Gramm`, shortens it to `gr`, and says `Pfund` where an English speaker
+    /// says pound. Missing them is the expensive direction — the estimate is
+    /// wrong by a factor of three and nothing on screen says why.
+    @Test(
+        "a unit is a unit in the language the meal was typed in",
+        arguments: [
+            "r300 Gramm Reis",
+            "r300gr rice",
+            "r300 gr Reis",
+            "r300grs rice",
+            "r300kgs potatoes",
+            "r1 Kilo Kartoffeln",
+            "r1kilogramm Kartoffeln",
+            "r2 kilos of potatoes",
+            "r500 Pfund is a lot of beef",
+            "r300 grammes de riz",
+            "r1 kilogramme de riz",
+            "r8 Unzen Steak"
+        ]
+    )
+    func unitsInOtherLanguages(_ sentence: String) {
+        #expect(RawWeightNotation.isUsed(in: sentence))
+    }
+
+    /// A word that begins like a unit is not one, in any language. The
+    /// boundary check is what does this, not the order of the table.
+    @Test(
+        "a unit has to end where the word ends",
+        arguments: [
+            "r300gg rice",
+            "r300 grammatik",
+            "r300 kilometres from here",
+            "r300 pounding the dough"
+        ]
+    )
+    func unitPrefixes(_ sentence: String) {
+        #expect(!RawWeightNotation.isUsed(in: sentence))
+    }
+
+    /// Measures of space stay out even where a dry one would be meaningful,
+    /// because the same door lets in the liquids that have no raw form.
+    @Test(
+        "a measure of volume is not a weight",
+        arguments: [
+            "r1 cup of rice",
+            "r2 tbsp oil",
+            "r0.5 l milk",
+            "r2 Stück Brot"
+        ]
+    )
+    func volumesAndCounts(_ sentence: String) {
+        #expect(!RawWeightNotation.isUsed(in: sentence))
+    }
+
     @Test(
         "the marker is found wherever in the sentence it was typed",
         arguments: [
