@@ -70,14 +70,23 @@ private struct TodayGettingStartedRow: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(alignment: .center, spacing: FuelMetrics.Space.s12) {
+            // Screen 03's own gap between a row's label and its check, drawn
+            // `gap:14px` on all four key-test rows. It is the only place the
+            // export draws this pairing: screens 16 and 17 push a row's two
+            // halves apart with `space-between` and state no gap at all, so
+            // they cannot supply one.
+            //
+            // It is carried by the spacer rather than by the stack: a stack
+            // spacing is inserted on *both* sides of a spacer, so the narrowest
+            // the gap could ever close to would be twice the drawn one.
+            HStack(alignment: .center, spacing: .zero) {
                 // Screen 16's row label: 500 14px, ink.
                 Text(TodayCopy.gettingStartedTitle(item.step))
                     .fuelStyle(FuelTypography.itemTitle)
                     .foregroundStyle(palette.ink)
                     .multilineTextAlignment(.leading)
 
-                Spacer(minLength: .zero)
+                Spacer(minLength: FuelMetrics.Space.s14)
 
                 // The check of screen 03, in the twenty-unit box it is authored
                 // in and at the weight the design states for it. The slot is
