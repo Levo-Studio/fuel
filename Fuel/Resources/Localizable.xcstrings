@@ -86,7 +86,7 @@
       }
     },
     "intent.scan.title" : {
-      "comment" : "The name of the shortcut in the Shortcuts app and in Spotlight. The design notes call it Scan.",
+      "comment" : "The name of the shortcut in the Shortcuts app. The design notes call it Scan.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {

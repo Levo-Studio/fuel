@@ -17,9 +17,15 @@ import AppIntents
 /// a key here would put a secret on a path that has no use for one.
 struct ScanMealIntent: AppIntent {
 
-    /// Both of these are shown to the user — in the Shortcuts app, and in
-    /// Spotlight beside the app — so both are catalog keys rather than
-    /// literals, like every other visible string in Fuel.
+    /// Both of these are shown to the user — this is how the shortcut is named
+    /// and explained in the Shortcuts app — so both are catalog keys rather
+    /// than literals, like every other visible string in Fuel.
+    ///
+    /// Not in Spotlight: an intent is offered where a user goes looking for
+    /// one, and it is `AppShortcutsProvider` that makes the system volunteer a
+    /// shortcut unasked. Fuel declares none, because a phrase cannot be a
+    /// catalog key — it has to be a literal carrying `\(.applicationName)` —
+    /// and because it would need an icon the export does not draw.
     static let title: LocalizedStringResource = "intent.scan.title"
 
     static let description = IntentDescription("intent.scan.description")
