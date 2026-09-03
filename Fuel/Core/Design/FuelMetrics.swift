@@ -193,6 +193,13 @@ nonisolated enum FuelMetrics {
             /// path's `M1 1l3.5 3.5L8 1` transfers as written.
             static let chevronWidth: CGFloat = 9
             static let chevronHeight: CGFloat = 6
+
+            /// How far inside that box the path itself starts: `M1 1l3.5
+            /// 3.5L8 1` is held one unit off the left, the right and the top,
+            /// which is what leaves the round cap room inside the box. The
+            /// plus glyph's equivalent is `Space.s3`; the ladder has no 1, so
+            /// the chevron's own inset is named here.
+            static let chevronInset: CGFloat = 1
         }
     }
 
@@ -308,7 +315,7 @@ nonisolated enum FuelMetrics {
         Radius.pill, Radius.card, Radius.thumbnail,
         Line.hairline, Line.selectionBorder, Line.spinner, Line.spinnerArc,
         Line.Glyph.chevron, Line.Glyph.plus, Line.Glyph.check, Line.Glyph.viewBox,
-        Line.Glyph.chevronWidth, Line.Glyph.chevronHeight,
+        Line.Glyph.chevronWidth, Line.Glyph.chevronHeight, Line.Glyph.chevronInset,
         Control.circleButton, Control.swatchRing, Control.swatchDot, Control.shutterRing,
         Control.shutterFill, Control.stepMarkerSlot, Control.stepMarkerDot,
         Control.macroLabelColumn, Control.macroBarHeight, Control.thumbnailHeight,
