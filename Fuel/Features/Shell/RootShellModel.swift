@@ -308,4 +308,54 @@ final class RootShellModel {
         today = Self.presentation(for: store)
         destination = nil
     }
+
+    // MARK: - Arriving from outside
+
+    /// The "Scan" shortcut, asking for the camera.
+    ///
+    /// It lands on the plus control's destination — the log flow on screen 07,
+    /// the tab the export captions `Log · camera (default)` — and it draws
+    /// nothing of its own. Going through `openLogFlow` rather than assigning
+    /// `destination` is what keeps it that way: a flow opened from outside is
+    /// built against the provider selected now, with both halves fresh, or the
+    /// shortcut would be a second composition drifting out of step with the
+    /// drawn one.
+    ///
+    /// A key that is missing is not this method's business and is deliberately
+    /// not checked here. The camera half asks the Keychain whether an item
+    /// exists when its tab appears and puts screen 07 into its keyless state,
+    /// which is a state the user can read and act on — better than a shortcut
+    /// that appears to do nothing, and the only reading that does not make the
+    /// shell a second place where the key question is asked.
+    func requestScan() {
+        // Onboarding has not been answered, so there is no Today to present
+        // over — and screens 01 to 03 come before 04, so there is no key
+        // either. Opening the app is the whole answer available: it lands on
+        // the step that has to happen first, which is where a launch would
+        // land anyway. A cover over onboarding would put a viewfinder in front
+        // of a user who has not yet answered the questions that make a scan
+        // possible, and there is no drawn state for that.
+        guard stage == .today else { return }
+
+        switch destination {
+        case .logFlow:
+            // The flow the user is already in is the destination the shortcut
+            // asks for, so only the tab is left to answer. Rebuilding it would
+            // be the destructive reading of "open the camera": a scan in
+            // flight cancelled, a captured frame dropped, a result screen the
+            // user had not committed replaced by a viewfinder.
+            logFlow.selectedTab = .camera
+        case .settings:
+            // Only one cover can be presented, so Settings is left the way its
+            // `Done` leaves it — through `dismissDestination`, with the re-read
+            // of the day that comes with it — before the flow is opened as the
+            // plus opens it. Both writes land in one update, and
+            // `fullScreenCover(item:)` replaces the presentation when the
+            // item's identity changes, so Today is not shown in between.
+            dismissDestination()
+            openLogFlow()
+        case nil:
+            openLogFlow()
+        }
+    }
 }
