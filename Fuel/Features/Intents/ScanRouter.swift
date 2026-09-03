@@ -1,5 +1,3 @@
-import Foundation
-
 // MARK: - Router
 
 /// Where a scan request from outside the app is handed to the running shell.
