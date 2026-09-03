@@ -387,6 +387,41 @@ struct FuelMotionTests {
             #expect(curve.duration <= 0.6)
         }
     }
+
+    // MARK: - Press feedback
+
+    @Test("a control shrinks under a finger and returns to size once it lifts")
+    func pressScaleFollowsTheTouch() {
+        #expect(FuelMotion.resolvePressScale(isPressed: true, reduceMotion: false) == FuelMotion.Press.scale)
+        #expect(FuelMotion.resolvePressScale(isPressed: false, reduceMotion: false) == 1)
+    }
+
+    /// Reduce Motion drops the press entirely rather than applying the scale
+    /// without a spring. `Press` is not a state transition the way the curves
+    /// above are — softening it would still be a size that jumps — so the
+    /// control simply does not move under Reduce Motion, the same answer
+    /// `resolve`'s `.none` branch gives to travel.
+    @Test("reduced motion suppresses the press, not just its spring")
+    func pressIsSuppressedRatherThanSoftened() {
+        #expect(FuelMotion.resolvePressScale(isPressed: true, reduceMotion: true) == 1)
+        #expect(FuelMotion.resolvePress(reduceMotion: true) == nil)
+    }
+
+    @Test("the press spring runs when motion is not reduced")
+    func pressSpringRuns() {
+        #expect(FuelMotion.resolvePress(reduceMotion: false) != nil)
+    }
+
+    @Test("the press scale stays close to rest, the way an undrawn value has to")
+    func pressScaleStaysSubtle() {
+        // A bound, not a regression test, the way `dwellsStayInsideTheirBounds`
+        // is one for the two dwells above. Nothing here is drawn, so what this
+        // catches is a future value chosen without the brief this one was
+        // chosen against: a control this app is opened ten times a day for
+        // should answer a finger, not visibly resize.
+        #expect(FuelMotion.Press.scale < 1)
+        #expect(FuelMotion.Press.scale >= 0.9)
+    }
 }
 
 // MARK: - Back swipe

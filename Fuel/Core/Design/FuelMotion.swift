@@ -108,6 +108,39 @@ nonisolated enum FuelMotion {
     /// than to four restated ones.
     static let allCurves: [Curve] = [standard, emphasised, value, progress]
 
+    // MARK: - Press feedback
+
+    /// How much a control shrinks under a finger, and the spring it snaps back
+    /// with when the finger lifts.
+    ///
+    /// **Undrawn, like the curves above — more so.** The export renders states
+    /// and says nothing about the travel between them, but at least draws every
+    /// state on both ends of that travel. It draws no pressed frame for any
+    /// control at all: there is no fifteenth swatch, no depressed pill, nothing
+    /// to read a value off. `scale` and the spring constants below are chosen
+    /// rather than found, against one brief — this is a tracker opened perhaps
+    /// ten times a day, not a game, so the finger should feel answered without
+    /// the interface feeling loose. A shrink small enough that the drawn
+    /// geometry is never mistaken for having moved permanently, sprung back
+    /// briskly enough that letting go reads as release rather than as a bounce.
+    enum Press {
+
+        /// The scale a pressed control is drawn at. Close enough to 1 that
+        /// nothing drawn appears to change size at rest — only while a finger
+        /// is actually down.
+        static let scale: CGFloat = 0.96
+
+        /// How quickly the spring answers a change — the down-stroke, and the
+        /// release both use it, so a control neither lags the finger nor
+        /// overshoots on the way back.
+        static let springResponse: TimeInterval = 0.22
+
+        /// How much the spring's oscillation is damped. Comfortably short of 1
+        /// so the release still reads as a spring and not a hard stop, and far
+        /// enough from a wobble that it never overshoots past the resting size.
+        static let springDamping: Double = 0.7
+    }
+
     // MARK: - Paced sequences
 
     /// How long one of the four analysis steps is held before the next.
@@ -198,6 +231,27 @@ nonisolated enum FuelMotion {
     static func resolvePacing(_ hold: Duration, reduceMotion: Bool) -> Duration? {
         reduceMotion ? nil : hold
     }
+
+    /// What a control is drawn at while a finger is down on it.
+    ///
+    /// `1` under Reduce Motion rather than `Press.scale` held without a spring:
+    /// a size change applied with no animation is not a smaller motion, it is
+    /// the same motion with the easing removed, and a control that silently
+    /// jumps a size and back is closer to a glitch than to feedback. Dropping
+    /// it is the `.none` branch `resolve` already has for travel — this is
+    /// exactly that kind of motion and not a state transition, so there is
+    /// nothing to keep by softening it.
+    static func resolvePressScale(isPressed: Bool, reduceMotion: Bool) -> CGFloat {
+        guard isPressed, !reduceMotion else { return 1 }
+        return Press.scale
+    }
+
+    /// The spring behind that scale, or nothing to animate at all once it is
+    /// suppressed.
+    static func resolvePress(reduceMotion: Bool) -> Animation? {
+        guard !reduceMotion else { return nil }
+        return .spring(response: Press.springResponse, dampingFraction: Press.springDamping)
+    }
 }
 
 // MARK: - Applying a curve
@@ -286,3 +340,41 @@ extension View {
         modifier(FuelAnimationModifier(curve: curve, value: value))
     }
 }
+
+// MARK: - Press feedback
+
+/// Springs a control to `FuelMotion.Press.scale` while a finger is down on it,
+/// and back when it lifts.
+///
+/// One button style rather than a `.scaleEffect` at each call site, for the
+/// reason `fuelAnimation` exists: Reduce Motion honoured at every button is
+/// Reduce Motion forgotten at most of them. `ButtonStyle` rather than a plain
+/// `ViewModifier` because `isPressed` is the state — SwiftUI already tracks the
+/// touch down and the touch up, and a gesture recogniser added beside it would
+/// be a second, competing answer to "is a finger on this".
+///
+/// Applied as `.buttonStyle(FuelPressButtonStyle())`, not through a `.plain`-
+/// style static member: SwiftUI's own `.buttonStyle(_:)` is overloaded on both
+/// `ButtonStyle` and `PrimitiveButtonStyle`, and at a couple of call sites with
+/// a large label view the compiler resolved a `where Self ==` static member
+/// against the wrong one of the two and failed to find it. A direct
+/// initialiser leaves nothing to resolve.
+struct FuelPressButtonStyle: ButtonStyle {
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(
+                FuelMotion.resolvePressScale(
+                    isPressed: configuration.isPressed,
+                    reduceMotion: reduceMotion
+                )
+            )
+            .animation(
+                FuelMotion.resolvePress(reduceMotion: reduceMotion),
+                value: configuration.isPressed
+            )
+    }
+}
+
