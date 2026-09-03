@@ -396,8 +396,8 @@ nonisolated enum FuelTypography {
     /// synthesised face and look merely slightly wrong.
     static let allDrawnStyles: [Style] = [
         dayTotal, resultCalories, goalValue, macroValueLarge, macroValueCard, macroValue,
-        settingsValue, monoValue, listValue, listValueSmall, totalSuffix, unit, settingsRowTime,
-        eyebrow,
+        settingsValue, monoValue, listValue, listValueSmall, totalSuffix, unit, eyebrow,
+        settingsRowTime,
         flowLabel, meta, macroRatio, monoNote, timestamp, macroSummary, overlayAction,
         overlayCaption, confidence,
         display, displaySmall, screenTitle, sheetTitle, addGlyph, textEntry, analysisStep,
