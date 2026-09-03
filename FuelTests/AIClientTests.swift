@@ -216,13 +216,30 @@ struct PhotoEstimateTests {
         let estimate = try await client.estimate(photo: tinyPhoto())
 
         #expect(estimate.title == "Porridge with berries")
-        #expect(estimate.kilocalories == 420)
+        // 420 is what the reply says; 508 is what the client actually
+        // returns, because grounding now sits between the parse and the
+        // return. "Porridge" alone matches no CIQUAL row, so item 0 is
+        // untouched, but "Berries" at 90 g fully covers CIQUAL's one row
+        // containing that word — "Red berries tart" — and prices from it:
+        // 231 kcal/100g x 0.9 = 208, replacing the reply's 120 and carrying
+        // an 88 kcal delta onto the meal total. A tart is not the same food
+        // as the berries in it; this is the known cost of a single generic
+        // word matching the one compound dish CIQUAL happens to name with it,
+        // not a result this test is claiming is a good match.
+        #expect(estimate.kilocalories == 508)
+        // Two items, so the meal's macro aggregate is left exactly as the
+        // model estimated it — only a meal of exactly one item has an honest
+        // "before" to replace; see FoodTableGrounding's own doc comment.
         #expect(estimate.macros == MacroTotals(protein: 14, carbs: 62, fat: 11))
         #expect(estimate.items.count == 2)
         #expect(estimate.items[0].name == "Porridge")
         #expect(estimate.items[0].kilocalories == 300)
+        #expect(estimate.items[0].macros == nil)
+        #expect(estimate.items[1].kilocalories == 208)
+        #expect(estimate.items[1].macros == MacroTotals(protein: 3, carbs: 33, fat: 6))
         // A photo carries a confidence and an approximate weight; the note is
-        // the second line of the row on screen 14.
+        // the second line of the row on screen 14. Grounding never touches
+        // the note, whichever item it resolved.
         #expect(estimate.items[0].note == .photo(confidence: .confident, approximateGrams: 250))
         #expect(estimate.items[1].note == .photo(confidence: .unsure, approximateGrams: 90))
     }
@@ -268,7 +285,9 @@ struct PhotoEstimateTests {
 
         let estimate = try await client.estimate(photo: tinyPhoto())
 
-        #expect(estimate.kilocalories == 420)
+        // See anthropicPhoto for why 420 (the reply) is not 508 (the client's
+        // answer, once "Berries" grounds against CIQUAL's "Red berries tart").
+        #expect(estimate.kilocalories == 508)
         #expect(estimate.items.count == 2)
 
         let body = try #require(transport.requests.first?.httpBody)
@@ -1428,4 +1447,134 @@ struct MealPhotoCompressorTests {
         // an upload the provider would have rejected.
         #expect(transport.requests.isEmpty)
     }
+}
+
+// MARK: - Food table grounding, wired
+
+/// `FoodTableGrounding.groundAgainstBundledTable` is called from both
+/// clients' `estimate(photo:)`/`estimate(text:)`, immediately after
+/// `EstimateContract.estimate(from:mode:)` parses the reply — these are the
+/// only tests in this file that exercise that call site rather than the
+/// parsing it sits after. `FoodTableGroundingTests` already covers the
+/// grounding logic itself against dozens of constructed cases; this is only
+/// proof that a client's return value is the grounded one, not the model's
+/// raw one.
+@Suite("Food table grounding, wired")
+struct FoodTableGroundingWiredTests {
+
+    /// The bug this whole table exists to close, run end to end: a canned
+    /// reply answers `r45g` of polenta the same wrong way the real model once
+    /// did — 72 kcal, the cooked row's price for a raw weight — and the
+    /// client is expected to hand back the raw row's price instead, because
+    /// grounding now sits between the parse and the return.
+    @Test("A raw-marked polenta reply is corrected before it leaves the client")
+    func anthropicTextIsGrounded() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let transport = RecordingTransport(
+            status: 200,
+            body: Reply.anthropic(Reply.wrongPolenta)
+        )
+        let client = AnthropicClient(transport: transport, keys: keys.source)
+
+        let estimate = try await client.estimate(text: "r45g polenta")
+
+        #expect(estimate.kilocalories == 158)
+        #expect(estimate.macros == MacroTotals(protein: 4, carbs: 33, fat: 1))
+        #expect(estimate.items[0].kilocalories == 158)
+    }
+
+    /// The same reply, the other provider — grounding does not care which
+    /// client called it.
+    @Test("Mistral's reply is corrected the same way")
+    func mistralTextIsGrounded() async throws {
+        let keys = try KeyFixture(provider: .mistral, secret: "0123456789abcdefghij")
+        defer { keys.tearDown(provider: .mistral) }
+
+        let transport = RecordingTransport(
+            status: 200,
+            body: Reply.mistral(Reply.wrongPolenta)
+        )
+        let client = MistralClient(transport: transport, keys: keys.source)
+
+        let estimate = try await client.estimate(text: "r45g polenta")
+
+        #expect(estimate.kilocalories == 158)
+    }
+
+    /// A sentence with no marker grounds against the prepared row instead —
+    /// proof the client is not just always substituting the raw price.
+    @Test("The same food without the marker is corrected to the prepared row")
+    func unmarkedTextIsGroundedToPreparedRow() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let transport = RecordingTransport(
+            status: 200,
+            body: Reply.anthropic(Reply.wrongPolenta)
+        )
+        let client = AnthropicClient(transport: transport, keys: keys.source)
+
+        let estimate = try await client.estimate(text: "45g polenta")
+
+        #expect(estimate.kilocalories == 34)
+    }
+
+    /// Photo mode benefits from the same table, priced from the model's own
+    /// approximate weight rather than a typed one.
+    @Test("A photo reply is corrected using the model's own approximate weight")
+    func photoIsGrounded() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let transport = RecordingTransport(
+            status: 200,
+            body: Reply.anthropic(Reply.wrongRicePhoto)
+        )
+        let client = AnthropicClient(transport: transport, keys: keys.source)
+
+        let estimate = try await client.estimate(photo: tinyPhoto())
+
+        #expect(estimate.kilocalories != 999)
+    }
+
+    /// A food the table cannot confidently resolve leaves the client's answer
+    /// exactly as the model wrote it — grounding is additive, never a reason
+    /// an estimate the user paid for comes back different for the worse.
+    @Test("An unresolvable food passes through the client untouched")
+    func unresolvableFoodPassesThrough() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let transport = RecordingTransport(
+            status: 200,
+            body: Reply.anthropic(Reply.goodEstimate)
+        )
+        let client = AnthropicClient(transport: transport, keys: keys.source)
+
+        let estimate = try await client.estimate(text: "porridge with berries")
+
+        #expect(estimate.kilocalories == 420)
+    }
+}
+
+extension Reply {
+
+    /// What the model once actually answered for `r45g` of polenta: 72 kcal,
+    /// the cooked row's price applied to a raw weight. The raw-weight
+    /// instruction was sent and read; the arithmetic afterwards was still
+    /// wrong, which is the reason this table exists rather than a better
+    /// paragraph of prompt.
+    fileprivate static let wrongPolenta = """
+        {"title":"Polenta","kilocalories":72,"protein_g":2,"carbs_g":15,"fat_g":0,\
+        "items":[{"name":"Polenta","kilocalories":72,"grams":45,\
+        "confidence":"confident","amount":"recognised"}]}
+        """
+
+    fileprivate static let wrongRicePhoto = """
+        {"title":"Rice","kilocalories":999,"protein_g":0,"carbs_g":0,"fat_g":0,\
+        "items":[{"name":"Rice","kilocalories":999,"grams":150,\
+        "confidence":"unsure","amount":"estimated"}]}
+        """
 }

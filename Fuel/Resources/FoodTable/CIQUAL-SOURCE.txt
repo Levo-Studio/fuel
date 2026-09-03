@@ -1,0 +1,76 @@
+ANSES-CIQUAL French food composition table
+==========================================
+
+Required citation
+-----------------
+
+    Anses. 2025. Ciqual French food composition table.
+    https://ciqual.anses.fr
+
+Release used
+------------
+
+    Ciqual 2025, data files dated 2025-11-03.
+    Source archive: https://ciqual.anses.fr/cms/sites/default/files/inline-files/2025_11_03.7z
+    SHA-256 of that archive:
+    b3b34e58890263d0c5959a157de4470f1638271a73235b77750941d96979ae27
+
+Licence
+-------
+
+Licence Ouverte / Open Licence 2.0 (Etalab).
+https://www.etalab.gouv.fr/wp-content/uploads/2018/11/open-licence.pdf
+
+The licence grants the right to reproduce, adapt, modify and redistribute the
+information, including "by including it in his/her own product or application",
+for commercial or non-commercial purposes, worldwide and without limit of time,
+subject to acknowledgement of the source and of the date of the information.
+
+It has no share-alike or reciprocity clause of any kind. Bundling this data
+places no obligation on Fuel's own source code and does not affect Levo
+Studio's copyright in it. Conversely, Levo Studio claims no copyright in the
+data itself: what is Levo Studio's here is the selection, the reduction and the
+code around it.
+
+What ANSES additionally requires
+--------------------------------
+
+Beyond the licence, the CIQUAL download page requires that reused information
+is not altered, that its sense is not distorted, and that the source *and the
+version* are given. Two consequences for Fuel:
+
+  * The citation above carries the year, which is the version.
+  * Fuel multiplies these per-100 g figures by a weight to reach a portion.
+    The result is Fuel's calculation, not an ANSES value, and must never be
+    presented as one. The credit says where the per-100 g figures came from
+    and stops there.
+
+Fuel must also not imply that ANSES endorses it. It does not.
+
+What was taken
+--------------
+
+From `alim_2025_11_03.xml` and `compo_2025_11_03.xml`, per food:
+
+    alim_code                    the identifier, kept so a row is traceable
+                                 back to the published table
+    alim_nom_eng                 the English name
+    const 328                    energy, Regulation EU No 1169/2011, kcal/100 g
+    const 25000                  protein, g/100 g
+    const 31000                  carbohydrate, g/100 g
+    const 40000                  fat, g/100 g
+
+`alim_nom_fr` and `const 400` (water) are read during the reduction and
+neither is shipped. The French name is read only to help classify a row raw or
+cooked, alongside the English name — CIQUAL sometimes states that qualifier
+more plainly in French than in English. It is **not** tokenised into the
+search index: Fuel is English-only end to end, the model's reply is always
+English regardless of what language the user typed in, and a query therefore
+never arrives as a French word. The water content is read only to cross-check
+that classification.
+
+3,341 of the 3,484 published foods are here. The 143 missing have no energy
+value in CIQUAL at all; they are mostly cocktails and composite dishes.
+
+`tools/reduce-ciqual.py` in this repository produces this file from the archive
+above, and says why each of those choices was made.
