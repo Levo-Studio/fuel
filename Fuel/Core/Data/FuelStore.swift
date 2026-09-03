@@ -158,6 +158,19 @@ final class FuelStore {
         try existingGoalSettings()?.mode ?? .goal(.default)
     }
 
+    /// The four targets as stored, whichever mode the user is in.
+    ///
+    /// `countingMode()` cannot answer this: in count-only mode it returns a
+    /// case that carries no targets, which is the point of the type. The
+    /// numbers are still on the row — `GoalSettings` keeps them so switching
+    /// back in Settings returns the user's own goal rather than the defaults —
+    /// and this is how a caller reads them without unwrapping a mode that is
+    /// deliberately empty. Before onboarding has run there is no row, and the
+    /// defaults are what onboarding itself opens on.
+    func storedTargets() throws -> DailyTargets {
+        try existingGoalSettings()?.targets ?? .default
+    }
+
     func setCountingMode(_ mode: CountingMode) throws {
         let settings = try goalSettingsCreatingIfNeeded()
         settings.mode = mode

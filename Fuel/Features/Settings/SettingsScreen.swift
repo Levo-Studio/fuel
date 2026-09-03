@@ -20,6 +20,10 @@ struct SettingsScreen: View {
     let preferences: SettingsPreferences
     let keyModel: APIKeySettingsModel
 
+    /// The counting mode and the four targets, which unlike the three above are
+    /// user data and live in the store rather than in `UserDefaults`.
+    let countingModel: CountingSettingsModel
+
     let done: () -> Void
 
     private var palette: FuelPalette {
@@ -36,6 +40,12 @@ struct SettingsScreen: View {
                 AppearanceSection(preferences: preferences)
 
                 AccentSection(preferences: preferences)
+
+                CountingSection(model: countingModel)
+
+                AutomaticLabelsSection()
+
+                SettingsPrivacyNote()
             }
             .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
         }
@@ -47,14 +57,49 @@ struct SettingsScreen: View {
     }
 }
 
+// MARK: - Privacy note
+
+/// The line that closes the screen: a rule, and under it the sentence saying
+/// everything stays on the device.
+///
+/// It is a standing note rather than a section — it has no heading, and the
+/// rule above it is a `hair` line separating it from the last section rather
+/// than a heading's underline. The `16` between the rule and the text is the
+/// gap screen 16's camera note borrows, and this is where it is drawn.
+private struct SettingsPrivacyNote: View {
+
+    @Environment(\.fuelPalette) private var palette
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SettingsHairline(color: palette.hair)
+
+            Text("settings.privacyNote")
+                .fuelStyle(FuelTypography.monoNote)
+                .foregroundStyle(palette.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, FuelMetrics.Space.s16)
+        }
+        .padding(.top, FuelMetrics.Space.s22)
+    }
+}
+
 // MARK: - Previews
 
 #Preview("Dark · connection works") {
-    SettingsPreview(theme: .dark, accent: .mono, note: .passed)
+    SettingsPreview(theme: .dark, accent: .mono, note: .passed, counting: .withGoal)
 }
 
 #Preview("Light · no credit") {
-    SettingsPreview(theme: .light, accent: .green, note: .noCredit)
+    SettingsPreview(theme: .light, accent: .green, note: .noCredit, counting: .withGoal)
+}
+
+/// The second half of the screen has a state the first does not: count-only,
+/// where the four target rows are gone and the two sections below them close
+/// up. It is the frame a wrong gap under the control shows in, and the two
+/// previews above cannot reach it, because both draw the goal rows.
+#Preview("Dark · count only") {
+    SettingsPreview(theme: .dark, accent: .blue, note: .none, counting: .countOnly)
 }
 
 /// Renders the whole screen, both themes, with a note showing.
@@ -76,8 +121,9 @@ private struct SettingsPreview: View {
 
     @State private var preferences: SettingsPreferences
     @State private var model: APIKeySettingsModel
+    @State private var counting: CountingSettingsModel
 
-    init(theme: FuelTheme, accent: FuelAccent, note: KeyTestNote) {
+    init(theme: FuelTheme, accent: FuelAccent, note: KeyTestNote, counting: CountingChoice) {
         let preferences = SettingsPreferences(defaults: Self.previewDefaults())
         preferences.theme = theme
         preferences.accent = accent
@@ -89,10 +135,32 @@ private struct SettingsPreview: View {
                 showing: note
             )
         )
+        _counting = State(initialValue: Self.previewCounting(counting))
     }
 
     var body: some View {
-        SettingsScreen(preferences: preferences, keyModel: model, done: {})
+        SettingsScreen(
+            preferences: preferences,
+            keyModel: model,
+            countingModel: counting,
+            done: {}
+        )
+    }
+
+    /// A counting model over a container that exists only for this render.
+    ///
+    /// The mode is set through the ordinary path rather than seeded, because
+    /// unlike the key test it costs nothing to reach: it is a property the user
+    /// would set by tapping a segment, and the write it triggers lands in a
+    /// container held in memory and thrown away with the canvas.
+    ///
+    /// The force is deliberate and confined to this method. An in-memory
+    /// container that will not open is a broken build rather than a state the
+    /// design draws, and a canvas has no other frame to fall back to.
+    private static func previewCounting(_ choice: CountingChoice) -> CountingSettingsModel {
+        let model = try! CountingSettingsModel(store: try! FuelStore(inMemory: true))
+        model.choice = choice
+        return model
     }
 
     /// A suite of the preview's own, so a canvas render cannot change the

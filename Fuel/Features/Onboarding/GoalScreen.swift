@@ -210,6 +210,16 @@ nonisolated enum GoalFieldInput {
     /// field to retype it must not, for those few keystrokes, mean a goal of no
     /// calories, and the export draws no state for one.
     static func kilocalories(from typed: String, previous: Int) -> Int {
+        value(from: typed, previous: previous)
+    }
+
+    /// The same rule for any of the four target fields.
+    ///
+    /// Settings draws three more of them — protein, carbs and fat, in grams —
+    /// and they clear and refill exactly like this one. A second copy of the
+    /// rule beside them would be a second place for the cleared field to start
+    /// meaning zero again, which is the bug this type was written for.
+    static func value(from typed: String, previous: Int) -> Int {
         Int(digits(in: typed)) ?? previous
     }
 }

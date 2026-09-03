@@ -727,6 +727,30 @@
         }
       }
     },
+    "settings.counting.countOnly" : {
+      "comment" : "Second segment of the counting control on screen 17.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Count only"
+          }
+        }
+      }
+    },
+    "settings.counting.withGoal" : {
+      "comment" : "First segment of the counting control on screen 17.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "With a goal"
+          }
+        }
+      }
+    },
     "settings.done" : {
       "comment" : "Control that closes Settings.",
       "extractionState" : "manual",
@@ -735,6 +759,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Done"
+          }
+        }
+      }
+    },
+    "settings.goal.calories" : {
+      "comment" : "First target row of the counting section.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calories"
+          }
+        }
+      }
+    },
+    "settings.goal.carbs" : {
+      "comment" : "Third target row of the counting section.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carbs"
+          }
+        }
+      }
+    },
+    "settings.goal.fat" : {
+      "comment" : "Fourth target row of the counting section.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fat"
+          }
+        }
+      }
+    },
+    "settings.goal.protein" : {
+      "comment" : "Second target row of the counting section.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protein"
           }
         }
       }
@@ -811,6 +883,126 @@
         }
       }
     },
+    "settings.labels.breakfast" : {
+      "comment" : "First row of the automatic-labels section.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Breakfast"
+          }
+        }
+      }
+    },
+    "settings.labels.breakfast.window" : {
+      "comment" : "The time range drawn beside the breakfast row. Drawn copy, not the labelling rule.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "04:00 – 10:59"
+          }
+        }
+      }
+    },
+    "settings.labels.dinner" : {
+      "comment" : "Fourth row of the automatic-labels section.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dinner"
+          }
+        }
+      }
+    },
+    "settings.labels.dinner.window" : {
+      "comment" : "The time range drawn beside the dinner row. Drawn copy, not the labelling rule.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "18:00 – 22:59"
+          }
+        }
+      }
+    },
+    "settings.labels.lunch" : {
+      "comment" : "Second row of the automatic-labels section.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lunch"
+          }
+        }
+      }
+    },
+    "settings.labels.lunch.window" : {
+      "comment" : "The time range drawn beside the lunch row. Drawn copy, not the labelling rule.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "11:00 – 14:59"
+          }
+        }
+      }
+    },
+    "settings.labels.note" : {
+      "comment" : "The line under the automatic-labels heading.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entries are filed by time of day. Always overridable on the result screen."
+          }
+        }
+      }
+    },
+    "settings.labels.snack" : {
+      "comment" : "Third row of the automatic-labels section.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Snack"
+          }
+        }
+      }
+    },
+    "settings.labels.snack.window" : {
+      "comment" : "The time range drawn beside the snack row. Drawn copy, not the labelling rule: snack has no window of its own.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "15:00 – 17:59"
+          }
+        }
+      }
+    },
+    "settings.privacyNote" : {
+      "comment" : "The standing note at the foot of the Settings screen.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All data lives on this device. No account, no sync."
+          }
+        }
+      }
+    },
     "settings.provider.claude" : {
       "comment" : "First segment of the provider control. A product name, not translated.",
       "extractionState" : "manual",
@@ -867,6 +1059,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Appearance"
+          }
+        }
+      }
+    },
+    "settings.section.counting" : {
+      "comment" : "Fourth section heading on the Settings screen.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Counting"
+          }
+        }
+      }
+    },
+    "settings.section.labels" : {
+      "comment" : "Fifth section heading on the Settings screen.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatic labels"
           }
         }
       }
