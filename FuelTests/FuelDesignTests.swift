@@ -353,6 +353,30 @@ struct FuelMotionTests {
         #expect(FuelMotion.resolve(FuelMotion.emphasised, reduceMotion: true) == nil)
     }
 
+    @Test("a paced sequence advances normally, and not at all under reduced motion")
+    func pacingStopsRatherThanSoftens() {
+        // The distinction from `resolve` is the point. A cross-fade would keep
+        // a rotation running and only blur each swap, which is not less motion;
+        // for text that rewrites itself, less motion means none, and the caller
+        // draws the state it is already on.
+        #expect(
+            FuelMotion.resolvePacing(FuelMotion.placeholderExampleHold, reduceMotion: false)
+                == FuelMotion.placeholderExampleHold
+        )
+        #expect(FuelMotion.resolvePacing(FuelMotion.placeholderExampleHold, reduceMotion: true) == nil)
+    }
+
+    @Test("a dwell is long enough to read and short enough to notice")
+    func dwellsStayReadable() {
+        // Both dwells pace a sequence of states rather than an interpolation,
+        // and both have to clear the same two bars: long enough that the state
+        // can be taken in, short enough that the screen is not waiting on it.
+        for hold in [FuelMotion.analysisStepHold, FuelMotion.placeholderExampleHold] {
+            #expect(hold > .zero)
+            #expect(hold <= .seconds(3))
+        }
+    }
+
     @Test("no curve outlasts the interaction that caused it")
     func durationsStayTight() {
         for curve in FuelMotion.allCurves {
