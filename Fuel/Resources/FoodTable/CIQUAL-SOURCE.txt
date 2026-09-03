@@ -60,9 +60,14 @@ From `alim_2025_11_03.xml` and `compo_2025_11_03.xml`, per food:
     const 31000                  carbohydrate, g/100 g
     const 40000                  fat, g/100 g
 
-`alim_nom_fr` and `const 400` (water) are read during the reduction — the
-French name to index and to classify by, the water content to cross-check the
-classification — and neither is shipped.
+`alim_nom_fr` and `const 400` (water) are read during the reduction and
+neither is shipped. The French name is read only to help classify a row raw or
+cooked, alongside the English name — CIQUAL sometimes states that qualifier
+more plainly in French than in English. It is **not** tokenised into the
+search index: Fuel is English-only end to end, the model's reply is always
+English regardless of what language the user typed in, and a query therefore
+never arrives as a French word. The water content is read only to cross-check
+that classification.
 
 3,341 of the 3,484 published foods are here. The 143 missing have no energy
 value in CIQUAL at all; they are mostly cocktails and composite dishes.

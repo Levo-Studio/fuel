@@ -138,6 +138,23 @@ struct FoodTableTests {
         #expect(plain == accented)
     }
 
+    /// The search index holds English words only. CIQUAL's own French name
+    /// for rice is "riz", and that word has to find nothing at all — not a
+    /// wrong food, nothing — because the only thing that would ever land in
+    /// this search is a word the model wrote, and the model's replies are
+    /// always English. Indexing French too would risk an English query
+    /// landing on a French homograph and shortlisting the wrong food, which
+    /// is a correctness bug in the exact place this table exists to close
+    /// one.
+    @Test("A French word is not a way in", arguments: [
+        "riz",       // rice
+        "fromage",   // cheese
+        "poulet",    // chicken
+    ])
+    func frenchIsNotIndexed(term: String) {
+        #expect(table.search(term).isEmpty)
+    }
+
     @Test("A row can be fetched back by the code it was shortlisted under")
     func lookupByIdentifier() throws {
         let entry = try #require(table.entry(id: 9614))

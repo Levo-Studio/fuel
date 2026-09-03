@@ -269,12 +269,25 @@ def build(source_dir, output_path):
 
     check_states(foods)
 
-    # Tokens come from both names. The search term reaching the device is
-    # whatever the model wrote, and a model naming a French dish writes the
-    # French word as often as not.
+    # Tokens come from the English name only, and only the English name.
+    # Fuel is English-only end to end: the estimate contract asks both
+    # providers for English field names and the app normalises the model's
+    # own reply into English regardless of what language the user typed in,
+    # so a search term reaching this table has never been anything but an
+    # English word — "polenta", "egg", "cottage cheese" — never
+    # "polenta ou semoule de mais". Indexing the French name as well used to
+    # widen the vocabulary a query could hit; it was also indexing forty-six
+    # hundred words nothing arriving here would ever be written in. There is
+    # no language detection or fallback in the lookup itself for the same
+    # reason: one language arrives, so one column is searched.
+    #
+    # `name_fr` is still read above, into `preparation_state`, which is a
+    # different question — not what a query will say, but what CIQUAL itself
+    # says about a food, and CIQUAL sometimes says the raw-versus-cooked
+    # qualifier more plainly in French than in English.
     postings = {}
     for index, food in enumerate(foods):
-        for token in set(tokenise(food["name"]) + tokenise(food["name_fr"])):
+        for token in set(tokenise(food["name"])):
             postings.setdefault(token, []).append(index)
 
     tokens = sorted(postings)

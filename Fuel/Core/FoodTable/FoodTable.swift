@@ -48,11 +48,26 @@ nonisolated struct FoodTableEntry: Sendable, Hashable, Identifiable {
 
 /// The bundled food composition table, searched by name on the device.
 ///
+/// **The search index holds English words only, and a query is read as
+/// English only — there is no language detection and no fallback.** Fuel is
+/// English-only end to end: the estimate contract asks both providers for an
+/// English reply regardless of what language the user typed in or what
+/// language the dish's name usually is, so a search term reaching this type
+/// has never been anything but an English word — "polenta", "egg", "cottage
+/// cheese", never "polenta ou semoule de mais". CIQUAL publishes a French
+/// name for every row (`alim_nom_fr`) and this table reads it too, but only
+/// to help classify a row raw or cooked at build time — see
+/// `FoodPreparation` — and it is never tokenised into the index and never
+/// shipped in this artefact. Indexing it as well would not just be dead
+/// weight: an English query could land on a French homograph and shortlist
+/// the wrong food, which is a correctness bug in the exact place this table
+/// exists to close one.
+///
 /// **No request is made to look up a number.** That is the point of shipping
-/// 430 KB rather than calling an API: an online lookup would tell a third party
-/// what the user ate, one meal at a time, which is the one thing Fuel is built
-/// not to do. There is no network path in this type and there is no cache that
-/// could grow one.
+/// a few hundred kilobytes rather than calling an API: an online lookup would
+/// tell a third party what the user ate, one meal at a time, which is the one
+/// thing Fuel is built not to do. There is no network path in this type and
+/// there is no cache that could grow one.
 ///
 /// The file is memory-mapped and nothing in it is decoded until it is read, so
 /// opening the table costs a `mmap` and a header check rather than a parse. A
@@ -234,10 +249,12 @@ nonisolated struct FoodTable: Sendable {
     /// Prefix rather than equality, so "tomatoes" finds "tomato" — the model
     /// writes a plural as readily as a singular, and an English plural is a
     /// suffix in the great majority of cases. It is deliberately one-directional
-    /// and deliberately not a stemmer: a stemmer is a table of rules that would
-    /// have to be right in a second language too, and the shortlist is read by
-    /// a model that can discard a wrong candidate. Missing the row entirely is
-    /// the expensive failure here; an extra candidate costs a line of a prompt.
+    /// and deliberately not a stemmer: a stemmer is a table of rules that has
+    /// to be got right, for one gain — collapsing an irregular form like
+    /// "leaves" onto "leaf" — that a prefix match already gets for free in the
+    /// regular case, and the shortlist is read by a model that can discard a
+    /// wrong candidate. Missing the row entirely is the expensive failure
+    /// here; an extra candidate costs a line of a prompt.
     private func postings(matching token: String) -> [Int] {
         var low = 0
         var high = tokenCount
@@ -341,6 +358,11 @@ nonisolated struct FoodTable: Sendable {
     /// exactly with `fold`/`tokenise` in `tools/reduce-ciqual.py`, because a
     /// query token that is folded differently from the index simply never
     /// matches and there is nothing on screen to say why.
+    ///
+    /// No language parameter and no per-language branch, because the index
+    /// this is matched against holds one language. See the type's own doc
+    /// comment for why that is the whole of the query-language handling this
+    /// type needs.
     static func tokenise(_ text: String) -> [String] {
         let folded = text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
         return folded
