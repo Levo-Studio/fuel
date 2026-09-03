@@ -412,7 +412,12 @@ nonisolated enum FuelTypography {
     /// How far a scaling style may grow. Chosen so the largest accessibility
     /// size still fits the drawn rows; beyond it the layout the design
     /// specifies stops holding.
-    private static let maximumScale: CGFloat = 1.4
+    ///
+    /// Not private, because copy that has to survive the cap is checked against
+    /// it: the rotating examples on screen 12 are drawn in a prompt, which is
+    /// one line and truncates rather than wrapping, so their width is a rule
+    /// held to this number rather than to a restatement of it.
+    static let maximumScale: CGFloat = 1.4
 
     /// The `wght` OpenType variation axis, as the four-character tag `wght`
     /// read as a big-endian integer — the form `kCTFontVariationAttribute`

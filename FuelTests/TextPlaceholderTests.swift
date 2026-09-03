@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import UIKit
 
 @testable import Fuel
 
@@ -78,6 +79,32 @@ struct TextPlaceholderTests {
 
         #expect(line.hasPrefix("2 eggs"))
         #expect(line != "2 eggs")
+    }
+
+    @Test("every example fits the drawn line at the largest text size")
+    @MainActor
+    func examplesFitTheDrawnLine() {
+        // A prompt is one line. The typed text under it wraps and grows the
+        // field downward; the placeholder does not, so an example that outruns
+        // the line loses its trailing ellipsis to a truncating one — the export's
+        // own mark replaced by the system's.
+        //
+        // The line is the export's frame less the inset the log flow heads its
+        // screens at. The size is the widest the field can ever draw: the
+        // drawn 19pt taken to `FuelTypography.maximumScale`, which is where a
+        // scaling style stops growing. Asking the style for its font instead
+        // would measure whatever content size this process happens to run at,
+        // which is the default one — and a test that measures the easy case is
+        // decoration.
+        let lineWidth = 390 - 2 * FuelMetrics.Screen.logFlowHorizontalPadding
+        let drawnSize = FuelTypography.textEntry.uiFont.pointSize
+        let font = FuelTypography.textEntry.uiFont.withSize(drawnSize * FuelTypography.maximumScale)
+
+        for example in TextLogCopy.placeholderExamples {
+            let drawn = TextLogCopy.placeholderLine(example) as NSString
+            let width = drawn.size(withAttributes: [.font: font]).width
+            #expect(width <= lineWidth, "\(drawn) needs \(width)pt of \(lineWidth)pt")
+        }
     }
 
     @Test("every example names an amount")

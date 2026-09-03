@@ -1898,7 +1898,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "300ml latte and a 60g cookie"
+            "value" : "300ml latte, 1 cookie"
           }
         }
       }
@@ -1910,7 +1910,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "150g salmon and potatoes"
+            "value" : "150g salmon, potatoes"
           }
         }
       }
