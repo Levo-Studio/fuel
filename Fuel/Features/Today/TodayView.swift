@@ -21,6 +21,10 @@ struct TodayView: View {
     let onOpenSettings: () -> Void
     let onAddEntry: () -> Void
 
+    /// A meal in the list was tapped, by the identity its hand-off value
+    /// carries.
+    let onOpenMeal: (UUID) -> Void
+
     @Environment(\.fuelPalette) private var palette
 
     var body: some View {
@@ -66,7 +70,7 @@ struct TodayView: View {
     /// drawn as it always was: the header, the summary, and nothing under it.
     @ViewBuilder private var dayOrEmptyState: some View {
         if presentation.hasEntries {
-            TodayDayList(groups: presentation.groups)
+            TodayDayList(groups: presentation.groups, onSelect: onOpenMeal)
         } else if gettingStarted.isOffered {
             TodayGettingStartedView(
                 checklist: gettingStarted,
@@ -240,7 +244,8 @@ private struct TodayListFade: View {
         ),
         gettingStarted: TodayPreviewData.retiredChecklist,
         onOpenSettings: {},
-        onAddEntry: {}
+        onAddEntry: {},
+        onOpenMeal: { _ in }
     )
     .environment(\.fuelPalette, FuelPalette(theme: .dark, accent: .mono))
 }
@@ -254,7 +259,8 @@ private struct TodayListFade: View {
         ),
         gettingStarted: TodayPreviewData.retiredChecklist,
         onOpenSettings: {},
-        onAddEntry: {}
+        onAddEntry: {},
+        onOpenMeal: { _ in }
     )
     .environment(\.fuelPalette, FuelPalette(theme: .light, accent: .green))
 }
@@ -268,7 +274,8 @@ private struct TodayListFade: View {
         ),
         gettingStarted: TodayPreviewData.firstRunChecklist,
         onOpenSettings: {},
-        onAddEntry: {}
+        onAddEntry: {},
+        onOpenMeal: { _ in }
     )
     .environment(\.fuelPalette, FuelPalette(theme: .dark, accent: .mono))
 }
@@ -282,7 +289,8 @@ private struct TodayListFade: View {
         ),
         gettingStarted: TodayPreviewData.retiredChecklist,
         onOpenSettings: {},
-        onAddEntry: {}
+        onAddEntry: {},
+        onOpenMeal: { _ in }
     )
     .environment(\.fuelPalette, FuelPalette(theme: .light, accent: .mono))
 }

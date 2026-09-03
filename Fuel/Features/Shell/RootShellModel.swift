@@ -26,18 +26,24 @@ final class RootShellModel {
 
     /// What is presented over Today.
     ///
-    /// Both are full-screen presentations rather than pushes, because both are
-    /// dismissed by a control the export draws on their own chrome: the log
-    /// flow's `✕ Cancel` at the top left of screens 07, 12 and 13, and
-    /// Settings' `Done` opposite its title on screens 16 and 17. Neither is a
-    /// back chevron, neither sits in a navigation bar, and no screen in the
-    /// export draws one — so there is nothing for a stack to draw, and a stack
-    /// would put its own bar above screens that are laid out from the top of
-    /// the frame.
+    /// All three are full-screen presentations rather than pushes, because each
+    /// is dismissed by a control the export draws on its own chrome: the log
+    /// flow's `✕ Cancel` at the top left of screens 07, 12 and 13, Settings'
+    /// `Done` opposite its title on screens 16 and 17, and the result screen's
+    /// `‹ Back` on screens 14 and 15. None is a back chevron in a navigation
+    /// bar, and no screen in the export draws one — so there is nothing for a
+    /// stack to draw, and a stack would put its own bar above screens that are
+    /// laid out from the top of the frame.
     enum Destination: Hashable, Identifiable {
 
         case logFlow
         case settings
+
+        /// A meal that is already in the store, by the identity the day list
+        /// hands back. It is carried in the case rather than beside it so that
+        /// `fullScreenCover(item:)` replaces the presentation when the user
+        /// opens a different meal.
+        case mealDetail(UUID)
 
         var id: Self { self }
     }
@@ -84,6 +90,28 @@ final class RootShellModel {
         )
     }
 
+    /// Builds the screen a logged meal opens on, for the provider that is
+    /// selected at the moment the row is tapped.
+    ///
+    /// `nil` when there is no such meal — see `MealDetailModel.init`.
+    typealias MealDetailFactory = @MainActor (FuelStore, AIProvider, UUID) -> MealDetailModel?
+
+    /// The real thing: the client for that provider, and no camera. A stored
+    /// meal is re-estimated from its item list.
+    ///
+    /// The provider is passed twice for the reason it is above, and the two
+    /// questions are the same two: which endpoint a re-analysis is sent to, and
+    /// which key the model looks for before it makes one.
+    @MainActor
+    static let liveMealDetail: MealDetailFactory = { store, provider, entryID in
+        MealDetailModel(
+            entryID: entryID,
+            store: store,
+            client: ProviderClients.client(for: provider),
+            provider: provider
+        )
+    }
+
     // MARK: - Dependencies
 
     private let store: FuelStore
@@ -108,6 +136,11 @@ final class RootShellModel {
     /// reasons: `TextLogModel` keeps its client and its provider to itself, and
     /// the real composition points a client at a provider's endpoint.
     private let makeTextLog: TextLogFactory
+
+    /// How the screen for a logged meal is built, and a seam for the same two
+    /// reasons: `MealDetailModel` keeps its client and its provider to itself,
+    /// and the real composition points a client at a provider's endpoint.
+    private let makeMealDetail: MealDetailFactory
 
     // MARK: - State
 
@@ -171,6 +204,14 @@ final class RootShellModel {
     /// front of the next one — and hold its content in memory until then.
     private(set) var textLog: TextLogModel
 
+    /// The screen a logged meal opens on, built when a row is tapped and
+    /// released when it closes.
+    ///
+    /// Not kept, for the reason the log flow is not: it holds a draft the user
+    /// may have edited without asking for it to be priced, and reopening onto
+    /// that would put a meal they walked away from in front of the next one.
+    private(set) var mealDetail: MealDetailModel?
+
     /// Settings' API-key row. Built once, because a re-render must not drop a
     /// half-typed key or restart a check in flight — the same reason
     /// `onboarding` is built here rather than in a view.
@@ -201,12 +242,14 @@ final class RootShellModel {
         preferences: SettingsPreferences,
         keychain: KeychainStore = KeychainStore(),
         makeCameraLog: @escaping CameraLogFactory = RootShellModel.liveCameraLog,
-        makeTextLog: @escaping TextLogFactory = RootShellModel.liveTextLog
+        makeTextLog: @escaping TextLogFactory = RootShellModel.liveTextLog,
+        makeMealDetail: @escaping MealDetailFactory = RootShellModel.liveMealDetail
     ) {
         self.store = store
         self.preferences = preferences
         self.makeCameraLog = makeCameraLog
         self.makeTextLog = makeTextLog
+        self.makeMealDetail = makeMealDetail
         self.stage = Self.launchStage(for: store)
         self.today = Self.presentation(for: store)
         self.gettingStarted = Self.checklist(store: store, preferences: preferences)
@@ -317,6 +360,22 @@ final class RootShellModel {
         destination = .logFlow
     }
 
+    /// A meal in the day list on screens 05 and 06.
+    ///
+    /// A meal that is no longer there leaves the tap unanswered rather than
+    /// opening an empty screen — the same shape the gear uses against a store
+    /// it cannot read, and for the same reason: the export draws no state for
+    /// either.
+    ///
+    /// The provider is read here rather than kept from launch, so a provider
+    /// switched on screen 16 is the one a re-analysis talks to and looks a key
+    /// up under.
+    func openMealDetail(_ entryID: UUID) {
+        guard let detail = makeMealDetail(store, preferences.provider, entryID) else { return }
+        mealDetail = detail
+        destination = .mealDetail(entryID)
+    }
+
     /// The gear on screens 05 and 06.
     ///
     /// A store that cannot be read leaves the gear unanswered rather than
@@ -367,6 +426,13 @@ final class RootShellModel {
             cameraLog.camera.stop()
         }
 
+        // Released with the presentation, so a second tap on a row builds the
+        // screen again rather than reopening onto edits the user walked away
+        // from — and so the meal's breakdown is not held in memory until then.
+        if case .mealDetail = destination {
+            mealDetail = nil
+        }
+
         refreshToday()
         destination = nil
     }
@@ -407,12 +473,12 @@ final class RootShellModel {
             // flight cancelled, a captured frame dropped, a result screen the
             // user had not committed replaced by a viewfinder.
             logFlow.selectedTab = .camera
-        case .settings:
-            // Only one cover can be presented, so Settings is left the way its
-            // `Done` leaves it — through `dismissDestination`, with the re-read
-            // of the day that comes with it — before the flow is opened as the
-            // plus opens it. Both writes land in one update, and
-            // `fullScreenCover(item:)` replaces the presentation when the
+        case .settings, .mealDetail:
+            // Only one cover can be presented, so whichever is up is left the
+            // way its own control leaves it — through `dismissDestination`,
+            // with the re-read of the day that comes with it — before the flow
+            // is opened as the plus opens it. Both writes land in one update,
+            // and `fullScreenCover(item:)` replaces the presentation when the
             // item's identity changes, so Today is not shown in between.
             dismissDestination()
             openLogFlow()
