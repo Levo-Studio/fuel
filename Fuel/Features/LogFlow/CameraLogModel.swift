@@ -201,7 +201,7 @@ final class CameraLogModel {
             kilocalories: estimate.kilocalories,
             macros: estimate.macros,
             items: estimate.items,
-            label: provisionalLabel(at: capturedAt),
+            label: store.provisionalLabel(at: capturedAt),
             isLabelUserSet: false,
             isFavourite: false
         )
@@ -217,18 +217,6 @@ final class CameraLogModel {
             return
         }
         stage = .failed(failure)
-    }
-
-    /// What the label will be, unless the user overrules it.
-    ///
-    /// Derived through `MealLabeler` rather than restated, because the
-    /// course-of-the-day rule has exactly one implementation and the result
-    /// screen must not become a second one. The claimed set is what the day
-    /// has already handed out.
-    private func provisionalLabel(at date: Date) -> MealLabel {
-        let claimed = (try? store.nutritionEntries(on: date))?
-            .reduce(into: Set<MealLabel>()) { $0.insert($1.label) } ?? []
-        return MealLabeler(calendar: store.calendar).label(forEntryAt: date, claimedLabels: claimed)
     }
 
     // MARK: - Editing the result
