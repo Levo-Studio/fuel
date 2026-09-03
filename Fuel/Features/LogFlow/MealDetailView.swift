@@ -5,15 +5,21 @@ import SwiftUI
 /// A meal that is already logged, on the screen the export draws for one that
 /// is not.
 ///
-/// **There is no second drawing here.** It is `MealResultView` — screens 14 and
-/// 15 — with three things handed to it and nothing added: no leading footer
-/// control, because there is no estimate to throw away; `Delete` where `Add`
-/// sits; and, in the lede slot, whichever of the photograph or the sentence
-/// this meal was logged with — or, for a meal that has neither, its own name
-/// in that place instead. See `lede` for the rule and `MealDetailModel.photo`
-/// for why a meal can lack both. Everything from the pill down is the same
-/// drawing, including the rule that turns the footer into `Re-analyse` once
-/// the breakdown has been changed.
+/// **Everything above the footer is `MealResultView` unchanged** — screens 14
+/// and 15 — with no leading footer control, because there is no estimate to
+/// throw away, and, in the lede slot, whichever of the photograph or the
+/// sentence this meal was logged with, or its own name where neither exists.
+/// See `lede` for that rule and `MealDetailModel.photo` for why a meal can
+/// lack both.
+///
+/// **The footer is this screen's own**, not `MealResultView`'s built-in one —
+/// see `footer` for why and `MealResultView.commit` for the seam that lets it
+/// opt out. Once the breakdown has changed it is the same full-width
+/// `Re-analyse` pill the scan screens draw, reusing `MealResultPrimaryButton`
+/// rather than a second copy of it. Otherwise it is `Delete`, small and in a
+/// corner rather than the wide pill the export has no drawing for at all —
+/// the owner's call, so it cannot be reached by an accidental tap the way a
+/// footer-wide button can.
 ///
 /// The analysis states and the failure state sit over the whole screen, the
 /// way they do over the log flow, because the export gives them no chrome to
@@ -24,6 +30,8 @@ struct MealDetailView: View {
 
     /// `‹ Back`, and where a deleted meal leaves the user: Today.
     let onClose: () -> Void
+
+    @Environment(\.fuelPalette) private var palette
 
     /// Whether the delete confirmation is up.
     ///
@@ -60,10 +68,12 @@ struct MealDetailView: View {
                 // screen draws no leading control at all.
                 onDiscard: nil,
                 discardConfirmation: MealDetailCopy.discardEditsConfirmation,
-                commit: MealResultAction(
-                    title: MealDetailCopy.delete,
-                    perform: { isConfirmingDelete = true }
-                ),
+                // `nil` rather than a `Delete` action handed in the way the
+                // scan screens hand in `Add`: this screen's footer is not the
+                // filled full-width pill that value would draw, so drawing it
+                // at all here would be a footer nobody can see built beneath
+                // the one this screen actually shows. See `footer`.
+                commit: nil,
                 // The same slot `PhotoResultView`/`TextResultView` fill on the
                 // scan screens, reusing their exact rendering: the photo for a
                 // camera-mode meal, the sentence for a text-mode one. Neither
@@ -72,6 +82,7 @@ struct MealDetailView: View {
                 // opening on a gap — see `MealDetailModel.photo`.
                 lede: { lede }
             )
+            .safeAreaInset(edge: .bottom, spacing: .zero) { footer }
 
             switch model.stage {
             case .analysing(let step):
@@ -134,6 +145,92 @@ struct MealDetailView: View {
         } else {
             MealTitleLede(title: model.draft.title)
         }
+    }
+
+    // MARK: - Footer
+
+    /// This screen's own footer, in `MealResultView`'s place for one —
+    /// `commit: nil` above means it draws none.
+    ///
+    /// **Not one fixed shape.** Once the breakdown has changed there is a
+    /// real request behind `Re-analyse`, worth the same full-width pill the
+    /// scan screens spend on `Add`/`Re-analyse` — built from
+    /// `MealResultPrimaryButton`, the same view they use, so the two cannot
+    /// draw it differently by accident. `MealResultDraft.canReanalyse` is the
+    /// exact condition `MealResultView.primaryAction` gates on internally;
+    /// reading it again here is the one small price of drawing this outside
+    /// that view rather than forking it.
+    ///
+    /// Otherwise the footer is `Delete`. **Deliberately not that pill** —
+    /// there is no drawing for this screen at all, so nothing here is a
+    /// deviation from a frame the export draws, only from the seam the two
+    /// scan screens happen to share. A meal already sits in the store; the
+    /// owner does not want the one control that removes it sitting where a
+    /// scroll gone a fingerwidth too far, or a tap meant for the last
+    /// breakdown row, can catch it. See `deleteCorner`.
+    @ViewBuilder
+    private var footer: some View {
+        Group {
+            if model.draft.canReanalyse {
+                MealResultPrimaryButton(
+                    action: MealResultAction(title: MealResultCopy.reanalyse, perform: model.reanalyse)
+                )
+            } else {
+                deleteCorner
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
+        .padding(.bottom, FuelMetrics.Space.s34)
+        .fuelAnimation(FuelMotion.standard, value: model.draft.hasItemEdits)
+    }
+
+    /// `Delete`, small and in the leading corner.
+    ///
+    /// **Leading, not trailing — the same corner the discard control on the
+    /// scan screens already claims for a control that throws something
+    /// away**, so the app has one place a destructive control lives in a
+    /// footer rather than two. It also keeps this control off the trailing
+    /// edge, where every breakdown row's own remove mark already sits above
+    /// it — a column a scroll that overshoots would otherwise carry a thumb
+    /// straight through.
+    ///
+    /// **Sized at `Control.circleButton`, the 34pt circle Today's gear is
+    /// already drawn at, floored at the same `Control.minimumHitTarget` every
+    /// control in this app answers a finger within** — smaller than the pill
+    /// it replaces, but not smaller than a finger, which is the difference
+    /// between "harder to reach by accident" and "harder to reach". The
+    /// overhang trick is the gear's own: the hit region grows past the drawn
+    /// circle and a negative padding gives the layout its 34 back, so nothing
+    /// else in the row moves for it.
+    ///
+    /// The trash glyph and the `ink` it is drawn in are `discardControl`'s own
+    /// choices, reused rather than re-decided — the same mark means the same
+    /// thing wherever this app draws it. `surface` behind it for the reason
+    /// fix gave the same glyph a fill on the scan screens: an outlined circle
+    /// with one small symbol in it and nothing else nearby reads as barely
+    /// there, and a control this deliberately small cannot afford to also
+    /// read as absent.
+    private var deleteCorner: some View {
+        Button {
+            isConfirmingDelete = true
+        } label: {
+            Image(systemName: "trash")
+                .fuelStyle(FuelTypography.iconGlyph)
+                .foregroundStyle(palette.ink)
+                .frame(width: FuelMetrics.Control.circleButton, height: FuelMetrics.Control.circleButton)
+                .background {
+                    Circle().fill(palette.surface)
+                }
+                .overlay {
+                    Circle().strokeBorder(palette.hair, lineWidth: FuelMetrics.Line.hairline)
+                }
+                .frame(width: FuelMetrics.Control.minimumHitTarget, height: FuelMetrics.Control.minimumHitTarget)
+                .contentShape(Rectangle())
+                .padding(-FuelMetrics.Control.hitTargetOverhang(around: FuelMetrics.Control.circleButton))
+        }
+        .buttonStyle(FuelPressButtonStyle())
+        .accessibilityLabel(Text(MealDetailCopy.delete))
     }
 
     // MARK: - Editing
