@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Getting started
 
-/// What Today draws while the day has no entries: four things to do, in the
+/// What Today draws at the beginning of the app: three things to do, in the
 /// space the meal sections would otherwise occupy.
 ///
 /// **The export draws no empty state**, on either Today screen. Nothing here is
@@ -81,8 +81,8 @@ private struct TodayGettingStartedRow: View {
 
                 // The check of screen 03, in the twenty-unit box it is authored
                 // in and at the weight the design states for it. The slot is
-                // held whether or not the check is in it, so the four titles
-                // and the rule under them do not shift as rows are ticked.
+                // held whether or not the check is in it, so the three titles
+                // and the rules under them do not shift as rows are ticked.
                 ZStack {
                     if item.isDone {
                         FuelCheckGlyph()

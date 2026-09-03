@@ -109,14 +109,6 @@ final class RootShellModel {
     /// the real composition points a client at a provider's endpoint.
     private let makeTextLog: TextLogFactory
 
-    /// Whether a key is stored, for the get-started checklist's first row.
-    ///
-    /// `MealKeyPresence` rather than `KeychainStore`, which is the whole point:
-    /// the checklist asks whether an item exists and is not able to read one.
-    /// Nothing on Today has any business holding the user's key, and a tick is
-    /// drawn from presence alone.
-    private let keys: any MealKeyPresence
-
     // MARK: - State
 
     private(set) var stage: Stage
@@ -200,17 +192,15 @@ final class RootShellModel {
         validator: KeyValidating,
         preferences: SettingsPreferences,
         makeCameraLog: @escaping CameraLogFactory = RootShellModel.liveCameraLog,
-        makeTextLog: @escaping TextLogFactory = RootShellModel.liveTextLog,
-        keys: any MealKeyPresence = KeychainStore()
+        makeTextLog: @escaping TextLogFactory = RootShellModel.liveTextLog
     ) {
         self.store = store
         self.preferences = preferences
         self.makeCameraLog = makeCameraLog
         self.makeTextLog = makeTextLog
-        self.keys = keys
         self.stage = Self.launchStage(for: store)
         self.today = Self.presentation(for: store)
-        self.gettingStarted = Self.checklist(store: store, preferences: preferences, keys: keys)
+        self.gettingStarted = Self.checklist(store: store, preferences: preferences)
         self.logFlow = LogFlowModel(store: store)
         // One read, spent on both halves. Two reads could not disagree today —
         // nothing runs between them — but they are two sources for a value the
@@ -239,31 +229,28 @@ final class RootShellModel {
         return settings == nil ? .onboarding : .today
     }
 
-    /// The four answers, each read from whatever actually holds it.
+    /// The three answers, each read from whatever actually holds it.
     ///
-    /// Static and taking its three sources, so it can run inside `init` before
+    /// Static and taking its two sources, so it can run inside `init` before
     /// every stored property has a value — the same reason `presentation` is.
+    ///
+    /// **Nothing here asks about the key or the counting mode.** Both are
+    /// answered by onboarding before Today exists, so neither is a thing to
+    /// suggest on the first Today screen.
     private static func checklist(
         store: FuelStore,
-        preferences: SettingsPreferences,
-        keys: any MealKeyPresence
+        preferences: SettingsPreferences
     ) -> TodayGettingStarted {
-        // A store that cannot be read is not a store that has been logged to,
-        // and a first row that cannot be answered is not a row to tick. Both
-        // readings fail towards "still to do", which is recoverable: the worst
-        // it costs is a suggestion the user has already acted on, against a
-        // tick that would have been a lie.
-        let mode = try? store.countingMode()
-        return TodayGettingStarted(
-            hasProviderKey: keys.hasKey(for: preferences.provider),
-            // `targets` is the presence of a goal — count-only carries none,
-            // which is what the type exists to say.
-            isGoalMode: mode?.targets != nil,
+        TodayGettingStarted(
             // "Differs from what Fuel ships with", not "has been visited".
             // A user who opens screen 16 and picks the theme it already had
             // has changed nothing, and the row says the look, not the visit.
-            hasCustomisedAppearance: preferences.theme != SettingsPreferences.Default.theme
-                || preferences.accent != SettingsPreferences.Default.accent,
+            hasChosenTheme: preferences.theme != SettingsPreferences.Default.theme,
+            hasChosenAccent: preferences.accent != SettingsPreferences.Default.accent,
+            // A store that cannot be read is not a store that has been logged
+            // to. Failing towards "still to do" keeps the checklist on screen
+            // one launch too long, which is recoverable; failing the other way
+            // would retire it on someone who has never logged anything.
             hasLoggedMeal: (try? store.hasAnyEntry()) ?? false
         )
     }
@@ -295,7 +282,7 @@ final class RootShellModel {
     /// asking for the first meal.
     private func refreshToday() {
         today = Self.presentation(for: store)
-        gettingStarted = Self.checklist(store: store, preferences: preferences, keys: keys)
+        gettingStarted = Self.checklist(store: store, preferences: preferences)
     }
 
     // MARK: - Leaving and returning to Today

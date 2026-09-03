@@ -290,21 +290,19 @@ private struct TodayListFade: View {
 /// The day the export draws, so a preview shows the screen the design shows.
 private enum TodayPreviewData {
 
-    /// A first run: a key was asked for before Today was ever reached, so that
-    /// row is the one thing already done.
+    /// A first run: onboarding is answered, nothing is customised and nothing
+    /// has been logged.
     static let firstRunChecklist = TodayGettingStarted(
-        hasProviderKey: true,
-        isGoalMode: false,
-        hasCustomisedAppearance: false,
+        hasChosenTheme: false,
+        hasChosenAccent: false,
         hasLoggedMeal: false
     )
 
     /// A user who has logged before, so there is no checklist left to offer.
     /// A day with entries in it is in this state by definition.
     static let retiredChecklist = TodayGettingStarted(
-        hasProviderKey: true,
-        isGoalMode: true,
-        hasCustomisedAppearance: true,
+        hasChosenTheme: true,
+        hasChosenAccent: true,
         hasLoggedMeal: true
     )
 

@@ -1903,14 +1903,14 @@
         }
       }
     },
-    "today.gettingStarted.appearance" : {
-      "comment" : "Checklist row: change the theme or the accent colour. Opens Settings. Not in the export.",
+    "today.gettingStarted.accent" : {
+      "comment" : "Checklist row: pick one of the five accent colours. Opens Settings. Not in the export.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Customise the look"
+            "value" : "Choose an accent colour"
           }
         }
       }
@@ -1927,18 +1927,6 @@
         }
       }
     },
-    "today.gettingStarted.goal" : {
-      "comment" : "Checklist row: switch from counting only to counting against a goal. Opens Settings. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Set a daily goal"
-          }
-        }
-      }
-    },
     "today.gettingStarted.heading" : {
       "comment" : "Heading over the get-started checklist on an empty day, where a meal heading would otherwise be. Uppercased by the text style, not here. Not in the export.",
       "extractionState" : "manual",
@@ -1947,18 +1935,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Get started"
-          }
-        }
-      }
-    },
-    "today.gettingStarted.key" : {
-      "comment" : "Checklist row: store an API key for the selected provider. Opens Settings. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add your key"
           }
         }
       }
@@ -1983,6 +1959,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Not done"
+          }
+        }
+      }
+    },
+    "today.gettingStarted.theme" : {
+      "comment" : "Checklist row: pick light or dark. Opens Settings, which draws the two as a segmented control. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose light or dark"
           }
         }
       }

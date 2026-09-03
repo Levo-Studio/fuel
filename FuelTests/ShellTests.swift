@@ -46,16 +46,12 @@ private nonisolated struct StubTransport: HTTPTransport {
 /// Answers the key question without a keychain, which is what lets these tests
 /// run without an access group and without ever holding a secret.
 ///
-/// It says yes unless a test asks it not to. Whether the camera half goes dead
-/// without a key is `CameraLogTests`' subject and is covered there; here a key
-/// has to exist for the shutter to reach a stage worth reopening onto. The
-/// get-started checklist is the one thing in this suite that asks the question
-/// for its own sake, and it needs both answers.
+/// It always says yes. Whether the camera half goes dead without a key is
+/// `CameraLogTests`' subject and is covered there; here a key has to exist for
+/// the shutter to reach a stage worth reopening onto.
 private nonisolated struct StubKeys: MealKeyPresence {
 
-    var answer = true
-
-    func hasKey(for provider: AIProvider) -> Bool { answer }
+    func hasKey(for provider: AIProvider) -> Bool { true }
 }
 
 /// A client whose estimate fails, which is how a test drives the text half into
@@ -108,16 +104,14 @@ struct ShellTests {
         store: FuelStore,
         preferences: SettingsPreferences? = nil,
         makeCameraLog: @escaping RootShellModel.CameraLogFactory = ShellTests.stubCameraLog,
-        makeTextLog: @escaping RootShellModel.TextLogFactory = ShellTests.stubTextLog,
-        hasKey: Bool = true
+        makeTextLog: @escaping RootShellModel.TextLogFactory = ShellTests.stubTextLog
     ) -> RootShellModel {
         RootShellModel(
             store: store,
             validator: UnusedValidator(),
             preferences: preferences ?? makePreferences(),
             makeCameraLog: makeCameraLog,
-            makeTextLog: makeTextLog,
-            keys: StubKeys(answer: hasKey)
+            makeTextLog: makeTextLog
         )
     }
 
@@ -178,50 +172,37 @@ struct ShellTests {
 
     // MARK: - The get-started checklist
 
-    /// The state the owner looked at: onboarding answered with count-only, no
-    /// key, nothing logged, the shipped appearance.
-    @Test("A first run has nothing on the checklist done but the key")
+    /// The state the owner looked at: onboarding answered, nothing logged, the
+    /// appearance Fuel ships with.
+    @Test("A first run has nothing on the checklist done")
     func firstRunChecklist() throws {
         let store = try makeStore()
         try store.setCountingMode(.countOnly)
 
-        let model = makeModel(store: store, hasKey: false)
+        let model = makeModel(store: store)
         #expect(model.gettingStarted.items.allSatisfy { $0.isDone == false })
         #expect(model.gettingStarted.isOffered)
     }
 
-    @Test("A stored key ticks the key row")
-    func keyRow() throws {
-        let store = try makeStore()
-        try store.setCountingMode(.countOnly)
-
-        #expect(makeModel(store: store, hasKey: true).gettingStarted.isDone(.key))
-        #expect(makeModel(store: store, hasKey: false).gettingStarted.isDone(.key) == false)
-    }
-
-    @Test("Goal mode ticks the goal row and count-only leaves it open")
-    func goalRow() throws {
-        let goalStore = try makeStore()
-        try goalStore.setCountingMode(.goal(.default))
-        #expect(makeModel(store: goalStore).gettingStarted.isDone(.goal))
-
-        let countingStore = try makeStore()
-        try countingStore.setCountingMode(.countOnly)
-        #expect(makeModel(store: countingStore).gettingStarted.isDone(.goal) == false)
-    }
-
-    /// The shipped theme and accent are not a choice the user made, so the row
-    /// stays open until one of them differs.
-    @Test("An accent off the shipped one ticks the look row")
-    func appearanceRow() throws {
+    /// The shipped theme and accent are not a choice the user made, so each row
+    /// stays open until its own control differs.
+    @Test("The theme and the accent tick their own rows")
+    func appearanceRows() throws {
         let store = try makeStore()
         try store.setCountingMode(.countOnly)
 
         let preferences = makePreferences()
-        #expect(makeModel(store: store, preferences: preferences).gettingStarted.isDone(.appearance) == false)
+        let untouched = makeModel(store: store, preferences: preferences).gettingStarted
+        #expect(untouched.isDone(.theme) == false)
+        #expect(untouched.isDone(.accent) == false)
 
         preferences.accent = .blue
-        #expect(makeModel(store: store, preferences: preferences).gettingStarted.isDone(.appearance))
+        let accented = makeModel(store: store, preferences: preferences).gettingStarted
+        #expect(accented.isDone(.accent))
+        #expect(accented.isDone(.theme) == false)
+
+        preferences.theme = .light
+        #expect(makeModel(store: store, preferences: preferences).gettingStarted.isDone(.theme))
     }
 
     /// The row that would un-tick itself at midnight if it asked about today.
@@ -245,21 +226,22 @@ struct ShellTests {
         #expect(model.gettingStarted.isOffered == false)
     }
 
-    /// The checklist is read from four places that a presented cover can all
-    /// change, so it is re-read where the day is.
+    /// The checklist is read from places a presented cover can change, so it is
+    /// re-read where the day is.
     @Test("Dismissing a cover re-reads the checklist")
     func checklistIsRefreshedOnDismissal() throws {
         let store = try makeStore()
         try store.setCountingMode(.countOnly)
 
-        let model = makeModel(store: store)
-        #expect(model.gettingStarted.isDone(.goal) == false)
+        let preferences = makePreferences()
+        let model = makeModel(store: store, preferences: preferences)
+        #expect(model.gettingStarted.isDone(.accent) == false)
 
         model.openSettings()
-        try store.setCountingMode(.goal(.default))
+        preferences.accent = .lilac
         model.dismissDestination()
 
-        #expect(model.gettingStarted.isDone(.goal))
+        #expect(model.gettingStarted.isDone(.accent))
     }
 
     // MARK: - Finishing onboarding

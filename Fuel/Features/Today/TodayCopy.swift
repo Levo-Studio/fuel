@@ -110,9 +110,8 @@ nonisolated enum TodayCopy {
 
     static func gettingStartedTitle(_ step: TodayGettingStartedStep) -> String {
         switch step {
-        case .key: String(localized: "today.gettingStarted.key")
-        case .goal: String(localized: "today.gettingStarted.goal")
-        case .appearance: String(localized: "today.gettingStarted.appearance")
+        case .theme: String(localized: "today.gettingStarted.theme")
+        case .accent: String(localized: "today.gettingStarted.accent")
         case .firstMeal: String(localized: "today.gettingStarted.firstMeal")
         }
     }

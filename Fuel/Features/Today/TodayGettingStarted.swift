@@ -2,39 +2,42 @@ import Foundation
 
 // MARK: - Step
 
-/// The four things a new user still has ahead of them, in the order they are
+/// The three things a new user still has ahead of them, in the order they are
 /// drawn.
 ///
-/// **Every one of them has a done state Fuel can actually establish**, and that
-/// is the whole membership rule. A checklist that shows a tick for something it
-/// cannot know is a lie, and there is no drawn design to hide behind here — the
-/// export draws no empty state at all, so this list is built with more
-/// restraint than a drawn screen, not less. Anything whose completion could
-/// only be guessed at is left off.
+/// Two rules decide what is on this list, and both are exclusions.
+///
+/// **Nothing onboarding already answered.** The key is screens 01–03 and cannot
+/// be skipped; goal-or-count-only is screen 04. Both are settled before Today
+/// is reachable at all, so a row asking for either would be asking for
+/// something the user did a minute ago. What is left is customisation — the
+/// choices screen 16 offers and nobody is made to make — and the first use of
+/// the app.
+///
+/// **Nothing whose done state Fuel cannot establish.** A checklist that shows a
+/// tick for something it can only guess at is a lie, and there is no drawn
+/// design to hide behind here: the export draws no empty state at all, so this
+/// list is built with more restraint than a drawn screen, not less.
 nonisolated enum TodayGettingStartedStep: CaseIterable, Hashable, Sendable, Identifiable {
 
-    /// Done when a key is stored for the provider that is selected.
+    /// Done when the theme differs from the one Fuel opens on.
     ///
-    /// Answered through `MealKeyPresence`, which cannot return a key — the tick
-    /// is drawn from an item's existence, never from reading a secret to look
-    /// at it.
-    case key
+    /// Screen 16 draws Light and Dark as a two-segment control of its own, so
+    /// this is a choice in its own right rather than half of an "appearance"
+    /// row invented here.
+    case theme
 
-    /// Done when the counting mode is goal rather than count-only.
-    ///
-    /// Count-only is a legitimate final answer and not an unfinished state, so
-    /// this row stays unticked for a user who meant it. It is an invitation
-    /// rather than a scold: the row is worded as an offer, it is one tap from
-    /// the control that changes it, and the whole checklist disappears the
-    /// moment the day has an entry in it.
-    case goal
-
-    /// Done when the theme or the accent differs from what Fuel ships with.
-    case appearance
+    /// Done when the accent differs from `mono`, which is the one the app
+    /// ships with. Screen 16 draws the five swatches as their own section.
+    case accent
 
     /// Done when any entry exists in the store, on any day — not when today has
     /// one. An entry today would un-tick itself at midnight, which for a row
     /// that says "your first meal" is absurd.
+    ///
+    /// It is also the row that ends the list: see `TodayGettingStarted`'s
+    /// `isOffered`. A user never sees this one ticked, because the moment it
+    /// would be, the checklist is gone.
     case firstMeal
 
     var id: Self { self }
@@ -45,8 +48,8 @@ nonisolated enum TodayGettingStartedStep: CaseIterable, Hashable, Sendable, Iden
     ///
     /// Both are destinations Today already has: the gear's and the plus's. The
     /// checklist opens no route of its own, and Settings has no way to be
-    /// opened at a particular section, so the three rows it answers all land at
-    /// the top of it.
+    /// opened at a particular section, so the two rows it answers land at the
+    /// top of it.
     enum Destination: Hashable, Sendable {
         case settings
         case logFlow
@@ -54,7 +57,7 @@ nonisolated enum TodayGettingStartedStep: CaseIterable, Hashable, Sendable, Iden
 
     var destination: Destination {
         switch self {
-        case .key, .goal, .appearance: .settings
+        case .theme, .accent: .settings
         case .firstMeal: .logFlow
         }
     }
@@ -75,9 +78,9 @@ nonisolated struct TodayGettingStartedItem: Hashable, Sendable, Identifiable {
 
 /// The get-started checklist Today draws at the beginning of the app.
 ///
-/// A plain value with no store, no keychain and no view in it, so every rule
-/// above can be pinned without a `ModelContainer` and without a simulator. The
-/// four answers are worked out by whoever can reach the things that hold them —
+/// A plain value with no store and no view in it, so every rule above can be
+/// pinned without a `ModelContainer` and without a simulator. The three answers
+/// are worked out by whoever can reach the things that hold them —
 /// `RootShellModel` — and handed in.
 ///
 /// It is not in `Fuel/Nutrition/`: none of this is nutrition, and the core
@@ -91,16 +94,14 @@ nonisolated struct TodayGettingStarted: Hashable, Sendable {
     private let hasLoggedMeal: Bool
 
     init(
-        hasProviderKey: Bool,
-        isGoalMode: Bool,
-        hasCustomisedAppearance: Bool,
+        hasChosenTheme: Bool,
+        hasChosenAccent: Bool,
         hasLoggedMeal: Bool
     ) {
         self.hasLoggedMeal = hasLoggedMeal
         let answers: [TodayGettingStartedStep: Bool] = [
-            .key: hasProviderKey,
-            .goal: isGoalMode,
-            .appearance: hasCustomisedAppearance,
+            .theme: hasChosenTheme,
+            .accent: hasChosenAccent,
             .firstMeal: hasLoggedMeal
         ]
         // Built from `allCases` rather than from the dictionary, so the drawn
