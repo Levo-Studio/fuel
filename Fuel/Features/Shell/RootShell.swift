@@ -81,6 +81,7 @@ struct RootShell: View {
             case .today:
                 TodayView(
                     presentation: model.today,
+                    gettingStarted: model.gettingStarted,
                     onOpenSettings: model.openSettings,
                     onAddEntry: model.openLogFlow
                 )

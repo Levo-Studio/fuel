@@ -120,6 +120,15 @@ final class RootShellModel {
     /// the only moment its inputs can have changed while no log flow exists.
     private(set) var today: TodayPresentation
 
+    /// What Today draws in the day list's place while the day is empty.
+    ///
+    /// Recomputed with `today` and never separately. Its three answers come
+    /// from two places — the preferences hold the theme and the accent, and the
+    /// store answers whether a meal was ever logged — and all three can change
+    /// behind a presented cover, so the moment they are read is the moment the
+    /// cover goes away.
+    private(set) var gettingStarted: TodayGettingStarted
+
     /// The onboarding flow's own state, built once so a re-render of the shell
     /// cannot drop a half-typed key or restart the key test.
     ///
@@ -191,6 +200,7 @@ final class RootShellModel {
         self.makeTextLog = makeTextLog
         self.stage = Self.launchStage(for: store)
         self.today = Self.presentation(for: store)
+        self.gettingStarted = Self.checklist(store: store, preferences: preferences)
         self.logFlow = LogFlowModel(store: store)
         // One read, spent on both halves. Two reads could not disagree today —
         // nothing runs between them — but they are two sources for a value the
@@ -219,6 +229,32 @@ final class RootShellModel {
         return settings == nil ? .onboarding : .today
     }
 
+    /// The three answers, each read from whatever actually holds it.
+    ///
+    /// Static and taking its two sources, so it can run inside `init` before
+    /// every stored property has a value — the same reason `presentation` is.
+    ///
+    /// **Nothing here asks about the key or the counting mode.** Both are
+    /// answered by onboarding before Today exists, so neither is a thing to
+    /// suggest on the first Today screen.
+    private static func checklist(
+        store: FuelStore,
+        preferences: SettingsPreferences
+    ) -> TodayGettingStarted {
+        TodayGettingStarted(
+            // "Differs from what Fuel ships with", not "has been visited".
+            // A user who opens screen 16 and picks the theme it already had
+            // has changed nothing, and the row says the look, not the visit.
+            hasChosenTheme: preferences.theme != SettingsPreferences.Default.theme,
+            hasChosenAccent: preferences.accent != SettingsPreferences.Default.accent,
+            // A store that cannot be read is not a store that has been logged
+            // to. Failing towards "still to do" keeps the checklist on screen
+            // one launch too long, which is recoverable; failing the other way
+            // would retire it on someone who has never logged anything.
+            hasLoggedMeal: (try? store.hasAnyEntry()) ?? false
+        )
+    }
+
     private static func presentation(for store: FuelStore) -> TodayPresentation {
         let now = Date()
         return TodayPresentation(
@@ -234,8 +270,19 @@ final class RootShellModel {
     /// truth, so the presentation is read back from the store rather than
     /// assembled from what the flow happened to hold.
     private func showToday() {
-        today = Self.presentation(for: store)
+        refreshToday()
         stage = .today
+    }
+
+    /// Re-reads everything Today draws.
+    ///
+    /// One call rather than two at each site: the checklist and the day are
+    /// read from the same store at the same moment, and a site that refreshed
+    /// only one of them would show a day with an entry in it beside a row still
+    /// asking for the first meal.
+    private func refreshToday() {
+        today = Self.presentation(for: store)
+        gettingStarted = Self.checklist(store: store, preferences: preferences)
     }
 
     // MARK: - Leaving and returning to Today
@@ -305,7 +352,7 @@ final class RootShellModel {
             cameraLog.camera.stop()
         }
 
-        today = Self.presentation(for: store)
+        refreshToday()
         destination = nil
     }
 

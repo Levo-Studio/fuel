@@ -150,14 +150,11 @@ struct KeyTestStepMarker: View {
 
     /// The done marker, as the export draws it.
     ///
-    /// A system checkmark stood here while `FuelMetrics` had no stroke weight
-    /// for a drawn glyph. It has one now, and the design layer's rule is that
-    /// a glyph drawn as a path is built from the path: a symbol's weight is a
-    /// design of its own and would not have matched, and a symbol scaled to
-    /// fill the slot is half again the size of the drawn mark, which spans only
-    /// x 4→16 and y 6→14.5 of the twenty.
+    /// The path and the reason it is a path rather than a symbol are in
+    /// `FuelCheckGlyph`; the stroke is stated here, because a `Shape` carries
+    /// none.
     private var check: some View {
-        KeyTestCheck()
+        FuelCheckGlyph()
             .stroke(
                 palette.ink,
                 style: StrokeStyle(
@@ -211,39 +208,6 @@ struct KeyTestStepMarker: View {
     /// where nothing turns at all.
     private static var arcRotation: Angle {
         .degrees(FuelMetrics.Ring.startAngleDegrees - fullTurn * FuelMetrics.Line.spinnerArc / 2)
-    }
-}
-
-// MARK: - Check glyph
-
-/// The check the export draws on a completed step: `d="M4 10.5l4 4L16 6"`.
-///
-/// The three points are the path's own coordinates in the export's twenty-unit
-/// glyph box, which is why they sit here rather than in `FuelMetrics` — they
-/// describe the shape of a mark, not a distance in the app's layout, and the
-/// design layer says as much where it supplies the box and the stroke and
-/// leaves the path to the call site. Scaled by the frame so the glyph follows
-/// its slot instead of assuming the two are the same size.
-private struct KeyTestCheck: Shape {
-
-    private static let points: [CGPoint] = [
-        CGPoint(x: 4, y: 10.5),
-        CGPoint(x: 8, y: 14.5),
-        CGPoint(x: 16, y: 6)
-    ]
-
-    nonisolated func path(in rect: CGRect) -> Path {
-        let scale = min(rect.width, rect.height) / FuelMetrics.Line.Glyph.viewBox
-        var path = Path()
-        for (position, point) in Self.points.enumerated() {
-            let scaled = CGPoint(x: point.x * scale, y: point.y * scale)
-            if position == 0 {
-                path.move(to: scaled)
-            } else {
-                path.addLine(to: scaled)
-            }
-        }
-        return path
     }
 }
 

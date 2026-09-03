@@ -53,6 +53,21 @@ final class FuelStore {
         try entries(on: day).map(\.nutritionValue)
     }
 
+    /// Whether anything has ever been logged, on any day.
+    ///
+    /// Deliberately not "today has an entry". It answers whether the user has
+    /// ever used the app to log a meal, which is a thing that happens once and
+    /// stays true; a reading scoped to the current day would come back false
+    /// again every midnight.
+    ///
+    /// One row is enough to answer it, so the fetch is limited to one rather
+    /// than counting a store that grows for the life of the app.
+    func hasAnyEntry() throws -> Bool {
+        var descriptor = FetchDescriptor<FoodEntry>()
+        descriptor.fetchLimit = 1
+        return try !context.fetch(descriptor).isEmpty
+    }
+
     /// The most recently logged entries, newest first, for the Recent tab.
     func recentEntries(limit: Int) throws -> [FoodEntry] {
         var descriptor = FetchDescriptor<FoodEntry>(

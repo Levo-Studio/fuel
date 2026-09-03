@@ -170,6 +170,80 @@ struct ShellTests {
         #expect(model.today.showsRing == false)
     }
 
+    // MARK: - The get-started checklist
+
+    /// The state the owner looked at: onboarding answered, nothing logged, the
+    /// appearance Fuel ships with.
+    @Test("A first run has nothing on the checklist done")
+    func firstRunChecklist() throws {
+        let store = try makeStore()
+        try store.setCountingMode(.countOnly)
+
+        let model = makeModel(store: store)
+        #expect(model.gettingStarted.items.allSatisfy { $0.isDone == false })
+        #expect(model.gettingStarted.isOffered)
+    }
+
+    /// The shipped theme and accent are not a choice the user made, so each row
+    /// stays open until its own control differs.
+    @Test("The theme and the accent tick their own rows")
+    func appearanceRows() throws {
+        let store = try makeStore()
+        try store.setCountingMode(.countOnly)
+
+        let preferences = makePreferences()
+        let untouched = makeModel(store: store, preferences: preferences).gettingStarted
+        #expect(untouched.isDone(.theme) == false)
+        #expect(untouched.isDone(.accent) == false)
+
+        preferences.accent = .blue
+        let accented = makeModel(store: store, preferences: preferences).gettingStarted
+        #expect(accented.isDone(.accent))
+        #expect(accented.isDone(.theme) == false)
+
+        preferences.theme = .light
+        #expect(makeModel(store: store, preferences: preferences).gettingStarted.isDone(.theme))
+    }
+
+    /// The row that would un-tick itself at midnight if it asked about today.
+    @Test("A meal logged on another day still ticks the meal row")
+    func mealRow() throws {
+        let store = try makeStore()
+        try store.setCountingMode(.countOnly)
+        let lastWeek = try #require(Calendar.current.date(byAdding: .day, value: -7, to: Date()))
+        try store.log(
+            title: "Porridge",
+            kilocalories: 420,
+            macros: .zero,
+            loggedAt: lastWeek,
+            source: .photo
+        )
+
+        let model = makeModel(store: store)
+        #expect(model.today.hasEntries == false)
+        #expect(model.gettingStarted.isDone(.firstMeal))
+        // And the whole checklist is retired by it, on a day with nothing in.
+        #expect(model.gettingStarted.isOffered == false)
+    }
+
+    /// The checklist is read from places a presented cover can change, so it is
+    /// re-read where the day is.
+    @Test("Dismissing a cover re-reads the checklist")
+    func checklistIsRefreshedOnDismissal() throws {
+        let store = try makeStore()
+        try store.setCountingMode(.countOnly)
+
+        let preferences = makePreferences()
+        let model = makeModel(store: store, preferences: preferences)
+        #expect(model.gettingStarted.isDone(.accent) == false)
+
+        model.openSettings()
+        preferences.accent = .lilac
+        model.dismissDestination()
+
+        #expect(model.gettingStarted.isDone(.accent))
+    }
+
     // MARK: - Finishing onboarding
 
     @Test("Completing onboarding moves to Today without a relaunch")

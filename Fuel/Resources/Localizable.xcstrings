@@ -1963,6 +1963,78 @@
         }
       }
     },
+    "today.gettingStarted.accent" : {
+      "comment" : "Checklist row: pick one of the five accent colours. Opens Settings. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose an accent colour"
+          }
+        }
+      }
+    },
+    "today.gettingStarted.firstMeal" : {
+      "comment" : "Checklist row: log a meal. Opens the log flow. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Log your first meal"
+          }
+        }
+      }
+    },
+    "today.gettingStarted.heading" : {
+      "comment" : "Heading over the get-started checklist on an empty day, where a meal heading would otherwise be. Uppercased by the text style, not here. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get started"
+          }
+        }
+      }
+    },
+    "today.gettingStarted.state.done" : {
+      "comment" : "Spoken state of a checklist row that is done, which is drawn as a check. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        }
+      }
+    },
+    "today.gettingStarted.state.notDone" : {
+      "comment" : "Spoken state of a checklist row that is not done, which is drawn as nothing at all. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not done"
+          }
+        }
+      }
+    },
+    "today.gettingStarted.theme" : {
+      "comment" : "Checklist row: pick light or dark. Opens Settings, which draws the two as a segmented control. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose light or dark"
+          }
+        }
+      }
+    },
     "today.group.breakfast" : {
       "comment" : "Heading over the breakfast group in the day list. Uppercased by the text style, not here.",
       "extractionState" : "manual",

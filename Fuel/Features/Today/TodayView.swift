@@ -12,6 +12,12 @@ struct TodayView: View {
 
     let presentation: TodayPresentation
 
+    /// What stands in the day list's place while the day has no entries. The
+    /// export draws nothing there, and a first run showed the header over five
+    /// hundred points of empty, which reads as a fault rather than as a
+    /// beginning.
+    let gettingStarted: TodayGettingStarted
+
     let onOpenSettings: () -> Void
     let onAddEntry: () -> Void
 
@@ -34,7 +40,7 @@ struct TodayView: View {
                     )
                     .padding(.top, FuelMetrics.Space.s34)
 
-                    TodayDayList(groups: presentation.groups)
+                    dayOrEmptyState
                         .padding(.top, listTopPadding)
                 }
                 .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
@@ -50,6 +56,23 @@ struct TodayView: View {
             TodayAddButton(action: onAddEntry)
                 .padding(.trailing, FuelMetrics.Control.addButtonTrailingInset)
                 .padding(.bottom, FuelMetrics.Control.addButtonBottomInset)
+        }
+    }
+
+    /// The day, or the checklist that stands in for it at the beginning.
+    ///
+    /// The checklist is offered on an empty day *and only until the first meal
+    /// is logged* — after that it is gone for good, and a later empty day is
+    /// drawn as it always was: the header, the summary, and nothing under it.
+    @ViewBuilder private var dayOrEmptyState: some View {
+        if presentation.hasEntries {
+            TodayDayList(groups: presentation.groups)
+        } else if gettingStarted.isOffered {
+            TodayGettingStartedView(
+                checklist: gettingStarted,
+                onOpenSettings: onOpenSettings,
+                onAddEntry: onAddEntry
+            )
         }
     }
 
@@ -215,6 +238,7 @@ private struct TodayListFade: View {
             mode: .goal(.default),
             date: TodayPreviewData.date
         ),
+        gettingStarted: TodayPreviewData.retiredChecklist,
         onOpenSettings: {},
         onAddEntry: {}
     )
@@ -228,14 +252,59 @@ private struct TodayListFade: View {
             mode: .countOnly,
             date: TodayPreviewData.date
         ),
+        gettingStarted: TodayPreviewData.retiredChecklist,
         onOpenSettings: {},
         onAddEntry: {}
     )
     .environment(\.fuelPalette, FuelPalette(theme: .light, accent: .green))
 }
 
+#Preview("First run") {
+    TodayView(
+        presentation: TodayPresentation(
+            entries: [],
+            mode: .countOnly,
+            date: TodayPreviewData.date
+        ),
+        gettingStarted: TodayPreviewData.firstRunChecklist,
+        onOpenSettings: {},
+        onAddEntry: {}
+    )
+    .environment(\.fuelPalette, FuelPalette(theme: .dark, accent: .mono))
+}
+
+#Preview("Empty day, after the first meal") {
+    TodayView(
+        presentation: TodayPresentation(
+            entries: [],
+            mode: .goal(.default),
+            date: TodayPreviewData.date
+        ),
+        gettingStarted: TodayPreviewData.retiredChecklist,
+        onOpenSettings: {},
+        onAddEntry: {}
+    )
+    .environment(\.fuelPalette, FuelPalette(theme: .light, accent: .mono))
+}
+
 /// The day the export draws, so a preview shows the screen the design shows.
 private enum TodayPreviewData {
+
+    /// A first run: onboarding is answered, nothing is customised and nothing
+    /// has been logged.
+    static let firstRunChecklist = TodayGettingStarted(
+        hasChosenTheme: false,
+        hasChosenAccent: false,
+        hasLoggedMeal: false
+    )
+
+    /// A user who has logged before, so there is no checklist left to offer.
+    /// A day with entries in it is in this state by definition.
+    static let retiredChecklist = TodayGettingStarted(
+        hasChosenTheme: true,
+        hasChosenAccent: true,
+        hasLoggedMeal: true
+    )
 
     /// Local midnight, because the rows print `TimeZone.current`. Anchoring to
     /// UTC would slide every drawn time by the machine's offset and the

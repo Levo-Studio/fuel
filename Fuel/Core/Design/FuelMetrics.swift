@@ -187,7 +187,9 @@ nonisolated enum FuelMetrics {
             /// The plus on the add button, screens 05 and 06.
             static let plus: CGFloat = 1.6
 
-            /// The check on a completed key-test step.
+            /// The check of screen 03, drawn `stroke-width="1.7"`. Two things
+            /// carry it: a completed key-test step, and a done row of Today's
+            /// get-started checklist, which draws the same mark.
             static let check: CGFloat = 1.7
 
             /// The box the paths are authored in, like `Ring.viewBox`.

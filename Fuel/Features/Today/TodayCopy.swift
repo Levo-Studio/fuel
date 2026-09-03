@@ -96,6 +96,33 @@ nonisolated enum TodayCopy {
     static func entryMeta(time: String, source: EntrySource) -> String {
         String(format: String(localized: "today.entry.meta"), time, sourceName(source))
     }
+
+    // MARK: - Empty day
+
+    // None of the copy below is in the export, which draws no empty state on
+    // either Today screen. Every key carries that in its comment in the
+    // catalog, so a reader who greps the screens for one of these lines and
+    // finds nothing is told why before they go looking.
+
+    static var gettingStartedHeading: String {
+        String(localized: "today.gettingStarted.heading")
+    }
+
+    static func gettingStartedTitle(_ step: TodayGettingStartedStep) -> String {
+        switch step {
+        case .theme: String(localized: "today.gettingStarted.theme")
+        case .accent: String(localized: "today.gettingStarted.accent")
+        case .firstMeal: String(localized: "today.gettingStarted.firstMeal")
+        }
+    }
+
+    /// What a row's state is announced as. The check is drawn and its absence
+    /// is drawn as nothing at all, so neither says anything out loud.
+    static func gettingStartedState(isDone: Bool) -> String {
+        isDone
+            ? String(localized: "today.gettingStarted.state.done")
+            : String(localized: "today.gettingStarted.state.notDone")
+    }
 }
 
 // MARK: - Figures
