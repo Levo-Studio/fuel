@@ -104,6 +104,22 @@ private struct TodayHeader: View {
                     .overlay {
                         Circle().strokeBorder(palette.hair, lineWidth: FuelMetrics.Line.hairline)
                     }
+                    // The drawn circle is 34 and a finger is 44. The larger
+                    // frame grows the region that answers around it, and the
+                    // negative padding gives the layout its 34 back — so the
+                    // circle keeps the size and the position the export puts
+                    // it in, and the header row is laid out as though nothing
+                    // here were bigger than what is drawn.
+                    .frame(
+                        width: FuelMetrics.Control.minimumHitTarget,
+                        height: FuelMetrics.Control.minimumHitTarget
+                    )
+                    .contentShape(Rectangle())
+                    .padding(
+                        -FuelMetrics.Control.hitTargetOverhang(
+                            around: FuelMetrics.Control.circleButton
+                        )
+                    )
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Text(TodayCopy.settingsLabel))
