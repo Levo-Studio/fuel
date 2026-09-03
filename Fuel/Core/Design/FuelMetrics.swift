@@ -70,12 +70,23 @@ nonisolated enum FuelMetrics {
         /// `horizontalPadding`; only the header row sits in this.
         static let logFlowHorizontalPadding = Space.s26
 
-        /// The drop from the top of the frame to the first line on the two
-        /// onboarding screens that carry content — the API key screen and the
-        /// goal screen.
+        /// The drop to the first line on the two onboarding screens that carry
+        /// content — the API key screen and the goal screen.
+        ///
+        /// Measured **below the safe area**, not from the top of the screen.
+        /// The export draws its own status bar as a sibling that comes first
+        /// and puts this padding on the container after it, so the 88 sits
+        /// under the bar. That mock bar is the stand-in for the real safe
+        /// area, which is why the same number lands lower on a device: a real
+        /// status bar is taller than the drawn one.
+        ///
+        /// The same reading in reverse governs every bottom edge — a drawn
+        /// bottom distance is measured above the safe-area boundary, because
+        /// the mock frame omits the home indicator a device has.
         static let onboardingTopPadding = Space.s88
 
-        /// The same drop on the two key-test screens, which sit lower.
+        /// The same drop on the two key-test screens, which sit lower. Also
+        /// below the safe area — see `onboardingTopPadding`.
         ///
         /// The larger value goes to the screen with *less* on it, which is the
         /// opposite of the intuition: screens 02 and 03 carry a headline and
