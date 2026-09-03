@@ -553,6 +553,28 @@ struct CameraLogTests {
         #expect(try store.entries(on: at(19, 20)).isEmpty)
     }
 
+    @Test("discarding an edited estimate writes nothing and lets the frame go")
+    func discardAfterEditingWritesNothing() async throws {
+        let store = try makeStore()
+        let model = makeModel(store: store, client: ScriptedClient(answer: .success(Self.estimate)))
+        await model.scanning(pixel())
+
+        model.removeItem(try #require(model.draft?.items.first?.id))
+        model.addItem("Olive oil, 1 tbsp")
+        model.toggleFavourite()
+
+        // What the trash control does once the confirmation is answered. The
+        // confirmation itself is the screen's state, not the model's: nothing
+        // here runs until it is confirmed, which is what makes backing out of
+        // it safe.
+        model.discard()
+
+        #expect(model.stage == .viewfinder)
+        #expect(model.draft == nil)
+        #expect(model.photo == nil)
+        #expect(try store.entries(on: at(19, 20)).isEmpty)
+    }
+
     @Test("a commit with nothing to commit reports failure rather than writing")
     func commitWithoutADraft() throws {
         let store = try makeStore()

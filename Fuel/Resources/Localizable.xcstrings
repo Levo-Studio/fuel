@@ -955,6 +955,54 @@
         }
       }
     },
+    "result.discard.cancel" : {
+      "comment" : "Backs out of the discard confirmation, leaving the estimate and its edits alone. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep editing"
+          }
+        }
+      }
+    },
+    "result.discard.confirm" : {
+      "comment" : "The destructive action in the discard confirmation. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard"
+          }
+        }
+      }
+    },
+    "result.discard.label" : {
+      "comment" : "The leading footer control, which is a trash mark and no word, for VoiceOver. The export draws it as Neu. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard this estimate"
+          }
+        }
+      }
+    },
+    "result.discard.title" : {
+      "comment" : "The discard confirmation's own title. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard this estimate?"
+          }
+        }
+      }
+    },
     "result.favourite.label" : {
       "comment" : "The favourite toggle for VoiceOver, without the star. Not in the export.",
       "extractionState" : "manual",
@@ -1215,18 +1263,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Protein"
-          }
-        }
-      }
-    },
-    "result.new" : {
-      "comment" : "Screens 14 and 15, the outlined footer action. Drawn Neu.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "New"
           }
         }
       }

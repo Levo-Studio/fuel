@@ -121,8 +121,21 @@ nonisolated enum MealResultCopy {
 
     // MARK: - Footer
 
-    static var new: String {
-        String(localized: "result.new")
+    /// The leading footer control, which is a trash mark and no word.
+    static var discardLabel: String {
+        String(localized: "result.discard.label")
+    }
+
+    static var discardTitle: String {
+        String(localized: "result.discard.title")
+    }
+
+    static var discardConfirm: String {
+        String(localized: "result.discard.confirm")
+    }
+
+    static var discardCancel: String {
+        String(localized: "result.discard.cancel")
     }
 
     static var add: String {

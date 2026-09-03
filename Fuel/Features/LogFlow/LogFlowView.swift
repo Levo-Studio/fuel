@@ -56,7 +56,7 @@ struct LogFlowView: View {
                         onEditItem: camera.editItem,
                         onAddItem: camera.addItem,
                         onReanalyse: camera.reanalyse,
-                        onNew: camera.discard,
+                        onDiscard: camera.discard,
                         commit: MealResultAction(title: MealResultCopy.add, perform: add)
                     )
                 }
@@ -79,10 +79,10 @@ struct LogFlowView: View {
                     TextResultView(
                         draft: draft,
                         typedText: text.typedText,
-                        // `Back` keeps the sentence and `New` clears it, which
-                        // is the one thing the text mode can offer that the
-                        // camera mode cannot: a photograph is not editable on
-                        // the way back, so the export had no version of this
+                        // `Back` keeps the sentence and discarding clears it,
+                        // which is the one thing the text mode can offer that
+                        // the camera mode cannot: a photograph is not editable
+                        // on the way back, so the export had no version of this
                         // to draw.
                         onBack: text.returnToEntry,
                         onCycleLabel: text.cycleLabel,
@@ -91,7 +91,7 @@ struct LogFlowView: View {
                         onEditItem: text.editItem,
                         onAddItem: text.addItem,
                         onReanalyse: text.reanalyse,
-                        onNew: text.discard,
+                        onDiscard: text.discard,
                         commit: MealResultAction(title: MealResultCopy.add, perform: addTypedMeal)
                     )
                 }

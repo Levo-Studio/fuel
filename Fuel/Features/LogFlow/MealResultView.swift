@@ -76,7 +76,13 @@ struct MealResultView<Lede: View>: View {
     /// in that list has changed.
     let onReanalyse: () -> Void
 
-    let onNew: () -> Void
+    /// The leading footer control: throw this estimate away without logging
+    /// it.
+    ///
+    /// Optional, because it is only a control where there is something to
+    /// throw away. A screen opened on a meal that is already in the store has
+    /// nothing to discard, and draws no leading control at all.
+    let onDiscard: (() -> Void)?
 
     /// The filled footer button as this caller means it.
     let commit: MealResultAction
@@ -97,6 +103,8 @@ struct MealResultView<Lede: View>: View {
 
     @State private var editedText = ""
 
+    @State private var isConfirmingDiscard = false
+
     init(
         draft: MealResultDraft,
         flowLabel: String,
@@ -108,7 +116,7 @@ struct MealResultView<Lede: View>: View {
         onEditItem: @escaping (RecognisedItem.ID, String) -> Void,
         onAddItem: @escaping (String) -> Void,
         onReanalyse: @escaping () -> Void,
-        onNew: @escaping () -> Void,
+        onDiscard: (() -> Void)?,
         commit: MealResultAction,
         @ViewBuilder lede: @escaping () -> Lede
     ) {
@@ -122,7 +130,7 @@ struct MealResultView<Lede: View>: View {
         self.onEditItem = onEditItem
         self.onAddItem = onAddItem
         self.onReanalyse = onReanalyse
-        self.onNew = onNew
+        self.onDiscard = onDiscard
         self.commit = commit
         self.lede = lede
     }
@@ -167,6 +175,22 @@ struct MealResultView<Lede: View>: View {
             Button(MealResultCopy.itemEditConfirm) { commitItemEdit() }
         } message: {
             Text(MealResultCopy.itemEditMessage)
+        }
+        // The platform's own confirmation, for the same reason the item field
+        // is: the export draws no modal of any kind, so a drawn one would be a
+        // second undrawn surface where iOS already has the honest answer.
+        // `confirmationDialog` rather than `alert` because this is a
+        // destructive action being confirmed, which is the sheet's whole
+        // subject, and it puts the destructive verb where the platform's users
+        // look for it.
+        .confirmationDialog(
+            MealResultCopy.discardTitle,
+            isPresented: $isConfirmingDiscard,
+            titleVisibility: .visible
+        ) {
+            Button(MealResultCopy.discardConfirm, role: .destructive) { onDiscard?() }
+
+            Button(MealResultCopy.discardCancel, role: .cancel) {}
         }
     }
 
@@ -481,19 +505,9 @@ struct MealResultView<Lede: View>: View {
 
     private var footer: some View {
         HStack(alignment: .center, spacing: FuelMetrics.Space.s10) {
-            Button(action: onNew) {
-                Text(MealResultCopy.new)
-                    .fuelStyle(FuelTypography.chipLabel)
-                    .foregroundStyle(palette.ink)
-                    .padding(.vertical, FuelMetrics.Space.s17)
-                    .padding(.horizontal, FuelMetrics.Space.s20)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: FuelMetrics.Radius.pill)
-                            .strokeBorder(palette.hair, lineWidth: FuelMetrics.Line.hairline)
-                    }
-                    .contentShape(.rect(cornerRadius: FuelMetrics.Radius.pill))
+            if onDiscard != nil {
+                discardControl
             }
-            .buttonStyle(.plain)
 
             Button(action: primaryAction.perform) {
                 Text(primaryAction.title)
@@ -509,6 +523,41 @@ struct MealResultView<Lede: View>: View {
         .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
         .padding(.bottom, FuelMetrics.Space.s34)
         .fuelAnimation(FuelMotion.standard, value: draft.hasItemEdits)
+    }
+
+    /// The leading footer control.
+    ///
+    /// **Deviation from the export, on the owner's instruction.** Screens 14
+    /// and 15 draw an outlined pill here reading `Neu` → `New`. What it
+    /// actually does is throw the estimate away, and the owner wants it to
+    /// read as that: a trash mark and no word.
+    ///
+    /// The pill does not move and does not change size. Its `s17`/`s20`
+    /// padding, its `Radius.pill` hairline outline, its `chipLabel` type and
+    /// its `ink` are the drawn ones; only what sits inside it changes, and the
+    /// pill is already past a fingertip in both directions at that padding.
+    ///
+    /// A symbol stands in for a glyph the export does not draw and the bundled
+    /// faces cannot render — the same situation as Today's gear, and the same
+    /// answer. `FuelMetrics.Line.Glyph`'s stroke weights do not apply to a
+    /// symbol: SF draws its own.
+    private var discardControl: some View {
+        Button {
+            isConfirmingDiscard = true
+        } label: {
+            Image(systemName: "trash")
+                .fuelStyle(FuelTypography.chipLabel)
+                .foregroundStyle(palette.ink)
+                .padding(.vertical, FuelMetrics.Space.s17)
+                .padding(.horizontal, FuelMetrics.Space.s20)
+                .overlay {
+                    RoundedRectangle(cornerRadius: FuelMetrics.Radius.pill)
+                        .strokeBorder(palette.hair, lineWidth: FuelMetrics.Line.hairline)
+                }
+                .contentShape(.rect(cornerRadius: FuelMetrics.Radius.pill))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(MealResultCopy.discardLabel))
     }
 
     /// What the filled button is right now.

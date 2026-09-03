@@ -21,7 +21,7 @@ struct TextResultView: View {
     let onEditItem: (RecognisedItem.ID, String) -> Void
     let onAddItem: (String) -> Void
     let onReanalyse: () -> Void
-    let onNew: () -> Void
+    let onDiscard: (() -> Void)?
     let commit: MealResultAction
 
     @Environment(\.fuelPalette) private var palette
@@ -38,7 +38,7 @@ struct TextResultView: View {
             onEditItem: onEditItem,
             onAddItem: onAddItem,
             onReanalyse: onReanalyse,
-            onNew: onNew,
+            onDiscard: onDiscard,
             commit: commit,
             lede: { quote }
         )
@@ -87,7 +87,7 @@ struct TextResultView: View {
         onEditItem: { _, _ in },
         onAddItem: { _ in },
         onReanalyse: {},
-        onNew: {},
+        onDiscard: {},
         commit: MealResultAction(title: MealResultCopy.add, perform: {})
     )
     .environment(\.fuelPalette, FuelPalette(theme: .light, accent: .green))
