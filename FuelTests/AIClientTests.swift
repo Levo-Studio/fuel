@@ -124,6 +124,31 @@ private enum Reply {
     }
 }
 
+/// Every `"text"` value anywhere in a request body.
+///
+/// Both providers wrap the instruction in a content part keyed `text`, at
+/// different depths and under different neighbours. Walking for the key rather
+/// than for a path means one helper covers both envelopes and neither client's
+/// body shape is asserted twice.
+private func textParts(in body: Data) -> [String] {
+    func walk(_ value: Any) -> [String] {
+        switch value {
+        case let dictionary as [String: Any]:
+            let own = (dictionary["text"] as? String).map { [$0] } ?? []
+            return own + dictionary.values.flatMap(walk)
+        case let array as [Any]:
+            return array.flatMap(walk)
+        default:
+            return []
+        }
+    }
+
+    guard let object = try? JSONSerialization.jsonObject(with: body) else {
+        return []
+    }
+    return walk(object)
+}
+
 /// A flat image of a given size **in pixels**.
 ///
 /// `scale` is passed explicitly rather than left to the renderer's default,
@@ -278,6 +303,61 @@ struct TextEstimateTests {
         let body = try #require(transport.requests.first?.httpBody)
         let text = try #require(String(data: body, encoding: .utf8))
         #expect(text.contains("two eggs and toast"))
+    }
+
+    /// The convention has to reach both providers identically, because a rule
+    /// the user's estimate follows on one provider and not the other is worse
+    /// than no rule: the same sentence would come back with two answers three
+    /// times apart, with nothing on screen to explain which was which.
+    @Test("both providers are taught the raw-weight convention in the same words")
+    func conventionReachesBothProviders() async throws {
+        let claudeKeys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { claudeKeys.tearDown(provider: .claude) }
+
+        let mistralKeys = try KeyFixture(provider: .mistral, secret: "0123456789abcdefghij")
+        defer { mistralKeys.tearDown(provider: .mistral) }
+
+        let anthropicTransport = RecordingTransport(
+            status: 200,
+            body: Reply.anthropic(Reply.goodEstimate)
+        )
+        let mistralTransport = RecordingTransport(
+            status: 200,
+            body: Reply.mistral(Reply.goodEstimate)
+        )
+
+        _ = try await AnthropicClient(transport: anthropicTransport, keys: claudeKeys.source)
+            .estimate(text: "r300g rice")
+        _ = try await MistralClient(transport: mistralTransport, keys: mistralKeys.source)
+            .estimate(text: "r300g rice")
+
+        // The two envelopes differ, so the text parts are lifted out of each
+        // and compared to the instruction the contract built. Comparing raw
+        // bodies would compare the envelopes as well.
+        let instruction = EstimateContract.textInstruction(for: "r300g rice")
+        #expect(instruction.contains(EstimateContract.rawWeightConvention))
+
+        for transport in [anthropicTransport, mistralTransport] {
+            let body = try #require(transport.requests.first?.httpBody)
+            #expect(textParts(in: body).contains(instruction))
+        }
+    }
+
+    @Test("a sentence with no raw marker is sent without the convention")
+    func plainSentenceCarriesNoConvention() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let transport = RecordingTransport(
+            status: 200,
+            body: Reply.anthropic(Reply.goodEstimate)
+        )
+        let client = AnthropicClient(transport: transport, keys: keys.source)
+        _ = try await client.estimate(text: "300g rice and chicken")
+
+        let body = try #require(transport.requests.first?.httpBody)
+        let text = try #require(String(data: body, encoding: .utf8))
+        #expect(!text.contains("weighed raw or dry"))
     }
 }
 
