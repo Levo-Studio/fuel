@@ -57,18 +57,28 @@ struct OnboardingTests {
         }
     }
 
+    /// Never the app's suite: these tests write a provider preference, and a
+    /// run must not change the provider Fuel opens on for whoever is on the
+    /// machine.
+    private func makePreferences() -> SettingsPreferences {
+        let suite = "apps.levo-studio.Fuel.tests.onboarding.\(UUID().uuidString)"
+        return SettingsPreferences(defaults: UserDefaults(suiteName: suite) ?? .standard)
+    }
+
     /// A model whose step reveal takes no time, so a suite never waits on the
     /// pacing that exists purely for the eye.
     private func makeModel(
         keychain: KeychainStore,
         validator: StubValidator,
         store: FuelStore,
+        preferences: SettingsPreferences? = nil,
         onFinished: @escaping () -> Void = {}
     ) -> OnboardingModel {
         OnboardingModel(
             keychain: keychain,
             validator: validator,
             store: store,
+            preferences: preferences ?? makePreferences(),
             stepInterval: .zero,
             onFinished: onFinished
         )
@@ -287,6 +297,35 @@ struct OnboardingTests {
         model.selectProvider(.mistral)
 
         #expect(model.keyDraft.isEmpty)
+    }
+
+    /// The segment is the stored preference rather than a copy of it, so there
+    /// is nothing left behind that could go stale — not for a user who changes
+    /// their mind twice, and not for one who goes back to the field afterwards.
+    @Test("the segment on screen 01 is the stored provider preference")
+    func selectingProviderWritesThePreference() throws {
+        let keychain = makeKeychain()
+        defer { clear(keychain) }
+        let preferences = makePreferences()
+        let model = makeModel(
+            keychain: keychain,
+            validator: StubValidator(),
+            store: try makeStore(),
+            preferences: preferences
+        )
+
+        #expect(model.provider == .claude)
+        #expect(preferences.provider == .claude)
+
+        model.selectProvider(.mistral)
+        #expect(preferences.provider == .mistral)
+
+        model.selectProvider(.claude)
+        model.selectProvider(.mistral)
+        model.returnToKeyEntry()
+
+        #expect(model.provider == .mistral)
+        #expect(preferences.provider == .mistral)
     }
 
     // MARK: - Screen 04
