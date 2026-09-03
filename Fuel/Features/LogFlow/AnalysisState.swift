@@ -41,10 +41,50 @@ nonisolated enum AnalysisFailure: Equatable, Sendable {
     /// response body.
     case noCredit(billingPage: URL)
 
-    /// Everything else worth showing: a lost connection, a reply Fuel could
-    /// not read, a photo too large to send, a camera that did not deliver a
-    /// frame.
-    case retry
+    /// Everything else worth showing: a lost connection, a provider that
+    /// refused, a reply Fuel could not read, a photo too large to send, a
+    /// camera that did not deliver a frame.
+    ///
+    /// **It carries where it died, and the screen does not draw it.** The
+    /// export has one retry state and this does not add a second — `AnalysisCopy`
+    /// prints the same two sentences for every origin, and will go on doing so
+    /// until the owner decides otherwise. What the origin buys is that the
+    /// failure is no longer a single undifferentiated outcome: a test can pin
+    /// which of four very different things happened, where before every one of
+    /// them was the same value.
+    ///
+    /// It is also the shape a copy distinction would be built on. The retry
+    /// hint says the description did not reach the model or the answer did not
+    /// come back, and that sentence is only true of `.transport`. Whether the
+    /// other three deserve their own words is the owner's call and not an
+    /// agent's.
+    case retry(Origin)
+
+    // MARK: - Origin
+
+    /// How far a retryable failure got before it died.
+    ///
+    /// Four, because they are four different investigations, and because the
+    /// one sentence the design draws is honest about exactly one of them.
+    nonisolated enum Origin: Equatable, Sendable {
+
+        /// It never left the device: a photo too large to send, a camera that
+        /// did not deliver a frame, a store that refused a write.
+        case device
+
+        /// It was sent and nothing came back — no route, a dropped
+        /// connection, a timeout. The only origin the drawn sentence
+        /// describes correctly.
+        case transport
+
+        /// The provider answered and refused: a `429`, a `500`, an
+        /// `overloaded_error`, a `404` for a model id.
+        case provider
+
+        /// The provider answered with an estimate Fuel could not read —
+        /// prose, a wrong shape, or a reply cut off at the token ceiling.
+        case reply
+    }
 
     /// `nil` for a cancelled scan.
     ///
@@ -62,8 +102,14 @@ nonisolated enum AnalysisFailure: Equatable, Sendable {
             self = .invalidKey
         case .noCredit(_, let billingPage):
             self = .noCredit(billingPage: billingPage)
-        case .network, .providerRefused, .malformedResponse, .truncatedReply, .imageTooLarge:
-            self = .retry
+        case .network:
+            self = .retry(.transport)
+        case .providerRefused:
+            self = .retry(.provider)
+        case .malformedResponse, .truncatedReply:
+            self = .retry(.reply)
+        case .imageTooLarge:
+            self = .retry(.device)
         }
     }
 }

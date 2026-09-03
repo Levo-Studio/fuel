@@ -192,9 +192,11 @@ struct CameraLogTests {
     @Test("each provider error maps to the state that is drawn for it", arguments: [
         (AIError.invalidKey, AnalysisFailure.invalidKey),
         (AIError.missingKey, AnalysisFailure.invalidKey),
-        (AIError.network, AnalysisFailure.retry),
-        (AIError.malformedResponse, AnalysisFailure.retry),
-        (AIError.imageTooLarge, AnalysisFailure.retry),
+        (AIError.network, AnalysisFailure.retry(.transport)),
+        (AIError.providerRefused, AnalysisFailure.retry(.provider)),
+        (AIError.malformedResponse, AnalysisFailure.retry(.reply)),
+        (AIError.truncatedReply, AnalysisFailure.retry(.reply)),
+        (AIError.imageTooLarge, AnalysisFailure.retry(.device)),
     ])
     func errorMapping(error: AIError, expected: AnalysisFailure) async throws {
         let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .failure(error)))
@@ -241,7 +243,8 @@ struct CameraLogTests {
 
         await model.capture()
 
-        #expect(model.stage == .failed(.retry))
+        // `.device`: the shutter never produced a frame, so nothing was sent.
+        #expect(model.stage == .failed(.retry(.device)))
     }
 
     // MARK: - Editing the result
@@ -455,7 +458,7 @@ struct CameraLogTests {
         model.addItem("Olive oil, 1 tbsp")
         await model.reanalysing()
 
-        #expect(model.stage == .failed(.retry))
+        #expect(model.stage == .failed(.retry(.transport)))
 
         model.dismissFailure()
         #expect(model.stage == .result)
@@ -475,7 +478,7 @@ struct CameraLogTests {
 
         model.removeItem(try #require(model.draft?.items.last?.id))
         await model.reanalysing()
-        #expect(model.stage == .failed(.retry))
+        #expect(model.stage == .failed(.retry(.transport)))
 
         model.retry()
         while case .analysing = model.stage {

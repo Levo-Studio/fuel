@@ -188,13 +188,13 @@ struct ScanIntentTests {
 
         model.openLogFlow()
         await model.cameraLog.capture()
-        #expect(model.cameraLog.stage == .failed(.retry))
+        #expect(model.cameraLog.stage == .failed(.retry(.device)))
 
         model.requestScan()
 
         #expect(model.destination == .logFlow)
         #expect(model.logFlow.selectedTab == .camera)
-        #expect(model.cameraLog.stage == .failed(.retry))
+        #expect(model.cameraLog.stage == .failed(.retry(.device)))
     }
 
     /// Two covers cannot be presented over one another, and ignoring the user

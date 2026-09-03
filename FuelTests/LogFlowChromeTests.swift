@@ -47,7 +47,7 @@ struct LogFlowChromeTests {
     /// it replaces, so it inks with that state and not with the results.
     @Test("a failed scan stays with the analysis states")
     func failureIsDark() {
-        #expect(LogFlowChrome.colorScheme(camera: .failed(.retry), text: .entry, theme: .light) == .dark)
+        #expect(LogFlowChrome.colorScheme(camera: .failed(.retry(.transport)), text: .entry, theme: .light) == .dark)
     }
 
     // MARK: - Results
@@ -83,7 +83,7 @@ struct LogFlowChromeTests {
             .analysing(.identifyingIngredients),
             .analysing(.estimatingAmounts),
             .analysing(.calculatingNutrition),
-            .failed(.retry),
+            .failed(.retry(.transport)),
             .result,
             .noKey
         ]

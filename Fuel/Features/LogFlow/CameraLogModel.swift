@@ -154,7 +154,9 @@ final class CameraLogModel {
         do {
             analyse(try await camera.capturePhoto())
         } catch {
-            stage = .failed(.retry)
+            // `.device`: the shutter never produced a frame, so nothing was
+            // sent and nothing is owed to the provider.
+            stage = .failed(.retry(.device))
         }
     }
 

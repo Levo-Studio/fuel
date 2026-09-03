@@ -328,7 +328,7 @@ struct MealDetailTests {
         model.addItem("Olive oil, 1 tbsp")
         await model.reanalysing()
 
-        #expect(model.stage == .failed(.retry))
+        #expect(model.stage == .failed(.retry(.transport)))
         #expect(try store.entry(withID: entry.entryID)?.kilocalories == 460)
 
         model.dismissFailure()
@@ -346,7 +346,7 @@ struct MealDetailTests {
         let polenta = try #require(model.draft.items.last?.id)
         model.editItem(polenta, to: "Polenta, raw 50 g")
         await model.reanalysing()
-        #expect(model.stage == .failed(.retry))
+        #expect(model.stage == .failed(.retry(.transport)))
 
         model.retry()
         while case .analysing = model.stage {

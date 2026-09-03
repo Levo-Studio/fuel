@@ -300,7 +300,9 @@ final class MealDetailModel {
                 items: estimate.items
             )
         } catch {
-            stage = .failed(.retry)
+            // `.device`: the estimate arrived and it is the store that
+            // refused it. Nothing about the request went wrong.
+            stage = .failed(.retry(.device))
             return
         }
         // Keeps the label, whether the user set it, and the favourite mark.

@@ -397,7 +397,7 @@ struct ShellTests {
 
         model.openLogFlow()
         await model.cameraLog.capture()
-        #expect(model.cameraLog.stage == .failed(.retry))
+        #expect(model.cameraLog.stage == .failed(.retry(.device)))
 
         model.dismissDestination()
         model.openLogFlow()
@@ -430,7 +430,7 @@ struct ShellTests {
         while case .analysing = model.textLog.stage {
             await Task.yield()
         }
-        #expect(model.textLog.stage == .failed(.retry))
+        #expect(model.textLog.stage == .failed(.retry(.transport)))
 
         model.dismissDestination()
         model.openLogFlow()

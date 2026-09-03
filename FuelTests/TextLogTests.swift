@@ -203,8 +203,10 @@ struct TextLogTests {
     @Test("each provider error maps to the state that is drawn for it", arguments: [
         (AIError.invalidKey, AnalysisFailure.invalidKey),
         (AIError.missingKey, AnalysisFailure.invalidKey),
-        (AIError.network, AnalysisFailure.retry),
-        (AIError.malformedResponse, AnalysisFailure.retry),
+        (AIError.network, AnalysisFailure.retry(.transport)),
+        (AIError.providerRefused, AnalysisFailure.retry(.provider)),
+        (AIError.malformedResponse, AnalysisFailure.retry(.reply)),
+        (AIError.truncatedReply, AnalysisFailure.retry(.reply)),
     ])
     func errorMapping(error: AIError, expected: AnalysisFailure) async throws {
         let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .failure(error)))
@@ -324,7 +326,7 @@ struct TextLogTests {
         model.typedText = Self.sentence
 
         await model.estimating()
-        #expect(model.stage == .failed(.retry))
+        #expect(model.stage == .failed(.retry(.transport)))
 
         model.retry()
         while case .analysing = model.stage {
@@ -341,13 +343,26 @@ struct TextLogTests {
         // other mode. The words themselves live in the catalog; what is pinned
         // here is that the two are not the same string.
         #expect(
-            AnalysisCopy.failureHint(.retry, mode: .text)
-                != AnalysisCopy.failureHint(.retry, mode: .photo)
+            AnalysisCopy.failureHint(.retry(.transport), mode: .text)
+                != AnalysisCopy.failureHint(.retry(.transport), mode: .photo)
         )
         #expect(
             AnalysisCopy.failureHint(.invalidKey, mode: .text)
                 != AnalysisCopy.failureHint(.invalidKey, mode: .photo)
         )
+        // The export draws one retry state, and carrying the origin did not
+        // quietly add a second. Every origin still prints the same sentence —
+        // whether some of them deserve their own is the owner's call.
+        for origin in [AnalysisFailure.Origin.device, .transport, .provider, .reply] {
+            #expect(
+                AnalysisCopy.failureHint(.retry(origin), mode: .text)
+                    == AnalysisCopy.failureHint(.retry(.transport), mode: .text)
+            )
+            #expect(
+                AnalysisCopy.failureTitle(.retry(origin))
+                    == AnalysisCopy.failureTitle(.retry(.transport))
+            )
+        }
         // An exhausted balance names only the account, which is the same
         // sentence either way.
         let billing = AnalysisFailure.noCredit(billingPage: AIError.billingPage(for: .claude))
