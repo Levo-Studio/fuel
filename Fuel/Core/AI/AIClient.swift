@@ -144,7 +144,11 @@ extension AIError {
         // The design draws no fourth state, and inventing one for "the
         // provider is having a bad day" would be a deviation; a plain retry is
         // also the correct advice.
-        return .network
+        //
+        // `providerRefused` rather than `network`: the round trip completed,
+        // and the interface should not be told the answer never came back when
+        // it did. Both still reach the user as the retry state.
+        return .providerRefused
     }
 
     /// Whether the body says, in words, that the balance is spent.

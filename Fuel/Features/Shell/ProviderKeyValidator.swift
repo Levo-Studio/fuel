@@ -63,7 +63,7 @@ nonisolated struct ProviderKeyValidator: KeyValidating {
         // cancelled check, a reply Fuel could not read and the two cases a key
         // check cannot reach all leave the same thing true: nothing was
         // learned, so the honest answer is to offer another go.
-        case .network, .cancelled, .malformedResponse, .imageTooLarge, .missingKey:
+        case .network, .providerRefused, .cancelled, .malformedResponse, .imageTooLarge, .missingKey:
             .retry
         }
     }

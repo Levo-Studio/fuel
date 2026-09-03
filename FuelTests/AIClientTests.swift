@@ -428,7 +428,9 @@ struct AIErrorMappingTests {
         )
         let client = AnthropicClient(transport: transport, keys: keys.source)
 
-        await #expect(throws: AIError.network) {
+        // `providerRefused` rather than `network`: the answer did come back,
+        // and it said to wait. The user still sees the retry state.
+        await #expect(throws: AIError.providerRefused) {
             _ = try await client.estimate(text: "an apple")
         }
     }
@@ -441,7 +443,7 @@ struct AIErrorMappingTests {
         let transport = RecordingTransport(status: 429, body: "{}")
         let client = MistralClient(transport: transport, keys: keys.source)
 
-        await #expect(throws: AIError.network) {
+        await #expect(throws: AIError.providerRefused) {
             _ = try await client.estimate(text: "an apple")
         }
     }
@@ -588,8 +590,33 @@ struct AIErrorMappingTests {
             keys: keys.source
         )
 
-        await #expect(throws: AIError.network) {
+        await #expect(throws: AIError.providerRefused) {
             _ = try await client.estimate(text: "an apple")
+        }
+    }
+
+    /// The distinction the retry state used to hide. Both of these are a
+    /// retry to the user and the design draws one screen for them, but Fuel
+    /// now knows which it is looking at — and the sentence under that screen
+    /// claims the answer never came back, which is only true of one of them.
+    @Test("a provider that refused is told apart from an answer that never came")
+    func refusalIsNotSilence() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        // Anthropic's own "we are busy" status. The round trip completed.
+        let refused = AnthropicClient(
+            transport: RecordingTransport(status: 529, body: #"{"error":{"type":"overloaded_error"}}"#),
+            keys: keys.source
+        )
+        await #expect(throws: AIError.providerRefused) {
+            _ = try await refused.estimate(text: "an apple")
+        }
+
+        // A train tunnel. Nothing came back at all.
+        let silent = AnthropicClient(transport: RecordingTransport.offline(), keys: keys.source)
+        await #expect(throws: AIError.network) {
+            _ = try await silent.estimate(text: "an apple")
         }
     }
 
@@ -1175,7 +1202,7 @@ struct KeyCheckTests {
             )
         )
 
-        #expect(await client.checkKey(APIKey("0123456789abcdefghij")) == .failed(.network))
+        #expect(await client.checkKey(APIKey("0123456789abcdefghij")) == .failed(.providerRefused))
     }
 
     @Test("a lost connection fails the check as a retry, not as a verdict")
