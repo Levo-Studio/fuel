@@ -40,6 +40,7 @@ struct PhotoResultView: View {
             onAddItem: onAddItem,
             onReanalyse: onReanalyse,
             onDiscard: onDiscard,
+            discardConfirmation: MealResultCopy.discardConfirmation,
             commit: commit,
             lede: { thumbnail }
         )

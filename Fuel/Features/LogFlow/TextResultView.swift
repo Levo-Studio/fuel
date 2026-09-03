@@ -39,6 +39,7 @@ struct TextResultView: View {
             onAddItem: onAddItem,
             onReanalyse: onReanalyse,
             onDiscard: onDiscard,
+            discardConfirmation: MealResultCopy.discardConfirmation,
             commit: commit,
             lede: { quote }
         )

@@ -343,6 +343,19 @@ struct MealDetailTests {
         #expect(try store.entry(withID: entry.entryID)?.kilocalories == 390)
     }
 
+    // MARK: - Leaving with edits
+
+    /// `‹ Back` confirms once the breakdown has been changed, and the dialog it
+    /// raises is `MealResultView`'s. What it says has to be this screen's: on a
+    /// meal that is already in the store nothing is discarded and the meal
+    /// survives either answer, so the estimate wording would be false twice.
+    /// This is what goes red if the detail screen is ever pointed back at it.
+    @Test("leaving an edited meal asks about the changes, not about an estimate")
+    func backConfirmationNamesTheChanges() {
+        #expect(MealDetailCopy.discardEditsConfirmation.title != MealResultCopy.discardConfirmation.title)
+        #expect(MealDetailCopy.discardEditsConfirmation.confirm != MealResultCopy.discardConfirmation.confirm)
+    }
+
     // MARK: - Deleting
 
     /// The confirmation is the view's `@State` and `delete()` is what answering

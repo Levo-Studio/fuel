@@ -56,4 +56,22 @@ nonisolated enum MealDetailCopy {
     static var deleteCancel: String {
         String(localized: "detail.delete.cancel")
     }
+
+    // MARK: - Leaving with edits
+
+    /// What the confirmation in front of `‹ Back` says here.
+    ///
+    /// Not `MealResultCopy.discardConfirmation`, and the difference is not a
+    /// nicety. On screens 14 and 15 that dialog is true: nothing has been
+    /// written down, and answering it discards the estimate. Here it would be
+    /// false twice — nothing is discarded, and the meal is in the store and
+    /// stays there whichever button is pressed. What is actually at stake is
+    /// the breakdown edits the user has just made and has not had priced.
+    static var discardEditsConfirmation: MealResultConfirmation {
+        MealResultConfirmation(
+            title: String(localized: "detail.discardEdits.title"),
+            confirm: String(localized: "detail.discardEdits.confirm"),
+            cancel: String(localized: "detail.discardEdits.cancel")
+        )
+    }
 }

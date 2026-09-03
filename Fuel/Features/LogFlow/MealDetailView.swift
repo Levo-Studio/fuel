@@ -47,6 +47,7 @@ struct MealDetailView: View {
                 // Nothing to discard: the meal is written down already, and the
                 // screen draws no leading control at all.
                 onDiscard: nil,
+                discardConfirmation: MealDetailCopy.discardEditsConfirmation,
                 commit: MealResultAction(
                     title: MealDetailCopy.delete,
                     perform: { isConfirmingDelete = true }

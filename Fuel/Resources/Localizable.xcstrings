@@ -121,6 +121,42 @@
         }
       }
     },
+    "detail.discardEdits.cancel" : {
+      "comment" : "Backs out of that confirmation, leaving the edits alone. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep editing"
+          }
+        }
+      }
+    },
+    "detail.discardEdits.confirm" : {
+      "comment" : "The destructive action in that confirmation. Names the changes, not the meal, because the meal survives. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard changes"
+          }
+        }
+      }
+    },
+    "detail.discardEdits.title" : {
+      "comment" : "The confirmation in front of ‹ Back on a logged meal whose breakdown was edited. Nothing is discarded but the edits — the meal is in the store either way. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard your changes?"
+          }
+        }
+      }
+    },
     "detail.flow" : {
       "comment" : "The label top right on a meal that is already logged, where screens 14 and 15 draw Foto-Eintrag / Text-Eintrag; the style uppercases it. Not in the export.",
       "extractionState" : "manual",
