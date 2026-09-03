@@ -1,46 +1,7 @@
 import Foundation
 import Testing
-import UIKit
 
 @testable import Fuel
-
-// MARK: - Doubles
-
-/// The shell has to hand `OnboardingModel` a validator to build it at all, and
-/// nothing here submits a key.
-private nonisolated struct UnusedValidator: KeyValidating {
-
-    func validate(_ key: APIKey, for provider: AIProvider) async -> KeyValidationOutcome {
-        .retry
-    }
-}
-
-/// A client no test in this file lets an estimate reach.
-///
-/// **Nothing here goes near a provider.** What the shortcut is asked about is
-/// which screen it lands on, never what an estimate comes back as.
-private nonisolated struct UnusedEstimator: AIClient {
-
-    let provider: AIProvider = .claude
-
-    func checkKey(_ key: APIKey) async -> KeyCheckResult { .failed(.cancelled) }
-
-    func estimate(photo: MealPhoto) async throws -> MealEstimate { throw AIError.cancelled }
-
-    func estimate(text: String) async throws -> MealEstimate { throw AIError.cancelled }
-}
-
-/// A camera that opens no lens.
-private final class StubCamera: MealCamera {
-
-    var preview: MealCameraPreview { .unavailable }
-
-    func start() async {}
-
-    func stop() {}
-
-    func capturePhoto() async throws -> UIImage { UIImage() }
-}
 
 // MARK: - Suite
 
@@ -78,7 +39,7 @@ struct ScanIntentTests {
                 CameraLogModel(
                     store: store,
                     client: UnusedEstimator(),
-                    camera: StubCamera(),
+                    camera: CountingCamera(),
                     keys: keys,
                     provider: provider
                 )

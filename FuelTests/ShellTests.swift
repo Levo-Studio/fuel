@@ -4,18 +4,6 @@ import UIKit
 
 @testable import Fuel
 
-// MARK: - Validator double
-
-/// The shell has to hand `OnboardingModel` a validator to build it at all, and
-/// the launch tests are not about the key. This one is never reached: none of
-/// them submits one.
-private nonisolated struct UnusedValidator: KeyValidating {
-
-    func validate(_ key: APIKey, for provider: AIProvider) async -> KeyValidationOutcome {
-        .retry
-    }
-}
-
 // MARK: - Transport double
 
 /// Answers every request with one recorded shape, or fails the way a lost
@@ -66,27 +54,10 @@ private nonisolated struct StubKeys: MealKeyPresence {
     func hasKey(for provider: AIProvider) -> Bool { true }
 }
 
-/// A client no test in this file lets an estimate reach.
-///
-/// **Nothing here goes near a provider.** The shell's business with the camera
-/// half is which one it is pointed at and when it is built, never what an
-/// estimate comes back as — that is `CameraLogTests`' subject and it has its
-/// own recorded shapes.
-private nonisolated struct UnusedEstimator: AIClient {
-
-    let provider: AIProvider = .claude
-
-    func checkKey(_ key: APIKey) async -> KeyCheckResult { .failed(.cancelled) }
-
-    func estimate(photo: MealPhoto) async throws -> MealEstimate { throw AIError.cancelled }
-
-    func estimate(text: String) async throws -> MealEstimate { throw AIError.cancelled }
-}
-
 /// A client whose estimate fails, which is how a test drives the text half into
 /// a stage the entry field is not.
 ///
-/// It is the text mode's `FailingCamera`: what the shell is asked about is
+/// It is the text mode's `BrokenCamera`: what the shell is asked about is
 /// whether a flow reopens on that stage, never what the failure says.
 private nonisolated struct FailingEstimator: AIClient {
 
@@ -97,37 +68,6 @@ private nonisolated struct FailingEstimator: AIClient {
     func estimate(photo: MealPhoto) async throws -> MealEstimate { throw AIError.network }
 
     func estimate(text: String) async throws -> MealEstimate { throw AIError.network }
-}
-
-/// A camera that opens nothing and counts the one thing this suite asks about.
-///
-/// Only `stop()` is counted. The shell never starts a session — the flow does
-/// that when its tab appears — so a `startCount` here would be a number no
-/// test could assert without pretending the shell had a part in it.
-private final class StubCamera: MealCamera {
-
-    private(set) var stopCount = 0
-
-    var preview: MealCameraPreview { .unavailable }
-
-    func start() async {}
-
-    func stop() { stopCount += 1 }
-
-    func capturePhoto() async throws -> UIImage { UIImage() }
-}
-
-/// A camera whose shutter fails, which is how a test drives the camera half
-/// into a stage the viewfinder is not.
-private final class FailingCamera: MealCamera {
-
-    var preview: MealCameraPreview { .unavailable }
-
-    func start() async {}
-
-    func stop() {}
-
-    func capturePhoto() async throws -> UIImage { throw MealCameraError.unavailable }
 }
 
 /// Remembers which provider each log flow was built for.
@@ -181,7 +121,7 @@ struct ShellTests {
         CameraLogModel(
             store: store,
             client: UnusedEstimator(),
-            camera: StubCamera(),
+            camera: CountingCamera(),
             keys: StubKeys(),
             provider: provider
         )
@@ -345,7 +285,7 @@ struct ShellTests {
             CameraLogModel(
                 store: store,
                 client: UnusedEstimator(),
-                camera: FailingCamera(),
+                camera: BrokenCamera(),
                 keys: StubKeys(),
                 provider: provider
             )
@@ -458,7 +398,7 @@ struct ShellTests {
     @Test("Dismissing the flow stops the capture session")
     func dismissingStopsTheCamera() throws {
         let (store, _) = try makeTodayModel()
-        let camera = StubCamera()
+        let camera = CountingCamera()
         let model = makeModel(store: store) { store, provider in
             CameraLogModel(
                 store: store,
