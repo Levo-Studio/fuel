@@ -10,9 +10,15 @@ import Foundation
 /// both AI modes do exactly that work; the failures are the same three
 /// remedies whichever way the meal was described.
 ///
-/// Two hints are the exception, and they are the reason `AILogMode` reaches
-/// this file at all: telling someone to "take the photo again" after they typed
-/// a sentence is wrong. Everything else is one key.
+/// One hint is the exception, and it is the reason `AILogMode` reaches this
+/// file at all: telling someone to "take the photo again" after they typed a
+/// sentence is wrong, so the invalid-key hint — the one failure whose remedy
+/// really is "redo what you just did" — is chosen per mode. The retry hint
+/// used to be the same kind of per-mode pair and said the same thing either
+/// way: what changed was never the mode, so mode was never the right axis for
+/// it. It is chosen from `AnalysisFailure.Origin` instead, which is what
+/// actually differs between one retry and another. Everything else is one
+/// key.
 ///
 /// Nothing here holds English text — each entry names a key in
 /// `Localizable.xcstrings`. The `CANCEL` values are stored uppercase because
@@ -57,9 +63,21 @@ nonisolated enum AnalysisCopy {
 
     /// The line under a failure title.
     ///
-    /// The remedy for a refused key and the description of a lost request both
-    /// name what the user did, so they are per mode. An exhausted balance names
-    /// only the account, which is the same sentence either way.
+    /// The remedy for a refused key names what the user did, so it is per
+    /// mode. An exhausted balance names only the account, which is the same
+    /// sentence either way. A retry failure names its `Origin` — what the
+    /// four cause sentences describe is where the attempt died, and that
+    /// question has nothing to do with whether the meal was a photo or a
+    /// sentence, so `mode` is accepted here and not read for this case.
+    ///
+    /// **`.reply` is one sentence for two `AIError` cases**, `malformedResponse`
+    /// and `truncatedReply`. Both already collapse onto `Origin.reply` in
+    /// `AnalysisFailure.init?(_:)`, and splitting them back apart only in the
+    /// copy would buy a distinction with no remedy attached to either half —
+    /// "the reply was cut off" and "the reply was not JSON" are both, to
+    /// whoever is looking at this screen, an answer that did not arrive in a
+    /// usable shape. One honest sentence that is true of both costs nothing
+    /// that a second sentence would have bought.
     static func failureHint(_ failure: AnalysisFailure, mode: AILogMode) -> String {
         switch failure {
         case .invalidKey:
@@ -69,10 +87,12 @@ nonisolated enum AnalysisCopy {
             }
         case .noCredit:
             String(localized: "logFlow.failure.noCredit.hint")
-        case .retry:
-            switch mode {
-            case .photo: String(localized: "logFlow.failure.retry.hint.photo")
-            case .text: String(localized: "logFlow.failure.retry.hint.text")
+        case .retry(let origin):
+            switch origin {
+            case .device: String(localized: "logFlow.failure.retry.cause.device")
+            case .transport: String(localized: "logFlow.failure.retry.cause.transport")
+            case .provider: String(localized: "logFlow.failure.retry.cause.provider")
+            case .reply: String(localized: "logFlow.failure.retry.cause.reply")
             }
         }
     }

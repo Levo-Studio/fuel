@@ -385,26 +385,50 @@
         }
       }
     },
-    "logFlow.failure.retry.hint.photo" : {
-      "comment" : "Under the retry title. Covers a lost connection, an unreadable reply and a frame the camera did not deliver. Not in the export.",
+    "logFlow.failure.retry.cause.device" : {
+      "comment" : "Under the red retry title, for a failure that never touched the network: a frame the camera did not deliver, a photo still too large after compression, or a store write that failed after a re-analysis had already come back. Deliberately vague about which of the three, and deliberately not claiming the request was never sent — the store-write case sent one and got an answer, and only the save afterward failed. Not in the export.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The photo did not reach the model, or the answer did not come back."
+            "value" : "Something on this device stopped this from finishing."
           }
         }
       }
     },
-    "logFlow.failure.retry.hint.text" : {
-      "comment" : "Under the retry title after a text entry. Covers a lost connection and an unreadable reply. Not in the export.",
+    "logFlow.failure.retry.cause.provider" : {
+      "comment" : "Under the red retry title, when the provider answered and refused: a rate limit or an outage on their side. Must not read as the user's fault or point at billing — CLAUDE.md is explicit that a throttled or busy provider is not a no-credit signal. Not in the export.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The description did not reach the model, or the answer did not come back."
+            "value" : "The provider is busy right now."
+          }
+        }
+      }
+    },
+    "logFlow.failure.retry.cause.reply" : {
+      "comment" : "Under the red retry title, when the provider answered but Fuel could not turn the reply into an estimate — prose, a wrong shape, or a reply cut off at the token ceiling. Covers all three the same way, since none is more actionable to a non-technical user than another. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The answer did not come back in a form Fuel could read."
+          }
+        }
+      }
+    },
+    "logFlow.failure.retry.cause.transport" : {
+      "comment" : "Under the red retry title, when the request never reached the provider or nothing came back: no route, a dropped connection, a timeout. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not reach the network. Check your connection."
           }
         }
       }

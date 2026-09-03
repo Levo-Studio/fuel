@@ -409,30 +409,22 @@ struct TextLogTests {
 
     @Test("the advice after a failure never tells a typist to take a photo")
     func failureHintsAreToldApart() {
-        // Both hints name what the user did, so neither may be shown to the
-        // other mode. The words themselves live in the catalog; what is pinned
-        // here is that the two are not the same string.
-        #expect(
-            AnalysisCopy.failureHint(.retry(.transport), mode: .text)
-                != AnalysisCopy.failureHint(.retry(.transport), mode: .photo)
-        )
+        // The refused-key hint names what the user did, so it is the one
+        // failure that still differs by mode. The words themselves live in
+        // the catalog; what is pinned here is that the two are not the same
+        // string.
         #expect(
             AnalysisCopy.failureHint(.invalidKey, mode: .text)
                 != AnalysisCopy.failureHint(.invalidKey, mode: .photo)
         )
-        // The export draws one retry state, and carrying the origin did not
-        // quietly add a second. Every origin still prints the same sentence —
-        // whether some of them deserve their own is the owner's call.
-        for origin in [AnalysisFailure.Origin.device, .transport, .provider, .reply] {
-            #expect(
-                AnalysisCopy.failureHint(.retry(origin), mode: .text)
-                    == AnalysisCopy.failureHint(.retry(.transport), mode: .text)
-            )
-            #expect(
-                AnalysisCopy.failureTitle(.retry(origin))
-                    == AnalysisCopy.failureTitle(.retry(.transport))
-            )
-        }
+        // A retry failure's hint is chosen from its Origin, which has nothing
+        // to do with whether the meal was a photo or a sentence. Mode used to
+        // be the axis here and produced two sentences that said the same
+        // thing either way — now there is no second sentence to keep apart.
+        #expect(
+            AnalysisCopy.failureHint(.retry(.transport), mode: .text)
+                == AnalysisCopy.failureHint(.retry(.transport), mode: .photo)
+        )
         // An exhausted balance names only the account, which is the same
         // sentence either way.
         let billing = AnalysisFailure.noCredit(billingPage: AIError.billingPage(for: .claude))
@@ -440,6 +432,30 @@ struct TextLogTests {
             AnalysisCopy.failureHint(billing, mode: .text)
                 == AnalysisCopy.failureHint(billing, mode: .photo)
         )
+    }
+
+    /// The bug the owner asked this screen to stop having: four different
+    /// failures printed the same sentence, so "the answer did not come back"
+    /// was shown for a network that was never reached at all. Pins the fix
+    /// two ways — every origin's cause line is distinct from every other's,
+    /// and a `retry` failure's title stays the one fixed string regardless of
+    /// which origin produced it, since only the cause line is meant to vary.
+    @Test("each retry origin prints its own cause, and none of them is empty")
+    func retryCauseIsDistinctPerOrigin() {
+        let origins: [AnalysisFailure.Origin] = [.device, .transport, .provider, .reply]
+        let hints = origins.map { AnalysisCopy.failureHint(.retry($0), mode: .text) }
+
+        #expect(Set(hints).count == origins.count)
+        #expect(hints.allSatisfy { !$0.isEmpty })
+
+        for origin in origins {
+            #expect(AnalysisCopy.failureTitle(.retry(origin)) == AnalysisCopy.failureTitle(.retry(.transport)))
+        }
+
+        // The one place a provider's own words could sneak into this screen
+        // is the reply cause line, since it is the one drawn for a reply Fuel
+        // could not read. It says nothing that came from that reply.
+        #expect(!AnalysisCopy.failureHint(.retry(.reply), mode: .text).contains("{"))
     }
 
     // MARK: - Editing the result

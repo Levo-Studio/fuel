@@ -419,6 +419,20 @@ nonisolated struct FuelPalette: Sendable {
         /// capture session hands over a frame, not decoration on top of one.
         static let placeholderBase = FuelRGBA(hex: 0x111213).color
         static let placeholderStripe = FuelRGBA(hex: 0x17181A).color
+
+        /// The failed-estimate title on the analysis surface — screens 08 to
+        /// 11's own failure state, not in the export.
+        ///
+        /// The same token as `FuelPalette.error`, not a second red. That
+        /// colour is already `Self.errorRGBA.color` rather than something
+        /// resolved through `pick(dark:light:)` — it does not follow the
+        /// theme any more than it follows the accent, and for the same
+        /// reason: an error that shifts with either stops reading as one. A
+        /// value that already ignores both of the camera surface's own axes
+        /// needs no camera-specific version of itself; this exists only so a
+        /// view written entirely against `FuelPalette.Camera.*` is not the one
+        /// place that has to reach past it for an environment read.
+        static let error = FuelPalette.errorRGBA.color
     }
 
     // MARK: Resolution

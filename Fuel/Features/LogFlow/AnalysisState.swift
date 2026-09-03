@@ -45,19 +45,15 @@ nonisolated enum AnalysisFailure: Equatable, Sendable {
     /// refused, a reply Fuel could not read, a photo too large to send, a
     /// camera that did not deliver a frame.
     ///
-    /// **It carries where it died, and the screen does not draw it.** The
-    /// export has one retry state and this does not add a second — `AnalysisCopy`
-    /// prints the same two sentences for every origin, and will go on doing so
-    /// until the owner decides otherwise. What the origin buys is that the
-    /// failure is no longer a single undifferentiated outcome: a test can pin
-    /// which of four very different things happened, where before every one of
-    /// them was the same value.
-    ///
-    /// It is also the shape a copy distinction would be built on. The retry
-    /// hint says the description did not reach the model or the answer did not
-    /// come back, and that sentence is only true of `.transport`. Whether the
-    /// other three deserve their own words is the owner's call and not an
-    /// agent's.
+    /// **It carries where it died, and the title above it now says so.** The
+    /// export draws one generic retry state with one wording, in the theme's
+    /// ordinary ink; the owner asked for the title in `FuelPalette.error` and
+    /// a plain-language cause line under it once this case existed to make
+    /// that honest. `AnalysisCopy.failureHint` reads the origin and chooses
+    /// one of four fixed sentences — never a provider's own words, never a
+    /// status code — so what used to be a single undifferentiated screen for
+    /// four different failures is now telling the user which of the four it
+    /// was, in words a non-technical reader can act on.
     case retry(Origin)
 
     // MARK: - Origin
@@ -70,11 +66,17 @@ nonisolated enum AnalysisFailure: Equatable, Sendable {
 
         /// It never left the device: a photo too large to send, a camera that
         /// did not deliver a frame, a store that refused a write.
+        ///
+        /// **Reachable, and not by the rare one of the three.** A photo over
+        /// `MealPhotoCompressor.maximumBytes` is the pathological case the
+        /// type itself says it is, but the camera failing to deliver a frame
+        /// — `CameraLogModel.capture()`'s own catch — and a re-analysis the
+        /// store refused to write — `MealDetailModel.writeBack()`'s — are
+        /// ordinary hardware and disk failures with nothing rare about them.
         case device
 
         /// It was sent and nothing came back — no route, a dropped
-        /// connection, a timeout. The only origin the drawn sentence
-        /// describes correctly.
+        /// connection, a timeout.
         case transport
 
         /// The provider answered and refused: a `429`, a `500`, an

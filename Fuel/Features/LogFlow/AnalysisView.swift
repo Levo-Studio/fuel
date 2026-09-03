@@ -92,9 +92,26 @@ struct AnalysisView: View {
 /// **Not in the export.** The design draws the four analysis states and the
 /// result, and nothing between them, so this is assembled from what those
 /// screens already use: the same backdrop, the step label's own type for the
-/// headline, and the `CANCEL` row's type for the actions. No provider message
-/// reaches it — `AnalysisFailure` carries three cases and no text, and the one
-/// thing the mode changes is which of two hints is printed.
+/// headline, and the `CANCEL` row's type for the actions.
+///
+/// **The title is drawn in `FuelPalette.Camera.error`, not the surface's own
+/// ink, for all three kinds of failure.** Asked for by the owner once the
+/// three failure states existed to see: an unread key, an exhausted balance
+/// and a request that did not come back are all still failures the export
+/// never drew a colour for, and colouring only one of the three would read as
+/// an inconsistency rather than a distinction.
+///
+/// **The hint under it is where the fix for the retry state's own defect
+/// lives.** It used to print one of two sentences chosen by input mode, and
+/// both said the same untrue thing regardless of cause: "the answer did not
+/// come back", whether or not it had. It now switches on `AnalysisFailure`
+/// itself — `AnalysisCopy.failureHint(_:mode:)` still needs `mode` for
+/// `invalidKey`, whose remedy really does depend on what the user was doing,
+/// but a `.retry` failure's hint is chosen from its `Origin` and says nothing
+/// about mode at all. **No provider message reaches it anywhere in this
+/// path** — `AnalysisFailure` carries no text of its own, and every sentence
+/// `AnalysisCopy` returns is a fixed string keyed to a case, never built from
+/// anything a provider sent.
 struct AnalysisFailureView: View {
 
     let failure: AnalysisFailure
@@ -109,7 +126,7 @@ struct AnalysisFailureView: View {
             VStack(alignment: .center, spacing: FuelMetrics.Space.s8) {
                 Text(AnalysisCopy.failureTitle(failure))
                     .fuelStyle(FuelTypography.analysisStep)
-                    .foregroundStyle(FuelPalette.Camera.ink)
+                    .foregroundStyle(FuelPalette.Camera.error)
 
                 Text(AnalysisCopy.failureHint(failure, mode: backdrop.mode))
                     .fuelStyle(FuelTypography.hintWrapping)
