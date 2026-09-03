@@ -73,6 +73,30 @@
         }
       }
     },
+    "intent.scan.description" : {
+      "comment" : "The Scan shortcut, under its title in the Shortcuts app. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens Fuel on the camera, ready to log a meal."
+          }
+        }
+      }
+    },
+    "intent.scan.title" : {
+      "comment" : "The name of the shortcut in the Shortcuts app and in Spotlight. The design notes call it Scan.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scan"
+          }
+        }
+      }
+    },
     "logFlow.analysis.cancel" : {
       "comment" : "Screens 08 to 11, the control under the progress bar. Drawn ABBRECHEN and already uppercase, because overlayAction does not transform.",
       "extractionState" : "manual",
