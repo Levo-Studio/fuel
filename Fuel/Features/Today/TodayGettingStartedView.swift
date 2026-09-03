@@ -38,6 +38,22 @@ struct TodayGettingStartedView: View {
 
                 // Screens 16 and 17's row vocabulary: `hairSoft` between rows,
                 // and the last row of a section left open.
+                //
+                // This is the one place the block does not follow screens 05
+                // and 06, whose heading and 14pt rows it otherwise takes, and
+                // the departure is settled rather than accidental.
+                //
+                // On 05 and 06 every entry row carries a closing rule, a
+                // group's last included: the day list is open at the bottom —
+                // more groups, more rows as the day is logged — and a rule
+                // under the last one is what a list that continues looks like.
+                // On 17 a section's last row is left open — the last goal row
+                // and the last label row each end their section with no rule
+                // under them — because a section is a finished set of rows.
+                //
+                // The checklist is the second of those: three rows, fixed, with
+                // nothing after them. So the open last row is the transfer of
+                // what 17 draws, not a preference picked out of the mixture.
                 if item.step != checklist.items.last?.step {
                     TodayHairline(color: palette.hairSoft)
                 }
