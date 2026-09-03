@@ -30,6 +30,32 @@ nonisolated enum TextLogCopy {
         String(localized: "text.analyse")
     }
 
+    /// The examples the empty field rotates through, in the order they are
+    /// shown.
+    ///
+    /// Every one of them names an amount, because the line above the field
+    /// says the estimate is only as exact as the amounts are. An example
+    /// without one would teach the opposite of the screen's own instruction.
+    static var placeholderExamples: [String] {
+        [
+            String(localized: "text.placeholder.example.eggs"),
+            String(localized: "text.placeholder.example.chicken"),
+            String(localized: "text.placeholder.example.salmon"),
+            String(localized: "text.placeholder.example.latte"),
+        ]
+    }
+
+    /// An example with the trailing ellipsis that makes it read as unfinished.
+    ///
+    /// The ellipsis is a format rather than part of each example, so the glyph
+    /// and the space before it are written once and the examples stay plain
+    /// sentences. The spacing is the export's own: it draws `…` after a space
+    /// on all four analysis screens. It is deliberately not the `·` the export
+    /// uses to separate figures — a different mark doing a different job.
+    static func placeholderLine(_ example: String) -> String {
+        String(format: String(localized: "text.placeholder.format"), example)
+    }
+
     static var noKeyTitle: String {
         String(localized: "text.noKey.title")
     }
