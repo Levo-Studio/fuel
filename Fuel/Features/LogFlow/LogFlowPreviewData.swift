@@ -27,7 +27,15 @@ enum LogFlowPreviewData {
 
         // An hour apart and descending, so the seeded order is the drawn order
         // once the store hands them back newest first.
-        let base = Date()
+        //
+        // Anchored rather than read from the clock, like `TodayPreviewData`
+        // and for the same reason: `FuelStore.log` derives each entry's label
+        // from its time of day, so seeding against "now" would hand the five
+        // meals whatever labels the hour the preview was opened happens to
+        // give them. Local midnight, because the store's calendar is the
+        // machine's.
+        let base = Calendar.current.startOfDay(for: Date(timeIntervalSince1970: 1_756_771_200))
+            .addingTimeInterval(TimeInterval(19 * 3_600))
         for (index, meal) in meals.enumerated() {
             // Bound rather than discarded: `@discardableResult` does not
             // survive `try?`, which wraps the value in an Optional of its own.
