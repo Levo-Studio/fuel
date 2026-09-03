@@ -1219,6 +1219,30 @@
         }
       }
     },
+    "result.text.flow" : {
+      "comment" : "Screen 15, the label top right. Drawn Text-Eintrag; the style uppercases it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text entry"
+          }
+        }
+      }
+    },
+    "result.text.heading" : {
+      "comment" : "Screen 15, the heading over the breakdown. Drawn Aufgeschlüsselt; the style uppercases it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Broken down"
+          }
+        }
+      }
+    },
     "result.text.item.estimated" : {
       "comment" : "Screen 15, under an item whose amount the model had to guess. Drawn Menge geschätzt.",
       "extractionState" : "manual",
@@ -1239,6 +1263,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Amount recognised"
+          }
+        }
+      }
+    },
+    "result.text.quote.label" : {
+      "comment" : "The quoted sentence on screen 15, for VoiceOver. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What you typed"
           }
         }
       }
@@ -1755,6 +1791,66 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Settings"
+          }
+        }
+      }
+    },
+    "text.analyse" : {
+      "comment" : "Screen 12, the filled button at the foot. Drawn Analysieren.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Analyse"
+          }
+        }
+      }
+    },
+    "text.hint" : {
+      "comment" : "Screen 12, the line under the heading. Drawn Je genauer die Mengen, desto genauer die Schätzung.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The more exact the amounts, the more exact the estimate."
+          }
+        }
+      }
+    },
+    "text.noKey.hint" : {
+      "comment" : "Under the keyless title on screen 12. Says which log mode still works. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add your API key in Settings to estimate a meal. Recent still logs anything you have eaten before."
+          }
+        }
+      }
+    },
+    "text.noKey.title" : {
+      "comment" : "Screen 12 with no key stored, so no estimate can be made. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No key stored"
+          }
+        }
+      }
+    },
+    "text.title" : {
+      "comment" : "Screen 12, the heading. Drawn Beschreib die Mahlzeit.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Describe the meal"
           }
         }
       }
