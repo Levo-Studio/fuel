@@ -57,11 +57,13 @@ private nonisolated struct StubTransport: HTTPTransport {
 
 /// Answers the key question without a keychain, which is what lets these tests
 /// run without an access group and without ever holding a secret.
+///
+/// It always says yes. Whether the camera half goes dead without a key is
+/// `CameraLogTests`' subject and is covered there; here a key has to exist for
+/// the shutter to reach a stage worth reopening onto.
 private nonisolated struct StubKeys: MealKeyPresence {
 
-    let hasKey: Bool
-
-    func hasKey(for provider: AIProvider) -> Bool { hasKey }
+    func hasKey(for provider: AIProvider) -> Bool { true }
 }
 
 /// A client no test in this file lets an estimate reach.
@@ -81,15 +83,18 @@ private nonisolated struct UnusedEstimator: AIClient {
     func estimate(text: String) async throws -> MealEstimate { throw AIError.cancelled }
 }
 
-/// A camera that opens nothing and counts what it was asked to do.
+/// A camera that opens nothing and counts the one thing this suite asks about.
+///
+/// Only `stop()` is counted. The shell never starts a session — the flow does
+/// that when its tab appears — so a `startCount` here would be a number no
+/// test could assert without pretending the shell had a part in it.
 private final class StubCamera: MealCamera {
 
-    private(set) var startCount = 0
     private(set) var stopCount = 0
 
     var preview: MealCameraPreview { .unavailable }
 
-    func start() async { startCount += 1 }
+    func start() async {}
 
     func stop() { stopCount += 1 }
 
@@ -159,7 +164,7 @@ struct ShellTests {
             store: store,
             client: UnusedEstimator(),
             camera: StubCamera(),
-            keys: StubKeys(hasKey: true),
+            keys: StubKeys(),
             provider: provider
         )
     }
@@ -310,7 +315,7 @@ struct ShellTests {
                 store: store,
                 client: UnusedEstimator(),
                 camera: FailingCamera(),
-                keys: StubKeys(hasKey: true),
+                keys: StubKeys(),
                 provider: provider
             )
         }
@@ -366,7 +371,7 @@ struct ShellTests {
                 store: store,
                 client: UnusedEstimator(),
                 camera: camera,
-                keys: StubKeys(hasKey: true),
+                keys: StubKeys(),
                 provider: provider
             )
         }
