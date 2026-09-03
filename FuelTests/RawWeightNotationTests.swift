@@ -320,6 +320,38 @@ struct RawWeightInstructionTests {
     func conventionProtectsTheTitle() {
         #expect(EstimateContract.rawWeightConvention.contains("Never put it in the meal's title"))
     }
+
+    /// The examples the instruction shows.
+    ///
+    /// Held here rather than written into each test below, because the two
+    /// things asserted about them are a pair: the model has to be shown them,
+    /// and the device has to accept them.
+    ///
+    /// `nonisolated` because a `@Test`'s argument list is evaluated outside
+    /// the actor the suite is on, and everything in this repository is on the
+    /// main actor unless it says otherwise.
+    private nonisolated static let examples = ["r300g", "r 1.5 kg", "r8oz", "r300 Gramm"]
+
+    /// **The invariant worth keeping.** Every example the model is shown must
+    /// be a shape the scanner accepts, or the model is being taught a notation
+    /// that never reaches it — the user types the form they were shown, the
+    /// device declines to send the convention, and the estimate comes back
+    /// silently wrong with a sentence that looks exactly right.
+    @Test("every example shown to the model is one the scanner accepts", arguments: examples)
+    func examplesAreShapesTheScannerAccepts(_ example: String) {
+        #expect(EstimateContract.rawWeightConvention.contains(example))
+        #expect(RawWeightNotation.isUsed(in: example))
+    }
+
+    /// The scanner reads the unit in more than one language, so the examples
+    /// do too. A list of English shapes would teach a narrower rule than the
+    /// device accepts, and the person most likely to weigh their rice is the
+    /// one who writes `Gramm`.
+    @Test("the examples are not all English")
+    func examplesAreNotAllEnglish() {
+        #expect(EstimateContract.rawWeightConvention.contains("r300 Gramm"))
+        #expect(RawWeightNotation.isUsed(in: "r300 Gramm Reis"))
+    }
 }
 
 // MARK: - Amount field

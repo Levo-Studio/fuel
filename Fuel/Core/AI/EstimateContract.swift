@@ -76,6 +76,19 @@ nonisolated enum EstimateContract {
     /// the same thing again for the sentence that used it once and went on to
     /// describe four other things.
     ///
+    /// **One of the four examples is not in English, and that is deliberate.**
+    /// `RawWeightNotation` reads the unit in German and French as well, and a
+    /// list of English shapes would teach the model a narrower rule than the
+    /// device accepts — the first raw weight typed into Fuel in anger is at
+    /// least as likely to be `r300 Gramm Reis` as `r300g rice`. One example
+    /// carries that, and one is enough: the paragraph is an instruction, not a
+    /// tour of the unit table.
+    ///
+    /// Every example shown is a shape `RawWeightNotation.isUsed(in:)` accepts,
+    /// and `RawWeightInstructionTests` holds that to be true. Showing the model
+    /// a form the scanner suppresses would teach it a notation that never
+    /// reaches it, and the failure would be silent at both ends.
+    ///
     /// The item's name carries the raw amount because it is the only part of
     /// the reply the result screen already draws as the model wrote it. A
     /// structured field would be the better home and is a change to
@@ -91,12 +104,12 @@ nonisolated enum EstimateContract {
     /// writes one. An item name costs nothing when it varies — nothing groups
     /// on it — and a title costs the user the list they log from.
     static let rawWeightConvention = """
-        A weight written with a leading r — r300g, r 1.5 kg, r8oz — was \
-        weighed raw or dry, before cooking. A weight without it is the \
-        amount as eaten. Base that item's calories on the raw or dry food \
-        and not on the cooked portion, and end its name with the raw amount \
-        in brackets, like "Rice (raw 300 g)". Never put it in the meal's \
-        title. A raw weight is a stated amount, so that item's "amount" is \
+        A weight written with a leading r — r300g, r 1.5 kg, r8oz, r300 Gramm \
+        — was weighed raw or dry, before cooking. A weight without it is the \
+        amount as eaten. Base that item's calories on the raw or dry food and \
+        not on the cooked portion, and end its name with the raw amount in \
+        brackets, like "Rice (raw 300 g)". Never put it in the meal's title. A \
+        raw weight is a stated amount, so that item's "amount" is \
         "recognised".
 
         Read everything else as an ordinary amount, including a count such as \
