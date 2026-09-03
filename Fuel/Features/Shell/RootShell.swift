@@ -145,6 +145,12 @@ struct RootShell: View {
                         countingModel: counting,
                         done: model.dismissDestination
                     )
+                    // Settings loses nothing by being left: every control on it
+                    // writes the moment it is used, and the key row is built
+                    // once and held, so a half-typed key is still there when the
+                    // screen is opened again. `Done` stays the drawn control;
+                    // this is the same exit for a thumb that starts at the edge.
+                    .fuelBackSwipe(perform: model.dismissDestination)
                 }
             }
         }

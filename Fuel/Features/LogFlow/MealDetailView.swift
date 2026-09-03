@@ -90,6 +90,23 @@ struct MealDetailView: View {
 
             Button(MealDetailCopy.deleteCancel, role: .cancel) {}
         }
+        // The second way back to Today, for a thumb that reaches for the edge
+        // before it reaches for the corner. `‹ Back` stays the drawn control
+        // and nothing is added to the screen to advertise this one.
+        //
+        // **It is off the moment there is something to lose.** `MealResultView`
+        // puts a confirmation in front of `‹ Back` once the breakdown has been
+        // changed, and a gesture that skipped it would put back exactly the bug
+        // that confirmation exists to fix — item edits thrown away without a
+        // question. The confirmation belongs to that view and cannot be reached
+        // from here, so with edits pending this offers nothing and the drawn
+        // control, which asks, is the only way out. The analysis and failure
+        // states are excluded for the plainer reason that they draw their own
+        // cancel over the whole screen.
+        .fuelBackSwipe(
+            isEnabled: model.stage == .detail && !model.draft.hasItemEdits,
+            perform: onClose
+        )
         .fuelAnimation(FuelMotion.emphasised, value: model.stage)
     }
 
