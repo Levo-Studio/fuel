@@ -31,8 +31,16 @@ struct PhotoHatch: View {
             let band = FuelMetrics.Hatch.band
             var offset = -reach
             while offset < reach {
+                // Stacked along y, so the unrotated gradient axis points along
+                // y and the rotation above is the CSS angle itself rather than
+                // the CSS angle plus a quarter turn. CSS measures a gradient
+                // from "to top" and turns clockwise, so a construction that
+                // stacked bands along x would start at 90° and land the whole
+                // hatch a quarter turn out — bands running "\" where the export
+                // draws "/". They are the same three numbers either way, which
+                // is exactly why the mistake is invisible in a diff.
                 context.fill(
-                    Path(CGRect(x: offset, y: -reach, width: band, height: reach * 2)),
+                    Path(CGRect(x: -reach, y: offset, width: reach * 2, height: band)),
                     with: .color(stripe)
                 )
                 // One band painted, one band left, which is what
