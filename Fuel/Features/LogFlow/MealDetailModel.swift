@@ -246,7 +246,7 @@ final class MealDetailModel {
 
     private func rerun(_ described: String, as run: Int) async {
         do {
-            let estimate = try await stepping(described)
+            let estimate = try await stepping(described, as: run)
 
             try Task.checkCancellation()
             writeBack(estimate, as: run)
@@ -262,8 +262,8 @@ final class MealDetailModel {
     /// the pacing out into something all three share would rewrite both of
     /// them, and both are being reviewed by someone else. It is a refactor for
     /// the owner to call, not one to slip into a feature.
-    private func stepping(_ described: String) async throws -> MealEstimate {
-        let stepper = Task { [weak self] in await self?.walkSteps() }
+    private func stepping(_ described: String, as run: Int) async throws -> MealEstimate {
+        let stepper = Task { [weak self] in await self?.walkSteps(as: run) }
         do {
             let estimate = try await client.estimate(text: described)
             // Awaited rather than only cancelled, so a step cannot land on the
@@ -280,10 +280,20 @@ final class MealDetailModel {
 
     /// Walks steps two to four. The first is set the moment `Re-analyse` is
     /// tapped, and the fourth is held until the answer arrives.
-    private func walkSteps() async {
+    ///
+    /// **Guarded by run identity, not only by its own cancellation.** This
+    /// task is unstructured — `stepping()` creates it with a bare `Task { }`,
+    /// not a child task — so cancelling the re-analysis that owns it does not
+    /// cancel it. `isCurrent(run)` closes the window `Task.isCancelled` alone
+    /// cannot: `currentRun` is bumped synchronously the moment a run is
+    /// superseded or the user cancels, before any cancellation has had a
+    /// chance to propagate to this task. Both checks are kept — the other one
+    /// still stops a stepper whose own request has simply finished. The same
+    /// guard is in both log modes, for the same reason.
+    private func walkSteps(as run: Int) async {
         for step in AnalysisStep.allCases.dropFirst() {
             await pace()
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, isCurrent(run) else { return }
             stage = .analysing(step)
         }
     }

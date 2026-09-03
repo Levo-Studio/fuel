@@ -359,6 +359,47 @@ struct MealDetailTests {
         #expect(try store.entry(withID: entry.entryID)?.kilocalories == 390)
     }
 
+    /// The bug this pins, same shape as its counterpart in `CameraLogTests`
+    /// and `TextLogTests`: `cancelReanalysis()` cancelled the `Task` but left
+    /// the run current, so a re-analysis that happened to complete in the
+    /// window between the tap and the continuation resuming still passed
+    /// `isCurrent` — and wrote a fresh estimate over a meal the user had just
+    /// stopped re-analysing, on the one of the three models with no test
+    /// exercising the race. `GatedClient` holds the answer open past the
+    /// cancel and releases it afterwards, which is the only way to put a test
+    /// in that window.
+    @Test("a re-analysis that completes after CANCEL does not overwrite the meal")
+    func cancelledReanalysisDoesNotOverwriteTheStoredMeal() async throws {
+        let store = try makeStore()
+        let entry = try logMeal(in: store)
+        let client = GatedClient(answers: [.success(Self.reestimate)])
+        let built = MealDetailModel(
+            entryID: entry.entryID,
+            store: store,
+            client: client,
+            keys: StoredKey(),
+            provider: .claude,
+            pace: {}
+        )
+        guard let model = built else { throw FixtureFailure.noStoredMeal }
+
+        let polenta = try #require(model.draft.items.last?.id)
+        model.editItem(polenta, to: "Polenta, raw 50 g")
+        model.reanalyse()
+        while client.requests < 1 { await Task.yield() }
+
+        model.cancelReanalysis()
+        #expect(model.stage == .detail)
+
+        // The request the user backed out of answers anyway.
+        client.release(0)
+        for _ in 0..<50 { await Task.yield() }
+
+        #expect(model.stage == .detail)
+        #expect(model.draft.kilocalories == 460)
+        #expect(try store.entry(withID: entry.entryID)?.kilocalories == 460)
+    }
+
     // MARK: - Leaving with edits
 
     /// `‹ Back` confirms once the breakdown has been changed, and the dialog it
