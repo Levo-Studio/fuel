@@ -208,7 +208,10 @@ struct SettingsGoalsTests {
         ])
 
         // Read out of the rule rather than restated, so a rule that changed
-        // cannot take this expectation along with it.
+        // cannot take this expectation along with it. The reach is pinned in
+        // `Meal label` too, and that suite is the canonical one: an
+        // owner-sanctioned change to `claimable` is settled there first, and
+        // this line follows it.
         let reaches = try MainMeal.inDayOrder.map(reachText)
         #expect(reaches == ["04:00 – 10:59", "11:00 – 17:59", "18:00 – 23:59"])
 
@@ -230,12 +233,18 @@ struct SettingsGoalsTests {
     }
 
     /// How far a meal actually reaches, in the `HH:mm – HH:mm` shape the rows
-    /// print. The reach is contiguous, so its first and last claimed minute are
-    /// its ends.
+    /// print.
+    ///
+    /// A range is only an honest reading of `claimable` while the claimed
+    /// minutes are contiguous, so that is checked rather than assumed: a rule
+    /// that left a hole inside a meal's reach would otherwise still be
+    /// summarised by its endpoints, and the guard above would go on comparing
+    /// the drawn windows against a range no longer describing the rule.
     private func reachText(of meal: MainMeal) throws -> String {
         let claimed = (0 ..< 24 * 60).filter { MainMeal.claimable(atMinuteOfDay: $0) == meal }
         let first = try #require(claimed.first)
         let last = try #require(claimed.last)
+        #expect(claimed == Array(first ... last))
         return "\(clock(first)) – \(clock(last))"
     }
 
