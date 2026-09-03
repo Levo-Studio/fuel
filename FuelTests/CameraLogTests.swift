@@ -374,59 +374,6 @@ private extension CameraLogModel {
 
 // MARK: - Stand-ins
 
-/// Answers one estimate, from memory, and counts how often it was asked.
-///
-/// The count is the point of `noKeyDisablesTheTab`: a disabled tab that still
-/// sent the request would pass a test that only looked at the stage.
-private final class ScriptedClient: AIClient, @unchecked Sendable {
-
-    let provider: AIProvider = .claude
-
-    private let answer: Result<MealEstimate, AIError>
-    private(set) var requests = 0
-
-    init(answer: Result<MealEstimate, AIError>) {
-        self.answer = answer
-    }
-
-    func checkKey(_ key: APIKey) async -> KeyCheckResult { .passed }
-
-    func estimate(photo: MealPhoto) async throws -> MealEstimate {
-        requests += 1
-        return try answer.get()
-    }
-
-    func estimate(text: String) async throws -> MealEstimate {
-        requests += 1
-        return try answer.get()
-    }
-}
-
-/// No key for any provider.
-private struct NoKeys: MealKeyPresence {
-
-    func hasKey(for provider: AIProvider) -> Bool { false }
-}
-
-/// A key for every provider.
-private struct StoredKey: MealKeyPresence {
-
-    func hasKey(for provider: AIProvider) -> Bool { true }
-}
-
-/// A key that can be added or taken away between two questions, which is what
-/// Settings does while the app is running.
-private final class MutableKeys: MealKeyPresence, @unchecked Sendable {
-
-    var hasKey: Bool
-
-    init(hasKey: Bool) {
-        self.hasKey = hasKey
-    }
-
-    func hasKey(for provider: AIProvider) -> Bool { hasKey }
-}
-
 /// A camera that hands back the smallest possible frame.
 @MainActor
 private final class StubCamera: MealCamera {
