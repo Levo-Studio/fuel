@@ -134,9 +134,14 @@ nonisolated enum FuelHaptics {
         }
     }
 
-    /// Held rather than built per call: a generator that is already alive is
-    /// the difference between a click under the finger and one that arrives
-    /// after it has lifted.
+    /// Held rather than built per call, which is what Apple's own guidance
+    /// asks for: it saves rebuilding a generator on every tap.
+    ///
+    /// It does **not** warm the engine — that is `prepare()`'s job, and nothing
+    /// here calls it. Warming is only worth anything when there is a moment
+    /// beforehand that says a haptic is coming, and the four events have none a
+    /// feature file could name without knowing more about haptics than a
+    /// feature file should. The cost is a first tap that may arrive late.
     @MainActor private static let selection = UISelectionFeedbackGenerator()
 
     @MainActor private static let notification = UINotificationFeedbackGenerator()

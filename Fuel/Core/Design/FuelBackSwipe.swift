@@ -2,8 +2,14 @@ import SwiftUI
 
 // MARK: - Back swipe
 
-/// The leading-edge drag that closes a screen, and the geometry that decides
-/// when a drag is one.
+/// The left-edge drag that closes a screen, and the geometry that decides when
+/// a drag is one.
+///
+/// **Left, not leading.** `startX` is a distance from x = 0, which is the
+/// leading edge only where the layout runs left to right. Fuel's interface is
+/// English and nothing else — the string catalog holds one language and the
+/// repository forbids a second — so the two cannot come apart here, and saying
+/// "leading" would claim a right-to-left correctness this does not have.
 ///
 /// **Undrawn, like the curves in `FuelMotion`.** Every screen in Fuel is a
 /// `fullScreenCover`, which has no interactive dismissal of its own, and the
@@ -22,7 +28,7 @@ nonisolated enum FuelBackSwipe {
 
     // MARK: - Geometry
 
-    /// How far in from the leading edge a drag has to begin.
+    /// How far in from the left edge of the screen a drag has to begin.
     ///
     /// Narrow on purpose: a drag that starts in the middle of the screen is
     /// somebody swiping content, not somebody leaving, and this is the number
@@ -45,7 +51,7 @@ nonisolated enum FuelBackSwipe {
     /// simulator someone has to drag on.
     static func isBackSwipe(startX: CGFloat, translation: CGSize) -> Bool {
         guard startX <= edgeWidth, translation.width >= travel else { return false }
-        // Predominantly horizontal. A drag down the leading edge of a scrolling
+        // Predominantly horizontal. A drag down the left edge of a scrolling
         // list drifts sideways, and without this it would eventually close the
         // screen underneath the person reading it.
         return abs(translation.height) < translation.width
@@ -64,7 +70,14 @@ private struct FuelBackSwipeModifier: ViewModifier {
             // Simultaneous rather than `gesture`: the screens this sits on
             // scroll and carry buttons, and an exclusive drag recogniser over
             // the whole surface would take touches away from both.
-            DragGesture(minimumDistance: FuelBackSwipe.travel, coordinateSpace: .local)
+            // `.global` and not `.local`: `edgeWidth` is a distance from the
+            // edge of the screen, and in local space it would mean a distance
+            // from the edge of whatever this happens to be attached to. Both
+            // call sites are full-screen roots today, where the two agree — so
+            // the difference is invisible until someone applies this to an
+            // inset view, and then it arms a back swipe in the middle of the
+            // screen. Global keeps the constant meaning what it says.
+            DragGesture(minimumDistance: FuelBackSwipe.travel, coordinateSpace: .global)
                 .onEnded { drag in
                     guard
                         isEnabled,
@@ -83,7 +96,12 @@ private struct FuelBackSwipeModifier: ViewModifier {
 
 extension View {
 
-    /// Closes this screen on a drag in from the leading edge.
+    /// Closes this screen on a drag in from the left edge of the screen.
+    ///
+    /// **Apply it to something that fills the screen.** The drag is measured in
+    /// global coordinates, so the edge is the device's and not this view's: on
+    /// a half-width or inset view the gesture would still be armed by a touch
+    /// at the left of the screen, which may be nowhere near the view itself.
     ///
     /// `isEnabled` is for a screen that is holding something a dismissal would
     /// throw away. Passing `true` there is a claim that nothing is lost by
