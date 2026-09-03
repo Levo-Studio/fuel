@@ -28,13 +28,19 @@ struct FuelApp: App {
     /// There is no drawn state for "the database will not open", and the
     /// tempting fallback — an in-memory container — would give the user a
     /// working-looking app that silently discards every meal they log. Stopping
-    /// here is the honest outcome. The message carries nothing about the user
-    /// or their data.
+    /// here is the honest outcome.
+    ///
+    /// The error is interpolated into the crash report because the reasons this
+    /// call fails are worth telling apart: a schema mismatch after an update —
+    /// the likeliest of them in the field — a full disk, or protected data
+    /// still locked at launch all read as the same crash without it. It carries
+    /// nothing the no-logging rule protects: no key, no photo, no typed text,
+    /// no model reply. None of those exist yet at this point in the launch.
     private static func openStore() -> FuelStore {
         do {
             return try FuelStore()
         } catch {
-            fatalError("The Fuel store could not be opened.")
+            fatalError("The Fuel store could not be opened: \(error)")
         }
     }
 }
