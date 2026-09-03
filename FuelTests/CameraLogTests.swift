@@ -280,13 +280,15 @@ struct CameraLogTests {
         let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .success(Self.estimate)))
         await model.scanning(pixel())
 
-        let polenta = try #require(model.draft?.items.first?.id)
-        model.editItem(polenta, to: "  Polenta r50g  ")
+        // The first of the two items is the salmon. Correcting it with a
+        // weight the photograph could not give is the case the owner named.
+        let salmon = try #require(model.draft?.items.first?.id)
+        model.editItem(salmon, to: "  Salmon fillet, r180g  ")
 
-        #expect(model.draft?.items.first?.name == "Polenta r50g")
+        #expect(model.draft?.items.first?.name == "Salmon fillet, r180g")
         #expect(model.draft?.hasItemEdits == true)
         // The price beside it was the model's answer about a different line.
-        #expect(model.draft?.isPriced(polenta) == false)
+        #expect(model.draft?.isPriced(salmon) == false)
         #expect(model.draft?.isPriced(try #require(model.draft?.items.last?.id)) == true)
     }
 
@@ -362,8 +364,11 @@ struct CameraLogTests {
         let model = makeModel(store: try makeStore(), client: client)
         await model.scanning(pixel())
 
-        let polenta = try #require(model.draft?.items.last?.id)
-        model.editItem(polenta, to: "Polenta r50g")
+        // The second of the two items is the spinach, which is what the model
+        // read the polenta as — a misrecognised line, corrected by name and by
+        // weight at once.
+        let spinach = try #require(model.draft?.items.last?.id)
+        model.editItem(spinach, to: "Polenta r50g")
         await model.reanalysing()
 
         // The text estimate, which is what carries the list. A second photo
