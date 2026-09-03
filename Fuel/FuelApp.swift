@@ -7,10 +7,14 @@ struct FuelApp: App {
 
     /// One store for the whole process, created once and handed down.
     ///
-    /// It is `@State` rather than a plain property because SwiftUI owns the
-    /// storage behind a `@State`: the container is opened on the first
-    /// evaluation and never again, where a `let` on a struct SwiftUI is free to
-    /// re-create would risk opening it twice.
+    /// What makes it once is that `@main` instantiates this struct a single
+    /// time — **not** the property wrapper. A `@State`'s default expression
+    /// runs on every initialisation of the struct holding it and `State` keeps
+    /// only the first value it is handed, so the same line on a `View` would
+    /// open a container per construction and throw all but one away. Here a
+    /// plain `let` would behave identically; the wrapper is used because the
+    /// store outlives every view below it and SwiftUI, rather than this struct,
+    /// is what should own it.
     @State private var store = FuelApp.openStore()
 
     var body: some Scene {
