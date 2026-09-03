@@ -31,6 +31,35 @@ struct RawWeightNotationTests {
         #expect(RawWeightNotation.isUsed(in: sentence))
     }
 
+    /// A space the user cannot see the difference of must not be a space the
+    /// scanner sees the difference of. A non-breaking space comes off the iOS
+    /// keyboard and off the clipboard; a tab comes out of a spreadsheet.
+    @Test(
+        "any one whitespace character separates the marker from its weight",
+        arguments: [
+            "r300\u{00A0}g rice",
+            "r300\tg rice",
+            "r\u{00A0}300 g rice",
+            "r300 g\u{00A0}rice",
+            "r300\u{2009}g rice"
+        ]
+    )
+    func whitespaceVariants(_ sentence: String) {
+        #expect(RawWeightNotation.isUsed(in: sentence))
+    }
+
+    @Test(
+        "two separators are two things on the line, not one amount",
+        arguments: [
+            "r  50g rice",
+            "r \u{00A0}50g rice",
+            "r50  g rice"
+        ]
+    )
+    func doubleSeparators(_ sentence: String) {
+        #expect(!RawWeightNotation.isUsed(in: sentence))
+    }
+
     @Test(
         "the marker and its unit are read in any case",
         arguments: [
@@ -184,7 +213,6 @@ struct RawWeightNotationTests {
             "r50",
             "r",
             "r1.kg pasta",
-            "r  50g rice",
             "r50 grammar"
         ]
     )

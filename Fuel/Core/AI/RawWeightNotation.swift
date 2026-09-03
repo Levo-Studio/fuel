@@ -122,6 +122,14 @@ nonisolated enum RawWeightNotation {
     /// somebody with a different habit. More than one space is not: at that
     /// point the `r` and the number are two separate things on the line rather
     /// than one amount.
+    ///
+    /// "Space" means any one whitespace character and not the space bar. A
+    /// non-breaking space is a keystroke away on an iOS keyboard and arrives
+    /// with almost anything pasted, and a tab arrives with anything pasted out
+    /// of a spreadsheet — which is exactly where somebody keeps weights. All
+    /// of them look like one space on screen, and a rule that can only see
+    /// U+0020 rejects a sentence the user cannot tell apart from one it
+    /// accepts.
     private static func quantityFollows(_ characters: [Character], from index: Int) -> Bool {
         var cursor = skippingSpace(characters, from: index)
 
@@ -176,9 +184,9 @@ nonisolated enum RawWeightNotation {
         return false
     }
 
-    /// `index` advanced past one space, if there is one there.
+    /// `index` advanced past one whitespace character, if there is one there.
     private static func skippingSpace(_ characters: [Character], from index: Int) -> Int {
-        guard index < characters.count, characters[index] == " " else {
+        guard index < characters.count, characters[index].isWhitespace else {
             return index
         }
         return index + 1
