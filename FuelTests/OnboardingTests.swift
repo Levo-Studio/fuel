@@ -425,6 +425,114 @@ struct OnboardingTests {
         #expect(settings.kilocalorieGoal == 1800)
     }
 
+    // MARK: - The macro fields
+
+    /// The three macro cards are editable at the owner's instruction — the
+    /// export draws them as read-only cards — and this is what makes them
+    /// fields rather than figures.
+    ///
+    /// It reads the `UITextField`s the screen puts on a window, because that is
+    /// the difference the change made: four of them, one per target, where
+    /// there was one and three pieces of text. Each is identified by what it
+    /// holds, since nothing else on the screen shows a target's figure.
+    @Test("all four targets are fields the user can type into")
+    func everyTargetIsAField() throws {
+        let keychain = makeKeychain()
+        defer { clear(keychain) }
+        let model = makeModel(keychain: keychain, validator: StubValidator(), store: try makeStore())
+
+        let targets = DailyTargets.default
+        #expect(try fieldContents(of: GoalScreen(model: model)) == [
+            String(targets.kilocalories),
+            String(targets.protein),
+            String(targets.carbs),
+            String(targets.fat)
+        ])
+    }
+
+    /// Count-only draws no goal, so it offers nothing to type into either. The
+    /// collapse is the drawn behaviour; this holds the fields to it.
+    @Test("count-only mode offers no target to type into")
+    func countOnlyHasNoFields() throws {
+        let keychain = makeKeychain()
+        defer { clear(keychain) }
+        let model = makeModel(keychain: keychain, validator: StubValidator(), store: try makeStore())
+
+        model.selectCountOnly()
+
+        #expect(try fieldContents(of: GoalScreen(model: model)).isEmpty)
+    }
+
+    /// What each field on the screen holds, in the order the screen lays them
+    /// out.
+    ///
+    /// The screen is put on a key window of the export's own 390×844 and given
+    /// a turn of the run loop. All three are needed: SwiftUI backs a `TextField`
+    /// with a real `UITextField` only for a hosting view that is on a visible
+    /// window, and only once a layout pass has reached it.
+    ///
+    /// The window comes from the test host's own scene rather than from
+    /// `UIWindow(frame:)`, which iOS 26 deprecates.
+    ///
+    /// The fields are told apart by their contents rather than by their
+    /// accessibility label, which SwiftUI keeps on its own node and does not
+    /// pass down to the `UITextField`.
+    private func fieldContents(of screen: GoalScreen) throws -> [String] {
+        let scene = try #require(
+            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        )
+        let controller = UIHostingController(rootView: screen)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(origin: .zero, size: CGSize(width: 390, height: 844))
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        controller.view.layoutIfNeeded()
+        RunLoop.current.run(until: Date())
+        return textFields(in: controller.view).map { $0.text ?? "" }
+    }
+
+    private func textFields(in view: UIView) -> [UITextField] {
+        view.subviews.flatMap { subview in
+            (subview as? UITextField).map { [$0] } ?? textFields(in: subview)
+        }
+    }
+
+    @Test(
+        "a macro field commits what is typed into it",
+        arguments: [("180", 180), ("40", 40), ("1", 1)]
+    )
+    func typedMacroIsCommitted(typed: String, expected: Int) {
+        #expect(GoalFieldInput.value(from: typed, previous: 160) == expected)
+    }
+
+    /// The same rule the calorie field and the four Settings rows follow: a
+    /// field cleared to be retyped is not a target of zero. The card is not
+    /// left blank either — the field is put back to the figure the target still
+    /// holds once the user moves on, which the export's own drawing requires,
+    /// since it draws a number on every card.
+    @Test("a cleared macro field keeps the target it had")
+    func clearedMacroFieldKeepsItsValue() {
+        #expect(GoalFieldInput.value(from: "", previous: 160) == 160)
+    }
+
+    @Test("typed macros reach the settings row")
+    func typedMacrosAreWritten() throws {
+        let keychain = makeKeychain()
+        defer { clear(keychain) }
+        let store = try makeStore()
+        let model = makeModel(keychain: keychain, validator: StubValidator(), store: store)
+
+        model.targets.protein = GoalFieldInput.value(from: "180", previous: model.targets.protein)
+        model.targets.carbs = GoalFieldInput.value(from: "200", previous: model.targets.carbs)
+        model.targets.fat = GoalFieldInput.value(from: "80", previous: model.targets.fat)
+        #expect(model.complete())
+
+        let settings = try #require(try store.existingGoalSettings())
+        #expect(settings.proteinGoal == 180)
+        #expect(settings.carbGoal == 200)
+        #expect(settings.fatGoal == 80)
+    }
+
     // MARK: - The key cannot leak
 
     /// The guarantee `APIKey` makes about itself, held against the one type in
