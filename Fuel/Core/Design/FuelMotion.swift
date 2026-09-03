@@ -124,6 +124,20 @@ nonisolated enum FuelMotion {
     /// a scan takes.
     static let analysisStepHold: Duration = .milliseconds(700)
 
+    /// How long one example is held in the empty text field before the next.
+    ///
+    /// The second dwell in the app and the same kind of value as the one above
+    /// — a sequence of states rather than an interpolation — so it sits beside
+    /// it rather than in the feature that first needed one.
+    ///
+    /// **No drawn screen specifies it.** The export draws screen 12's field
+    /// with a sentence already in it and nothing rotating, so this is chosen
+    /// against what the example is for: it has to be readable at a glance and
+    /// gone before it becomes furniture. Two and a half seconds is long enough
+    /// to read a short line without hurrying and to notice it change, and far
+    /// longer than the analysis dwell, which paces work rather than reading.
+    static let placeholderExampleHold: Duration = .milliseconds(2500)
+
     // MARK: - Resolution
 
     /// Turns a curve into the animation to actually run.
@@ -165,6 +179,25 @@ nonisolated enum FuelMotion {
         guard !reduceMotion else { return nil }
         return curve.animation.repeatForever(autoreverses: false)
     }
+
+    /// Whether a sequence that advances on its own should advance at all, and
+    /// how long it holds each state when it does.
+    ///
+    /// The same question `resolveRepeating` answers, for the case where nothing
+    /// is being interpolated: text that swaps itself on a timer is not a
+    /// transition with a curve, it is a loop with a dwell. `ReducedBehaviour`
+    /// has no answer that fits — a cross-fade would keep the rotation and only
+    /// soften each swap, which is not less motion, it is the same motion
+    /// blurred.
+    ///
+    /// So `nil` means **do not advance**, and the caller shows the state it is
+    /// already on. Text that rewrites itself while someone is reading it is
+    /// close to the centre of what Reduce Motion is asked for, and a rotating
+    /// example loses nothing by standing still: one example teaches the same
+    /// thing as four.
+    static func resolvePacing(_ hold: Duration, reduceMotion: Bool) -> Duration? {
+        reduceMotion ? nil : hold
+    }
 }
 
 // MARK: - Applying a curve
@@ -181,7 +214,67 @@ private struct FuelAnimationModifier<Value: Equatable>: ViewModifier {
     }
 }
 
+// MARK: - Pacing a sequence
+
+/// Advances a sequence on a timer for as long as the view is on screen — and
+/// not at all when the user has asked for less motion.
+///
+/// It is `FuelAnimationModifier`'s counterpart for the case with no curve in
+/// it, and it exists for the same reason: the accessibility flag is read here,
+/// once, rather than at whichever call site happens to want a rotation. A
+/// feature file that read it itself would be one `if` away from a rotation that
+/// keeps running under Reduce Motion.
+private struct FuelPacingModifier: ViewModifier {
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    let hold: Duration
+    let isActive: Bool
+    let advance: () -> Void
+
+    /// What the loop is keyed on. Both inputs restart it: switching Reduce
+    /// Motion on has to stop a rotation that is already running, and a sequence
+    /// that has become irrelevant — a field with something in it — has to stop
+    /// waking up to advance something nobody can see.
+    private struct Key: Equatable {
+
+        let isActive: Bool
+        let reduceMotion: Bool
+    }
+
+    func body(content: Content) -> some View {
+        content.task(id: Key(isActive: isActive, reduceMotion: reduceMotion)) {
+            guard
+                isActive,
+                let hold = FuelMotion.resolvePacing(hold, reduceMotion: reduceMotion)
+            else {
+                return
+            }
+            // The first state is already showing, so the wait comes before the
+            // advance rather than after it.
+            while !Task.isCancelled {
+                try? await Task.sleep(for: hold)
+                guard !Task.isCancelled else { return }
+                advance()
+            }
+        }
+    }
+}
+
 extension View {
+
+    /// Advances something on a dwell from the design layer, honouring Reduce
+    /// Motion without the call site knowing about it.
+    ///
+    /// `isActive` is for a sequence that has stopped mattering rather than
+    /// stopped moving — the rotation behind a field the user has typed into.
+    func fuelPacing(
+        _ hold: Duration,
+        isActive: Bool = true,
+        advance: @escaping () -> Void
+    ) -> some View {
+        modifier(FuelPacingModifier(hold: hold, isActive: isActive, advance: advance))
+    }
 
     /// Animates a change with one of the curves above, already reduced if the
     /// user asked for that.
