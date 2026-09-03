@@ -381,12 +381,21 @@ private nonisolated struct EstimatePayload: Decodable {
         ///
         /// Everything else here is spelling. Case and surrounding space are
         /// not a different answer, and neither is the American `recognized`,
-        /// which a model writes without being asked. **`raw` is the one that
-        /// is new and the one that matters**: since the text instruction
-        /// began explaining raw weights, a model has an obvious word to reach
-        /// for, and the previous test — equality with `recognised` — would
-        /// have filed the most precisely stated amount in the sentence as an
-        /// estimate. A raw weight is an amount the user wrote down.
+        /// which a model writes without being asked.
+        ///
+        /// **`raw` is the one worth stating a reason for, and the reason is a
+        /// precaution rather than a bug that was seen.** Nothing asks for it:
+        /// `systemPrompt` names `recognised` and `estimated` and no third
+        /// value, and `rawWeightConvention` says outright that a raw weight's
+        /// `amount` is `recognised`. What the convention does introduce is the
+        /// word `raw` a few lines above that instruction, in the sentence
+        /// about the item's name, and a model that has just been asked to
+        /// write `Rice (raw 300 g)` has an obvious word within reach for the
+        /// field underneath it. Under the old test — equality with the exact
+        /// string `recognised` — that answer would have filed the most
+        /// precisely stated amount in the sentence as an estimate. Widening
+        /// the read costs nothing and closes it, and a raw weight is an
+        /// amount the user wrote down either way.
         ///
         /// It is deliberately *not* a third case on `RecognisedItem`. That is
         /// where a raw amount belongs, so the row could say `raw 300 g` and
