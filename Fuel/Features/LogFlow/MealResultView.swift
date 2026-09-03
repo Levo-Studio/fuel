@@ -314,12 +314,13 @@ struct MealResultView<Lede: View>: View {
     /// The figure and its unit, on the row the export puts them on.
     ///
     /// **The export also draws a `−` and a `+` in circles at the trailing end
-    /// of this row** — a ±10 kcal stepper, `Screens2c.dc.html` lines 328 to 331
-    /// and 368 to 371, with the step in `design/Fuel Design Notes.md` under
-    /// "Result stepper". The owner has removed it: a figure the user nudges ten
-    /// at a time is guesswork on top of the model's guess, and the way to
-    /// correct an estimate is now to correct the items it was made from and ask
-    /// again.
+    /// of this row** — a ±10 kcal stepper, `Screens2c.dc.html` lines 325 and
+    /// 326 on screen 14 and 365 and 366 on screen 15, inside the wrappers at
+    /// 324 to 327 and 364 to 367, with the step in `design/Fuel Design Notes.md`
+    /// under "Result stepper". The owner has removed it: a figure the user
+    /// nudges ten at a time is guesswork on top of the model's guess, and the
+    /// way to correct an estimate is now to correct the items it was made from
+    /// and ask again.
     ///
     /// The figure still animates, because it still changes — a re-analysis
     /// replaces it.
