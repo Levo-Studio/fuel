@@ -600,6 +600,39 @@ struct TextLogTests {
         ])
     }
 
+    @Test("committing writes the typed sentence behind the entry, verbatim")
+    func commitWritesTheSentence() async throws {
+        let store = try makeStore()
+        let model = makeModel(store: store, client: ScriptedClient(answer: .success(Self.estimate)))
+        model.typedText = Self.sentence
+        await model.estimating()
+
+        #expect(model.commit())
+
+        let entry = try #require(try store.entries(on: at(19, 20)).first)
+        #expect(entry.typedSentence == Self.sentence)
+        #expect(entry.capturedPhotoData == nil)
+    }
+
+    @Test("a re-analysis keeps the sentence it did not resend")
+    func reanalysisKeepsTheSentence() async throws {
+        let store = try makeStore()
+        let client = ScriptedClient(answers: [.success(Self.estimate), .success(Self.reestimate)])
+        let model = makeModel(store: store, client: client)
+        model.typedText = Self.sentence
+        await model.estimating()
+
+        model.editItem(try #require(model.draft?.items.last?.id), to: "Polenta, raw 50 g")
+        await model.reanalysing()
+
+        // What is sent is the edited list, not the sentence — the sentence is
+        // untouched and still what `commit()` hands the store.
+        #expect(model.typedText == Self.sentence)
+        #expect(model.commit())
+        let entry = try #require(try store.entries(on: at(19, 20)).first)
+        #expect(entry.typedSentence == Self.sentence)
+    }
+
     @Test("a label the user picked survives the commit as theirs")
     func commitKeepsTheUsersLabel() async throws {
         let store = try makeStore()

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // MARK: - Model
 
@@ -64,6 +65,17 @@ final class MealDetailModel {
     /// thing the user edits.
     private(set) var draft: MealResultDraft
 
+    /// The photo behind a camera-mode entry, decoded once at open. `nil` for a
+    /// text-mode or Recent-mode entry, and `nil` for one logged before
+    /// `FoodEntry.capturedPhotoData` existed — `MealDetailView` reads that
+    /// absence together with `typedSentence`'s and falls back to the meal's
+    /// own name in the lede slot.
+    let photo: UIImage?
+
+    /// The sentence behind a text-mode entry, exactly as typed. `nil` for the
+    /// same reasons `photo` is.
+    let typedSentence: String?
+
     // MARK: - Dependencies
 
     /// The row this screen was opened on. Held rather than re-fetched, so every
@@ -127,6 +139,8 @@ final class MealDetailModel {
             isLabelUserSet: entry.isLabelUserSet,
             isFavourite: entry.isFavourite
         )
+        self.photo = entry.capturedPhotoData.flatMap(UIImage.init(data:))
+        self.typedSentence = entry.typedSentence
     }
 
     // MARK: - Editing the breakdown

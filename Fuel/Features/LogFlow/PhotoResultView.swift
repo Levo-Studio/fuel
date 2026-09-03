@@ -25,8 +25,6 @@ struct PhotoResultView: View {
     let onDiscard: (() -> Void)?
     let commit: MealResultAction
 
-    @Environment(\.fuelPalette) private var palette
-
     var body: some View {
         MealResultView(
             draft: draft,
@@ -42,35 +40,8 @@ struct PhotoResultView: View {
             onDiscard: onDiscard,
             discardConfirmation: MealResultCopy.discardConfirmation,
             commit: commit,
-            lede: { thumbnail }
+            lede: { MealPhotoLede(photo: photo) }
         )
-    }
-
-    // MARK: - Photo
-
-    private var thumbnail: some View {
-        ZStack {
-            if let photo {
-                Image(uiImage: photo)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                PhotoHatch(base: .clear, stripe: palette.soft)
-
-                Text(CameraCopy.resultPhotoCaption)
-                    .fuelStyle(FuelTypography.overlayCaption)
-                    .foregroundStyle(palette.muted)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: FuelMetrics.Control.thumbnailHeight)
-        .clipShape(.rect(cornerRadius: FuelMetrics.Radius.thumbnail))
-        .overlay {
-            RoundedRectangle(cornerRadius: FuelMetrics.Radius.thumbnail)
-                .strokeBorder(palette.hair, lineWidth: FuelMetrics.Line.hairline)
-        }
-        .accessibilityElement()
-        .accessibilityLabel(Text(CameraCopy.resultPhotoLabel))
     }
 }
 

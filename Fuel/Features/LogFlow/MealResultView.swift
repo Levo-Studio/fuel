@@ -115,7 +115,16 @@ struct MealResultView<Lede: View>: View {
     let discardConfirmation: MealResultConfirmation
 
     /// The filled footer button as this caller means it.
-    let commit: MealResultAction
+    ///
+    /// `nil` only for a caller that draws no built-in footer at all —
+    /// `MealDetailView`, whose footer is not one fixed shape: a full-width
+    /// `Re-analyse` once the breakdown has changed, matching this screen's own
+    /// exactly, and something small and cornered otherwise, which this screen
+    /// has no drawing for at all. See `MealDetailView.footer`. Every other
+    /// caller always has something to commit, so this stays effectively
+    /// required for them — `nil` is a door held open for one caller, not an
+    /// invitation to the other two to leave the footer off.
+    let commit: MealResultAction?
 
     /// What the mode puts where the other mode puts its own: the thumbnail on
     /// screen 14, the quoted sentence on screen 15. It is the first thing in
@@ -155,7 +164,7 @@ struct MealResultView<Lede: View>: View {
         onReanalyse: @escaping () -> Void,
         onDiscard: (() -> Void)?,
         discardConfirmation: MealResultConfirmation,
-        commit: MealResultAction,
+        commit: MealResultAction?,
         @ViewBuilder lede: @escaping () -> Lede
     ) {
         self.draft = draft
@@ -219,7 +228,16 @@ struct MealResultView<Lede: View>: View {
                 // `spacing: .zero` because the gap is already drawn: the
                 // footer's own bottom padding is the export's `bottom:34`, and
                 // a spacing here would be a second, invented one.
-                .safeAreaInset(edge: .bottom, spacing: .zero) { footer }
+                //
+                // Nothing is inset at all when `commit` is `nil` — the one
+                // caller in that position draws its own footer outside this
+                // view entirely, with its own `safeAreaInset` doing the same
+                // job for it. See `MealDetailView.footer`.
+                .safeAreaInset(edge: .bottom, spacing: .zero) {
+                    if let commit {
+                        footer(commit: commit)
+                    }
+                }
             }
             // The second half of the same fix, and the half without which the
             // first does nothing.
@@ -643,22 +661,13 @@ struct MealResultView<Lede: View>: View {
 
     // MARK: - Footer
 
-    private var footer: some View {
+    private func footer(commit: MealResultAction) -> some View {
         HStack(alignment: .center, spacing: FuelMetrics.Space.s10) {
             if let onDiscard {
                 discardControl(onDiscard)
             }
 
-            Button(action: primaryAction.perform) {
-                Text(primaryAction.title)
-                    .fuelStyle(FuelTypography.buttonLabel)
-                    .foregroundStyle(palette.onAccent)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, FuelMetrics.Space.s17)
-                    .background(palette.accentColor, in: .rect(cornerRadius: FuelMetrics.Radius.pill))
-                    .contentShape(.rect(cornerRadius: FuelMetrics.Radius.pill))
-            }
-            .buttonStyle(.plain)
+            MealResultPrimaryButton(action: primaryAction(commit: commit))
         }
         .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
         .padding(.bottom, FuelMetrics.Space.s34)
@@ -686,6 +695,18 @@ struct MealResultView<Lede: View>: View {
     /// is something to lose. This control's whole subject is throwing the
     /// estimate away, so a confirmation in front of it is never a dialog in
     /// front of nothing.
+    ///
+    /// **`palette.surface` behind it, added on top of what the `New` pill
+    /// carried.** The text pill this replaced had two ink-coloured glyphs'
+    /// worth of drawn content sitting inside a `hair`-opacity ring — enough on
+    /// its own to read as a control. A single small symbol does not: measured
+    /// on a hosted render next to the filled `Add` pill it sits beside, the
+    /// unfilled version was a near-invisible ring with a mark floating in it,
+    /// reported as the pill "rendering transparent". `surface` is the token
+    /// this app already keeps for exactly this — a raised control's own
+    /// ground, distinct from the page behind it — and it was sitting unused.
+    /// The hairline and the ink stay the export's own values; only the fill
+    /// behind them is new.
     private func discardControl(_ perform: @escaping () -> Void) -> some View {
         Button {
             confirmDiscard(perform)
@@ -695,6 +716,10 @@ struct MealResultView<Lede: View>: View {
                 .foregroundStyle(palette.ink)
                 .padding(.vertical, FuelMetrics.Space.s17)
                 .padding(.horizontal, FuelMetrics.Space.s20)
+                .background {
+                    RoundedRectangle(cornerRadius: FuelMetrics.Radius.pill)
+                        .fill(palette.surface)
+                }
                 .overlay {
                     RoundedRectangle(cornerRadius: FuelMetrics.Radius.pill)
                         .strokeBorder(palette.hair, lineWidth: FuelMetrics.Line.hairline)
@@ -727,9 +752,45 @@ struct MealResultView<Lede: View>: View {
     /// press spends the user's own API credit, so it appears only while
     /// something has actually changed and never as a second button standing
     /// permanently on the screen. Nothing re-analyses on its own.
-    private var primaryAction: MealResultAction {
+    ///
+    /// Takes `commit` rather than reading the stored property directly so
+    /// `MealDetailView.footer` — which draws no built-in footer and so never
+    /// reaches this function — can still reuse the same rule for its own
+    /// `Re-analyse` pill without a second copy of it. See `commit`.
+    private func primaryAction(commit: MealResultAction) -> MealResultAction {
         guard draft.canReanalyse else { return commit }
         return MealResultAction(title: MealResultCopy.reanalyse, perform: onReanalyse)
+    }
+}
+
+// MARK: - Primary button
+
+/// The filled, full-width footer pill: `Add`/`Re-analyse` on the scan
+/// screens, and `Re-analyse` again on a stored meal once its breakdown has
+/// changed.
+///
+/// Shared rather than redrawn — `MealResultView.footer` and
+/// `MealDetailView.footer` both reach for exactly this button, and a second
+/// copy of it is a second place its padding, its type and its accent fill
+/// could drift from the first, the way `MealPhotoLede`/`MealQuoteLede` are
+/// shared for the same reason.
+struct MealResultPrimaryButton: View {
+
+    let action: MealResultAction
+
+    @Environment(\.fuelPalette) private var palette
+
+    var body: some View {
+        Button(action: action.perform) {
+            Text(action.title)
+                .fuelStyle(FuelTypography.buttonLabel)
+                .foregroundStyle(palette.onAccent)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, FuelMetrics.Space.s17)
+                .background(palette.accentColor, in: .rect(cornerRadius: FuelMetrics.Radius.pill))
+                .contentShape(.rect(cornerRadius: FuelMetrics.Radius.pill))
+        }
+        .buttonStyle(.plain)
     }
 }
 
