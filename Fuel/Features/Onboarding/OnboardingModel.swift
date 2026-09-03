@@ -84,6 +84,21 @@ final class OnboardingModel {
     private let validator: KeyValidating
     private let store: FuelStore
 
+    /// Where the provider choice lives.
+    ///
+    /// The segment on screen 01 and the segment on screen 16 are one decision
+    /// asked twice, so they are one stored value and not two. This model held
+    /// its own copy before, wrote the key into the Keychain under it, and never
+    /// passed it on — a user who chose Mistral got a valid Mistral key, a
+    /// preference still saying Claude, and a shutter and an `Analyse` button
+    /// that both went looking for a Claude key that did not exist.
+    ///
+    /// Writing the preference on completion would have closed that, and would
+    /// have left two values that have to be kept in step. Reading and writing
+    /// straight through leaves nothing to keep in step: there is one provider
+    /// in the app, and Settings is already bound to it.
+    private let preferences: SettingsPreferences
+
     /// How long one passed step rests before the next is ticked off.
     ///
     /// The test is a single call, so the four rows cannot be driven by real
@@ -100,8 +115,15 @@ final class OnboardingModel {
 
     private(set) var stage: Stage = .key
 
-    /// Claude is the selected segment in every frame of the export.
-    private(set) var provider: AIProvider = .claude
+    /// Which segment on screen 01 is selected.
+    ///
+    /// Not stored here. It is the preference itself, so the choice the user
+    /// makes on screen 01 is the choice the log flow reads when it opens and
+    /// the choice screen 16 draws — including after the user has changed it
+    /// twice and gone back a screen, because there is only ever the one value
+    /// to change. Claude is the default the preference already carries, and is
+    /// the selected segment in every frame of the export.
+    var provider: AIProvider { preferences.provider }
 
     /// What the user has typed into the secure field.
     ///
@@ -138,12 +160,14 @@ final class OnboardingModel {
         keychain: KeychainStore = KeychainStore(),
         validator: KeyValidating,
         store: FuelStore,
+        preferences: SettingsPreferences,
         stepInterval: Duration = .seconds(FuelMotion.progress.duration),
         onFinished: @escaping () -> Void = {}
     ) {
         self.keychain = keychain
         self.validator = validator
         self.store = store
+        self.preferences = preferences
         self.stepInterval = stepInterval
         self.onFinished = onFinished
     }
@@ -158,9 +182,14 @@ final class OnboardingModel {
     /// Mistral, and a key already in the Keychain has no reason to be pulled
     /// back out into a `String` just to be looked at. Each provider keeps its
     /// own Keychain entry, so switching loses nothing that was saved.
+    ///
+    /// The Keychain is not touched here at all — not the entry being left and
+    /// not the one being arrived at. Switching is a preference write and
+    /// nothing else, which is what lets a user who holds both keys move
+    /// between them without losing either.
     func selectProvider(_ provider: AIProvider) {
         guard provider != self.provider else { return }
-        self.provider = provider
+        preferences.provider = provider
         keyDraft = ""
     }
 
