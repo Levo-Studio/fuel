@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Automatic labels section
 
 /// The second section of screen 17: the line saying where a label comes from,
-/// and the four clock rows under it.
+/// and the clock rows under it.
 struct AutomaticLabelsSection: View {
 
     @Environment(\.fuelPalette) private var palette
@@ -49,25 +49,35 @@ struct AutomaticLabelsSection: View {
 
 // MARK: - The drawn rows
 
-/// One of the four rows the export draws under `Automatic labels`.
+/// One of the clock rows under `Automatic labels`.
 ///
-/// **These are drawn copy, not a projection of the labelling rule, and they are
-/// deliberately not derived from `MealLabel` or `MainMeal`.** The rows are the
-/// plain-language summary the user reads; the rule the app runs differs from
-/// them in three places, all of them written down in
-/// `design/Fuel Design Notes.md` under "Two things in the export that are not
-/// the rule" and "Owner ruling: the late hours":
+/// **The export draws four rows here**, with a `Snack` row at `15:00 – 17:59`
+/// between lunch and dinner. **The snack row is removed on the owner's
+/// instruction**, and this is the one place the code deliberately draws less
+/// than the export. Snack is not a clock window: it is what an entry gets when
+/// no main meal is still available to it, so a row naming hours for it states
+/// something the app does not do. An entry at 23:30 is a snack that the drawn
+/// band excludes, and an entry at 16:00 on a day with no lunch yet is *lunch*,
+/// which the drawn band gets outright wrong. Three rows, one per main meal, is
+/// what is left once the false one goes.
 ///
-/// - Snack has no window of its own. The `15:00 – 17:59` on its row names the
-///   ordinary gap between lunch and dinner; an entry at 16:00 on a day with no
-///   lunch yet is *lunch*, and no code reads a snack window.
-/// - Dinner's reach runs to the end of the calendar day, not to the `22:59`
-///   this row prints.
-/// - The small hours are always a snack, which no row here says.
+/// **The three that remain are still literal copy, and are deliberately not
+/// derived from `MealLabel` or `MainMeal`.** Their equal count is a
+/// coincidence, not a correspondence. The rows are the plain-language summary
+/// the user reads, and the rule the app runs reaches further than any of them
+/// says — the divergences are written down in `design/Fuel Design Notes.md`
+/// under "Two things in the export that are not the rule" and "Owner ruling:
+/// the late hours":
 ///
-/// Deriving the list from the labeler would therefore either print something
-/// the design does not draw, or force `Nutrition/` to publish a shape that
-/// exists only to feed this list. Neither is worth it for four static rows, so
+/// - Lunch's row stops at `14:59`; lunch's reach runs through the
+///   `15:00 – 17:59` gap the removed row used to claim.
+/// - Dinner's row stops at `22:59`; dinner's reach runs to the end of the
+///   calendar day.
+/// - The small hours claim no main meal at all, which no row here says.
+///
+/// Deriving the list from the labeler would therefore either print reaches the
+/// design does not draw, or force `Nutrition/` to publish a shape that exists
+/// only to feed this list. Neither is worth it for three static rows, so
 /// nothing in this file imports the rule.
 struct SettingsLabelRow: Identifiable, Equatable {
 
@@ -78,7 +88,7 @@ struct SettingsLabelRow: Identifiable, Equatable {
     let titleKey: LocalizedStringKey
     let windowKey: LocalizedStringKey
 
-    /// The four rows, in the order screen 17 draws them.
+    /// The three rows, in the order screen 17 draws them.
     static let drawn: [SettingsLabelRow] = [
         SettingsLabelRow(
             id: "breakfast",
@@ -89,11 +99,6 @@ struct SettingsLabelRow: Identifiable, Equatable {
             id: "lunch",
             titleKey: "settings.labels.lunch",
             windowKey: "settings.labels.lunch.window"
-        ),
-        SettingsLabelRow(
-            id: "snack",
-            titleKey: "settings.labels.snack",
-            windowKey: "settings.labels.snack.window"
         ),
         SettingsLabelRow(
             id: "dinner",

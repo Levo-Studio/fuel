@@ -7,7 +7,7 @@ import Testing
 // MARK: - Suite
 
 /// The second half of Settings: the counting mode, the four targets, and the
-/// four label rows.
+/// three label rows.
 @Suite("Settings counting and labels")
 @MainActor
 struct SettingsGoalsTests {
@@ -166,38 +166,80 @@ struct SettingsGoalsTests {
         #expect(!defaults.dictionaryRepresentation().values.contains { ($0 as? Int) == 2750 })
     }
 
-    // MARK: - The four label rows
+    // MARK: - The three label rows
 
-    @Test("the label rows are the drawn four, in the drawn order")
+    /// The keys the three rows carry, in the drawn order. Named once here
+    /// because both label tests want them and the second one has to resolve
+    /// them: `LocalizedStringKey` hands its own key back to nobody.
+    private static let drawnWindowKeys = [
+        "settings.labels.breakfast.window",
+        "settings.labels.lunch.window",
+        "settings.labels.dinner.window"
+    ]
+
+    @Test("the label rows are the drawn three, in the drawn order")
     func labelRowsAreAsDrawn() {
-        #expect(SettingsLabelRow.drawn.map(\.id) == ["breakfast", "lunch", "snack", "dinner"])
-        #expect(SettingsLabelRow.drawn.map(\.windowKey) == [
-            "settings.labels.breakfast.window",
-            "settings.labels.lunch.window",
-            "settings.labels.snack.window",
-            "settings.labels.dinner.window"
+        #expect(SettingsLabelRow.drawn.map(\.id) == ["breakfast", "lunch", "dinner"])
+        #expect(SettingsLabelRow.drawn.map(\.titleKey) == [
+            "settings.labels.breakfast",
+            "settings.labels.lunch",
+            "settings.labels.dinner"
         ])
+        let windowKeys: [LocalizedStringKey] = Self.drawnWindowKeys.map { LocalizedStringKey($0) }
+        #expect(SettingsLabelRow.drawn.map(\.windowKey) == windowKeys)
     }
 
-    /// The rows are drawn copy and the rule is something else, so the two are
-    /// expected to disagree — and this test fails the moment somebody "fixes"
-    /// the rows by deriving them from the labeler, because a derived list
-    /// cannot hold a snack window at all.
-    @Test("the rows are drawn copy rather than a projection of the labelling rule")
-    func labelRowsAreNotTheRule() {
-        // A snack row is drawn at 15:00 – 17:59, and no code reads a snack
-        // window: 16:00 on a day with no lunch yet is lunch.
+    /// The guard that keeps the rows from being "simplified" into a projection
+    /// of the labelling rule.
+    ///
+    /// The export's own snack row used to make that impossible by accident —
+    /// four drawn rows against three main meals, so a count settled it. The
+    /// snack row is gone on the owner's instruction, the counts now match, and
+    /// counting proves nothing. What still separates the two is the text: the
+    /// rows print the windows the export drew, and the rule reaches past two of
+    /// them. A list derived from the labeler would print the reaches instead,
+    /// and both halves of this test would go red.
+    @Test("the drawn windows are the export's, not the reach the rule runs by")
+    func labelRowsAreNotTheRule() throws {
+        #expect(Self.drawnWindowKeys.map(catalogValue) == [
+            "04:00 – 10:59",
+            "11:00 – 14:59",
+            "18:00 – 22:59"
+        ])
+
+        // Read out of the rule rather than restated, so a rule that changed
+        // cannot take this expectation along with it.
+        let reaches = try MainMeal.inDayOrder.map(reachText)
+        #expect(reaches == ["04:00 – 10:59", "11:00 – 17:59", "18:00 – 23:59"])
+
+        // The same three divergences by name, so a rule change reads here as
+        // more than a shifted string. Lunch reaches through the gap the removed
+        // snack row used to claim, dinner reaches to the end of the calendar
+        // day, and the small hours claim no main meal at all.
         #expect(MainMeal.claimable(atMinuteOfDay: 16 * 60) == .lunch)
-
-        // The dinner row stops at 22:59; dinner's reach runs to the end of the
-        // calendar day.
         #expect(MainMeal.claimable(atMinuteOfDay: 23 * 60 + 30) == .dinner)
-
-        // No row says anything about the small hours, which are always a snack.
         #expect(MainMeal.claimable(atMinuteOfDay: 2 * 60) == nil)
+    }
 
-        // And the shape does not match either: three meals own a window, four
-        // rows are drawn.
-        #expect(SettingsLabelRow.drawn.count == MainMeal.allCases.count + 1)
+    // MARK: - Reading the two sides
+
+    /// What a catalog key resolves to. The guard above is about the text the
+    /// user reads, not about which key produced it.
+    private func catalogValue(_ key: String) -> String {
+        String(localized: .init(stringLiteral: key))
+    }
+
+    /// How far a meal actually reaches, in the `HH:mm – HH:mm` shape the rows
+    /// print. The reach is contiguous, so its first and last claimed minute are
+    /// its ends.
+    private func reachText(of meal: MainMeal) throws -> String {
+        let claimed = (0 ..< 24 * 60).filter { MainMeal.claimable(atMinuteOfDay: $0) == meal }
+        let first = try #require(claimed.first)
+        let last = try #require(claimed.last)
+        return "\(clock(first)) – \(clock(last))"
+    }
+
+    private func clock(_ minuteOfDay: Int) -> String {
+        String(format: "%02d:%02d", minuteOfDay / 60, minuteOfDay % 60)
     }
 }

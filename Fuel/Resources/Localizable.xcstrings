@@ -1604,7 +1604,7 @@
       }
     },
     "settings.labels.dinner" : {
-      "comment" : "Fourth row of the automatic-labels section.",
+      "comment" : "Third row of the automatic-labels section.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -1659,30 +1659,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Entries are filed by time of day. Always overridable on the result screen."
-          }
-        }
-      }
-    },
-    "settings.labels.snack" : {
-      "comment" : "Third row of the automatic-labels section.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Snack"
-          }
-        }
-      }
-    },
-    "settings.labels.snack.window" : {
-      "comment" : "The time range drawn beside the snack row. Drawn copy, not the labelling rule: snack has no window of its own.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "15:00 – 17:59"
           }
         }
       }
