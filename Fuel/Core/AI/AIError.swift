@@ -91,6 +91,23 @@ nonisolated enum AIError: Error, Equatable {
     /// visible failure.
     case malformedResponse
 
+    /// The provider's answer stops in the middle, because the model ran into
+    /// the token ceiling the request set — Anthropic says so with
+    /// `stop_reason: "max_tokens"`, Mistral with `finish_reason: "length"`.
+    ///
+    /// A special case of `malformedResponse` and named separately because it
+    /// is the one unreadable reply Fuel caused itself: the ceiling is Fuel's
+    /// number, not the model's mistake, and a scan that fails this way fails
+    /// for a reason a `max_tokens` in this repository could fix. Folded in
+    /// with prose and wrong field names, it would be invisible — and a
+    /// truncation rate is exactly the kind of thing that shows up as "roughly
+    /// every second attempt" and nothing more specific.
+    ///
+    /// Raised only when the reply also fails to parse. A model that finished
+    /// its object and was cut off writing the newline after it has still
+    /// answered, and the user has already paid for it.
+    case truncatedReply
+
     /// The photo is still over the provider's request limit after compression.
     /// Raised before any request is built, so the user is not billed for a
     /// call the provider would reject.

@@ -111,7 +111,17 @@ private enum Reply {
         )!
         // `escaped` is `["…"]`; drop the brackets to get the quoted string.
         let quoted = String(escaped.dropFirst().dropLast())
-        return #"{"content":[{"type":"text","text":\#(quoted)}]}"#
+        return #"{"content":[{"type":"text","text":\#(quoted)}],"stop_reason":"end_turn"}"#
+    }
+
+    /// The same envelope with the answer cut off at the request's own token
+    /// ceiling, which is how a real `max_tokens` reply comes back: status 200,
+    /// well-formed envelope, half a JSON object inside it.
+    static func anthropicOutOfTokens(_ text: String) -> String {
+        anthropic(text).replacingOccurrences(
+            of: #""stop_reason":"end_turn""#,
+            with: #""stop_reason":"max_tokens""#
+        )
     }
 
     static func mistral(_ text: String) -> String {
@@ -120,7 +130,16 @@ private enum Reply {
             encoding: .utf8
         )!
         let quoted = String(escaped.dropFirst().dropLast())
-        return #"{"choices":[{"message":{"role":"assistant","content":\#(quoted)}}]}"#
+        return #"{"choices":[{"message":{"role":"assistant","content":\#(quoted)},"finish_reason":"stop"}]}"#
+    }
+
+    /// Mistral's word for the same thing, on the choice rather than on the
+    /// envelope.
+    static func mistralOutOfTokens(_ text: String) -> String {
+        mistral(text).replacingOccurrences(
+            of: #""finish_reason":"stop""#,
+            with: #""finish_reason":"length""#
+        )
     }
 }
 
@@ -673,6 +692,68 @@ struct ReplyParsingTests {
         await #expect(throws: AIError.malformedResponse) {
             _ = try await client.estimate(text: "an apple")
         }
+    }
+
+    /// The finding behind this: a reply cut off at `max_tokens` is a 200 with
+    /// a well-formed envelope and half an object in it, so brace counting sees
+    /// no object and reports prose. The user is then told the answer did not
+    /// come back — when it did, and when the reason it is unusable is a number
+    /// in this repository rather than anything the model got wrong.
+    @Test("a reply cut off at the token ceiling says so, rather than reading as prose")
+    func truncationIsNamed() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let client = AnthropicClient(
+            transport: RecordingTransport(
+                status: 200,
+                body: Reply.anthropicOutOfTokens(#"{"title":"Porridge","kilocalories":420,"#)
+            ),
+            keys: keys.source
+        )
+
+        await #expect(throws: AIError.truncatedReply) {
+            _ = try await client.estimate(text: "an apple")
+        }
+    }
+
+    @Test("Mistral's own word for the token ceiling is read the same way")
+    func mistralTruncationIsNamed() async throws {
+        let keys = try KeyFixture(provider: .mistral, secret: "0123456789abcdefghij")
+        defer { keys.tearDown(provider: .mistral) }
+
+        let client = MistralClient(
+            transport: RecordingTransport(
+                status: 200,
+                body: Reply.mistralOutOfTokens(#"{"title":"Porridge","kilocalories":420,"#)
+            ),
+            keys: keys.source
+        )
+
+        await #expect(throws: AIError.truncatedReply) {
+            _ = try await client.estimate(text: "an apple")
+        }
+    }
+
+    /// The other half of the rule: a model that finished its object and was
+    /// cut off writing the newline after it has still answered, and the user
+    /// has already paid for it. The signal never overrides a reply that parses.
+    @Test("a complete answer that reports the ceiling is still an estimate")
+    func truncationSignalDoesNotDiscardAGoodAnswer() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let client = AnthropicClient(
+            transport: RecordingTransport(
+                status: 200,
+                body: Reply.anthropicOutOfTokens(Reply.goodEstimate)
+            ),
+            keys: keys.source
+        )
+
+        let estimate = try await client.estimate(text: "porridge with berries")
+
+        #expect(estimate.kilocalories == 420)
     }
 
     @Test("missing macros are reported rather than silently zeroed")

@@ -62,7 +62,7 @@ nonisolated enum AnalysisFailure: Equatable, Sendable {
             self = .invalidKey
         case .noCredit(_, let billingPage):
             self = .noCredit(billingPage: billingPage)
-        case .network, .providerRefused, .malformedResponse, .imageTooLarge:
+        case .network, .providerRefused, .malformedResponse, .truncatedReply, .imageTooLarge:
             self = .retry
         }
     }

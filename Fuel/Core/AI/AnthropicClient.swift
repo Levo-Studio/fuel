@@ -145,7 +145,14 @@ nonisolated struct AnthropicClient: AIClient {
             throw AIError.from(status: response.statusCode, body: response.body, provider: provider)
         }
 
-        return try EstimateContract.estimate(from: Self.replyText(in: response.body), mode: mode)
+        do {
+            return try EstimateContract.estimate(from: Self.replyText(in: response.body), mode: mode)
+        } catch {
+            // Asked only once the reply has already failed to parse. A model
+            // that finished its object and was cut off writing the newline
+            // after it has still answered, and the user has paid for it.
+            throw Self.ranOutOfTokens(response.body) ? AIError.truncatedReply : error
+        }
     }
 
     // MARK: - Request
@@ -171,6 +178,20 @@ nonisolated struct AnthropicClient: AIClient {
     }
 
     // MARK: - Response
+
+    /// Whether the model stopped because it hit `max_tokens` rather than
+    /// because it had finished.
+    ///
+    /// A truncated reply is unbalanced JSON, so `EstimateContract` reports it
+    /// as prose or a wrong shape — the two things it cannot be. `stop_reason`
+    /// is the one field that says which, and it was being thrown away with the
+    /// rest of the envelope.
+    private static func ranOutOfTokens(_ body: Data) -> Bool {
+        guard let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else {
+            return false
+        }
+        return object["stop_reason"] as? String == "max_tokens"
+    }
 
     /// Pulls the assistant's text out of a Messages response.
     ///

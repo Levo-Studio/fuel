@@ -157,7 +157,13 @@ nonisolated struct MistralClient: AIClient {
             throw AIError.from(status: response.statusCode, body: response.body, provider: provider)
         }
 
-        return try EstimateContract.estimate(from: Self.replyText(in: response.body), mode: mode)
+        do {
+            return try EstimateContract.estimate(from: Self.replyText(in: response.body), mode: mode)
+        } catch {
+            // Same reasoning as the Anthropic client: asked only once the reply
+            // has already failed to parse.
+            throw Self.ranOutOfTokens(response.body) ? AIError.truncatedReply : error
+        }
     }
 
     // MARK: - Request
@@ -169,6 +175,19 @@ nonisolated struct MistralClient: AIClient {
     }
 
     // MARK: - Response
+
+    /// Whether the model stopped because it hit `max_tokens` rather than
+    /// because it had finished. Mistral's word for it is `length`, on the
+    /// choice rather than on the envelope.
+    private static func ranOutOfTokens(_ body: Data) -> Bool {
+        guard
+            let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
+            let choices = object["choices"] as? [[String: Any]]
+        else {
+            return false
+        }
+        return choices.first?["finish_reason"] as? String == "length"
+    }
 
     /// Pulls the assistant's text out of a chat-completions response.
     ///
