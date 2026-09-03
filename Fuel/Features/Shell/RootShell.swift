@@ -5,10 +5,12 @@ import SwiftUI
 /// The single window's content.
 ///
 /// The shell decides what the app opens on — the onboarding flow until a goal
-/// has been answered, the Today screen afterwards — and nothing else. It draws
-/// no chrome of its own: each screen brings its own background and its own
-/// margins, and a container that added a second one would shift every one of
-/// them.
+/// has been answered, the Today screen afterwards — and what is presented over
+/// Today when one of its two controls is used. It draws no chrome of its own:
+/// each screen brings its own background and its own margins, and a container
+/// that added a second one would shift every one of them. That is why the log
+/// flow and Settings arrive as full-screen covers and not inside a navigation
+/// stack — see `RootShellModel.Destination`.
 struct RootShell: View {
 
     @State private var model: RootShellModel
@@ -25,12 +27,39 @@ struct RootShell: View {
     @State private var preferences: SettingsPreferences
 
     init(store: FuelStore, validator: KeyValidating, defaults: UserDefaults = .standard) {
-        _model = State(initialValue: RootShellModel(store: store, validator: validator))
-        _preferences = State(initialValue: SettingsPreferences(defaults: defaults))
+        // One instance, handed to both. The model reads the selected provider
+        // when a log flow opens and Settings writes it on screen 16, so a
+        // second `SettingsPreferences` built from the same suite would work
+        // until the moment it mattered — the write would land in the plist and
+        // the flow already open would still be pointed at the old provider.
+        let preferences = SettingsPreferences(defaults: defaults)
+        _preferences = State(initialValue: preferences)
+        _model = State(
+            initialValue: RootShellModel(
+                store: store,
+                validator: validator,
+                preferences: preferences
+            )
+        )
     }
 
     private var palette: FuelPalette {
         FuelPalette(theme: preferences.theme, accent: preferences.accent)
+    }
+
+    /// `fullScreenCover` takes a binding it can clear, and the model's
+    /// destination is read-only from outside. The write is routed back through
+    /// `dismissDestination` rather than assigning the property, so a return to
+    /// Today the system initiates goes through the same re-read of the day as
+    /// the drawn controls do.
+    private var presentedDestination: Binding<RootShellModel.Destination?> {
+        Binding(
+            get: { model.destination },
+            set: { presented in
+                guard presented == nil else { return }
+                model.dismissDestination()
+            }
+        )
     }
 
     var body: some View {
@@ -41,27 +70,45 @@ struct RootShell: View {
             case .today:
                 TodayView(
                     presentation: model.today,
-                    // Both controls are drawn on screens 05 and 06, both
-                    // have a destination that now exists, and both are still
-                    // inert here.
-                    //
-                    // Screen 16's three sections are merged and screen 17's
-                    // four are not; the log flow draws its bar and its Recent
-                    // tab, and the two modes that need a key and a capture
-                    // session are placeholders. Neither is finished, and
-                    // neither export draws how it is entered from Today — no
-                    // sheet, no push, no dismissal is drawn anywhere — so the
-                    // presentation is a design decision rather than a wiring
-                    // one, and it is not this branch's to make.
-                    //
-                    // What is missing is a call, not a mechanism: both take a
-                    // model this shell already has the store for.
-                    onOpenSettings: {},
-                    onAddEntry: {}
+                    onOpenSettings: model.openSettings,
+                    onAddEntry: model.openLogFlow
                 )
             }
         }
+        .fullScreenCover(item: presentedDestination) { destination in
+            switch destination {
+            case .logFlow:
+                LogFlowView(
+                    model: model.logFlow,
+                    camera: model.cameraLog,
+                    onCancel: model.dismissDestination,
+                    onLogged: model.dismissDestination
+                )
+                // The camera surface is `--cam` in both themes — Settings says
+                // so in words — so the status bar over it is forced light
+                // whatever the app's theme is. Without this a light-theme user
+                // gets dark status text on a near-black screen.
+                .preferredColorScheme(.dark)
+            case .settings:
+                if let counting = model.settingsCounting {
+                    SettingsScreen(
+                        preferences: preferences,
+                        keyModel: model.settingsKey,
+                        countingModel: counting,
+                        done: model.dismissDestination
+                    )
+                }
+            }
+        }
         .fuelAnimation(FuelMotion.emphasised, value: model.stage)
+        // What the curve governs here is Today rearranging itself underneath —
+        // the totals, the ring and a new meal section arriving when the flow
+        // dismisses and the day is re-read. The cover's own travel up and down
+        // is the system's presentation, which honours Reduce Motion on its own
+        // account; there is nothing to hand it, and a hand-rolled curve at this
+        // call site would be the design-layer bypass `FuelMotion` exists to
+        // prevent.
+        .fuelAnimation(FuelMotion.emphasised, value: model.destination)
         .environment(\.fuelPalette, palette)
         // The theme is a stored choice and never follows the OS, so the system
         // chrome — the status bar, the keyboard, the home indicator — is forced
