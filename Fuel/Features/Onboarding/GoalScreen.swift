@@ -134,6 +134,18 @@ struct GoalScreen: View {
         .contentShape(Rectangle())
         .onTapGesture { isEditingGoal = true }
         .onAppear { goalDraft = String(model.targets.kilocalories) }
+        .onChange(of: isEditingGoal) { _, editing in
+            // The export draws a figure here, never an empty space, so a field
+            // left blank is put back to the goal it stands for. The goal itself
+            // was kept while the field was empty — that is `GoalFieldInput`'s
+            // rule — so this is the user's own number returning rather than a
+            // default overwriting an edit. The macro cards below and the four
+            // Settings rows do the same; without it this was the one field on
+            // the screen that could be walked away from showing nothing.
+            if !editing && goalDraft.isEmpty {
+                goalDraft = String(model.targets.kilocalories)
+            }
+        }
     }
 
     /// The three macro targets, in the order the export draws them.
