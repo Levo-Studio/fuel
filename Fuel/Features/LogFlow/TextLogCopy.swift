@@ -9,11 +9,17 @@ import Foundation
 /// `Localizable.xcstrings`. Casing is the style's: `Text entry` is stored in
 /// its natural case and uppercased by `FuelTypography.flowLabel`.
 ///
-/// Two entries have no counterpart in the export and are marked `Not in the
-/// export` in the catalog: the keyless state, which the design does not draw,
-/// and the field's spoken label. The field's *visible* label is the screen's
-/// own heading, which is why VoiceOver is given that same key rather than a
-/// second wording invented for it.
+/// Seven entries have no counterpart in the export and are marked `Not in the
+/// export` in the catalog. Two are states and labels the design does not draw:
+/// the keyless notice, and the field's spoken label — the field's *visible*
+/// label is the screen's own heading, which is why VoiceOver is given that same
+/// key rather than a second wording invented for it.
+///
+/// The other five are the rotating placeholder, which the owner asked for on a
+/// screen the export draws with a sentence already typed into it: the four
+/// examples and the format that ends them. Undrawn, so composed out of what the
+/// export does draw rather than invented — `TextTabView.prompt` says which
+/// element each part comes from.
 nonisolated enum TextLogCopy {
 
     // MARK: - Screen 12
