@@ -382,12 +382,17 @@ nonisolated enum FuelMetrics {
         static let labelGap = Space.s20
 
         /// How far down the frozen frame the bar sits, measured from the top
-        /// of that frame. Drawn as `top:330px` on all four analysis screens.
+        /// of that frame. Drawn as `top:330px` on all four analysis screens,
+        /// which inside the export's own 390×844 lands a little above the
+        /// middle.
         ///
-        /// An offset rather than a centring, because that is what was drawn —
-        /// inside the export's 390×844 it lands a little above the middle, and
-        /// on a taller device it stays where the design put it instead of
-        /// drifting down with the frame.
+        /// **The app no longer positions the block with it.** On the owner's
+        /// instruction `AnalysisView` centres the block in the frozen frame
+        /// instead, because a drop transcribed from a 390×844 frame reads as
+        /// sitting too low on a taller device — an iPhone 17 Pro is where it
+        /// showed. The number stays here because it is what the export draws,
+        /// and this file is a transcription of the export rather than a list of
+        /// what the app happens to use; the roster below holds it to that.
         static let topOffset: CGFloat = 330
     }
 
