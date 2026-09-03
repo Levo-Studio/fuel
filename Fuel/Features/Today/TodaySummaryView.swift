@@ -32,13 +32,30 @@ struct TodaySummaryView: View {
         }
     }
 
-    /// The figure and its suffix share a baseline-ish bottom edge: the export
-    /// aligns them at the foot of the box and lifts the suffix by 8.
+    /// The box the figure is bottom-aligned against, which is the line box the
+    /// export sets on it and not the one DM Mono asks for.
+    ///
+    /// `line-height:0.9` on a 74pt numeral is tighter than the font's own line
+    /// box, and `FuelTypography.Style.lineSpacing` explains why the style
+    /// cannot carry it: SwiftUI's `lineSpacing` is additive and floors at the
+    /// font's leading, so it resolves to zero here. Left at its natural height
+    /// the figure's box keeps DM Mono's full descent under digits that have
+    /// none, and bottom-aligning the suffix against that box drops it clear of
+    /// the number instead of setting it beside it.
+    ///
+    /// Optional on purpose: a style with no multiple imposes no box, which is
+    /// the same thing CSS does.
+    private static let figureLineBox: CGFloat? = FuelTypography.dayTotal.lineHeightMultiple
+        .map { $0 * FuelTypography.dayTotal.uiFont.pointSize }
+
+    /// The figure and its suffix share a bottom edge: the export aligns them at
+    /// the foot of the box and lifts the suffix by 8.
     private var total: some View {
         HStack(alignment: .bottom, spacing: FuelMetrics.Space.s10) {
             Text(TodayFormat.figure(kilocalories))
                 .fuelStyle(FuelTypography.dayTotal)
                 .foregroundStyle(palette.ink)
+                .frame(height: Self.figureLineBox)
 
             Text(suffix)
                 .fuelStyle(FuelTypography.totalSuffix)
