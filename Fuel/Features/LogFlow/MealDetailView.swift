@@ -148,7 +148,14 @@ struct MealDetailView: View {
     /// seconds the user is entitled to look away from.
     private func reportOutcome(from previous: MealDetailModel.Stage, to current: MealDetailModel.Stage) {
         switch (previous, current) {
-        case (_, .analysing):
+        // The two ways in, and not `(_, .analysing)`: that also matches the
+        // step walker advancing from one analysis step to the next, which
+        // re-arms the flag in the middle of a scan. Cancelling clears the flag
+        // and then cancels, but the walker is a task of its own that stops a
+        // moment later — long enough, if a step lands in between, for a
+        // cancelled scan to arrive back at `.detail` armed and be answered with
+        // the haptic for one that succeeded.
+        case (.detail, .analysing), (.failed, .analysing):
             isReanalysing = true
         case (.analysing, .failed):
             isReanalysing = false

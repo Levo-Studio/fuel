@@ -394,7 +394,7 @@ struct FuelMotionTests {
 @Suite("Back swipe")
 struct FuelBackSwipeTests {
 
-    @Test("a drag in from the leading edge closes the screen")
+    @Test("a drag in from the left edge closes the screen")
     func acrossFromTheEdge() {
         #expect(
             FuelBackSwipe.isBackSwipe(
@@ -430,7 +430,7 @@ struct FuelBackSwipeTests {
         )
     }
 
-    @Test("a scroll down the leading edge never closes the screen")
+    @Test("a scroll down the left edge never closes the screen")
     func mostlyVertical() {
         // The case that would actually bite: a list dragged downwards with a
         // thumb resting near the edge drifts sideways as it goes, and without
