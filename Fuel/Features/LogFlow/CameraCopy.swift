@@ -33,11 +33,6 @@ nonisolated enum CameraCopy {
         String(localized: "camera.shutter.hint")
     }
 
-    /// The `▣` in the circle top right.
-    static var galleryGlyph: String {
-        String(localized: "camera.gallery.glyph")
-    }
-
     static var galleryLabel: String {
         String(localized: "camera.gallery.label")
     }

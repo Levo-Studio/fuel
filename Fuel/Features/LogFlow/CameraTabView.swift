@@ -131,7 +131,19 @@ struct CameraGalleryButton: View {
     private struct Glyph: View {
 
         var body: some View {
-            Text(CameraCopy.galleryGlyph)
+            // A symbol stands in for a character the bundled face cannot
+            // draw. The export sets this control's glyph as the text `\u{25A3}`
+            // and the browser satisfied it from a fallback font; neither Plus
+            // Jakarta Sans nor DM Mono carries that codepoint, so the drawn
+            // markup renders as tofu on the device. `photo.on.rectangle` is
+            // the platform's own mark for taking an existing image out of the
+            // library, which is what this control does, and its two nested
+            // rectangles are the nearest silhouette SF has to the drawn
+            // square-inside-a-square. `FuelMetrics.Line.Glyph`'s stroke weights
+            // do not apply to a symbol either — SF draws its own. The drawn
+            // 14pt size, the 34pt circle, its hairline and its colour are
+            // unchanged.
+            Image(systemName: "photo.on.rectangle")
                 .fuelStyle(FuelTypography.iconGlyph)
                 .foregroundStyle(FuelPalette.Camera.ink)
                 .frame(width: FuelMetrics.Control.circleButton, height: FuelMetrics.Control.circleButton)
