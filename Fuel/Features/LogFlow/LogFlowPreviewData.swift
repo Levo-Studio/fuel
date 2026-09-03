@@ -29,7 +29,9 @@ enum LogFlowPreviewData {
         // once the store hands them back newest first.
         let base = Date()
         for (index, meal) in meals.enumerated() {
-            try? store.log(
+            // Bound rather than discarded: `@discardableResult` does not
+            // survive `try?`, which wraps the value in an Optional of its own.
+            _ = try? store.log(
                 title: meal.title,
                 kilocalories: meal.kilocalories,
                 macros: meal.macros,
