@@ -70,7 +70,6 @@ private struct GoalTargetRow: View {
                 .accessibilityLabel(Text(target.settingsRowTitle))
                 .fixedSize()
                 .keyboardType(.numberPad)
-                .multilineTextAlignment(.trailing)
                 .fuelStyle(FuelTypography.settingsValue)
                 .foregroundStyle(palette.ink)
                 .tint(palette.accentColor)
