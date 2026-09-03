@@ -134,7 +134,7 @@ private struct TodayGettingStartedRow: View {
             .frame(maxWidth: .infinity, minHeight: FuelMetrics.Control.minimumHitTarget, alignment: .leading)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(FuelPressButtonStyle())
         .accessibilityElement(children: .combine)
         .accessibilityValue(Text(TodayCopy.gettingStartedState(isDone: item.isDone)))
     }

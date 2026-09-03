@@ -100,7 +100,7 @@ private struct RecentMealRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(.rect)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(FuelPressButtonStyle())
         .accessibilityLabel(Text(meal.title))
         .accessibilityValue(Text(LogFlowCopy.kilocaloriesValue(meal.kilocalories)))
         .accessibilityHint(Text(LogFlowCopy.logHint))

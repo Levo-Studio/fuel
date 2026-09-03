@@ -88,7 +88,7 @@ private struct TodayEntryRow: View {
         } label: {
             row
         }
-        .buttonStyle(.plain)
+        .buttonStyle(FuelPressButtonStyle())
         .accessibilityElement(children: .combine)
         .accessibilityHint(Text(TodayCopy.entryHint))
     }

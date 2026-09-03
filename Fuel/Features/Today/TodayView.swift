@@ -148,7 +148,7 @@ private struct TodayHeader: View {
                         )
                     )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(FuelPressButtonStyle())
             .accessibilityLabel(Text(TodayCopy.settingsLabel))
         }
     }
@@ -181,7 +181,7 @@ private struct TodayAddButton: View {
                 )
                 .background(palette.accentColor, in: Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(FuelPressButtonStyle())
         .accessibilityLabel(Text(TodayCopy.addLabel))
     }
 }

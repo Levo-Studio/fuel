@@ -105,7 +105,7 @@ struct AIModelSection: View {
                     .fuelStyle(FuelTypography.inlineAction)
                     .foregroundStyle(palette.ink)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(FuelPressButtonStyle())
             .disabled(model.isChecking)
         }
         .fuelAnimation(FuelMotion.standard, value: model.note)

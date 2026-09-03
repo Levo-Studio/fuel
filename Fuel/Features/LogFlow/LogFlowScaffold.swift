@@ -96,7 +96,7 @@ private struct LogFlowHeader<Accessory: View>: View {
                     .fuelStyle(FuelTypography.eyebrow)
                     .foregroundStyle(FuelPalette.Camera.inkSecondary)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(FuelPressButtonStyle())
             .accessibilityLabel(Text(LogFlowCopy.cancelLabel))
 
             // No minimum: the export draws the row `space-between`, and a
