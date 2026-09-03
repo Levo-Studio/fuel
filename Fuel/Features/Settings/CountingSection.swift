@@ -50,6 +50,8 @@ private struct GoalTargetRow: View {
     /// the user's hands or be stored as a goal of zero.
     @State private var draft: String = ""
 
+    @FocusState private var isEditing: Bool
+
     var body: some View {
         SettingsRow(
             topPadding: topPadding,
@@ -69,6 +71,7 @@ private struct GoalTargetRow: View {
             TextField("", text: $draft)
                 .accessibilityLabel(Text(target.settingsRowTitle))
                 .fixedSize()
+                .focused($isEditing)
                 .keyboardType(.numberPad)
                 .fuelStyle(FuelTypography.settingsValue)
                 .foregroundStyle(palette.ink)
@@ -79,7 +82,23 @@ private struct GoalTargetRow: View {
                     model.setValue(from: digits, for: target)
                 }
         }
+        // The field keeps its intrinsic width so the number sits where the
+        // export draws it, which leaves the row as the thing that takes the
+        // tap — the same arrangement the onboarding goal field uses. Without
+        // it the only target is the digits themselves, and a field the user
+        // cleared has no target at all.
+        .contentShape(Rectangle())
+        .onTapGesture { isEditing = true }
         .onAppear { draft = String(model.value(for: target)) }
+        .onChange(of: isEditing) { _, editing in
+            // Every one of these rows draws a number in the export, so a field
+            // left empty is put back to what it stands for. The model kept the
+            // value while the field was blank, so this is the user's own
+            // figure returning rather than a default overwriting an edit.
+            if !editing && draft.isEmpty {
+                draft = String(model.value(for: target))
+            }
+        }
     }
 
     /// The export draws the calorie row with more room above it than the three
