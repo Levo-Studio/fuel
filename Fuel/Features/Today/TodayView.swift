@@ -59,18 +59,15 @@ struct TodayView: View {
         }
     }
 
-    /// The day, or what stands in for it.
+    /// The day, or the checklist that stands in for it at the beginning.
     ///
-    /// Three states rather than two. A day with entries is the drawn one; an
-    /// empty day gets the checklist, and an empty day with nothing left to
-    /// suggest gets a single line, because a list of four permanent ticks is
-    /// not a beginning.
+    /// The checklist is offered on an empty day *and only until the first meal
+    /// is logged* — after that it is gone for good, and a later empty day is
+    /// drawn as it always was: the header, the summary, and nothing under it.
     @ViewBuilder private var dayOrEmptyState: some View {
         if presentation.hasEntries {
             TodayDayList(groups: presentation.groups)
-        } else if gettingStarted.isComplete {
-            TodayEmptyDayNote()
-        } else {
+        } else if gettingStarted.isOffered {
             TodayGettingStartedView(
                 checklist: gettingStarted,
                 onOpenSettings: onOpenSettings,
@@ -241,7 +238,7 @@ private struct TodayListFade: View {
             mode: .goal(.default),
             date: TodayPreviewData.date
         ),
-        gettingStarted: TodayPreviewData.finishedChecklist,
+        gettingStarted: TodayPreviewData.retiredChecklist,
         onOpenSettings: {},
         onAddEntry: {}
     )
@@ -255,7 +252,7 @@ private struct TodayListFade: View {
             mode: .countOnly,
             date: TodayPreviewData.date
         ),
-        gettingStarted: TodayPreviewData.finishedChecklist,
+        gettingStarted: TodayPreviewData.retiredChecklist,
         onOpenSettings: {},
         onAddEntry: {}
     )
@@ -276,14 +273,14 @@ private struct TodayListFade: View {
     .environment(\.fuelPalette, FuelPalette(theme: .dark, accent: .mono))
 }
 
-#Preview("Empty day, nothing left to suggest") {
+#Preview("Empty day, after the first meal") {
     TodayView(
         presentation: TodayPresentation(
             entries: [],
             mode: .goal(.default),
             date: TodayPreviewData.date
         ),
-        gettingStarted: TodayPreviewData.finishedChecklist,
+        gettingStarted: TodayPreviewData.retiredChecklist,
         onOpenSettings: {},
         onAddEntry: {}
     )
@@ -302,9 +299,9 @@ private enum TodayPreviewData {
         hasLoggedMeal: false
     )
 
-    /// Everything answered, which is what a day with entries in it has by
-    /// definition — the last row asks for the first meal.
-    static let finishedChecklist = TodayGettingStarted(
+    /// A user who has logged before, so there is no checklist left to offer.
+    /// A day with entries in it is in this state by definition.
+    static let retiredChecklist = TodayGettingStarted(
         hasProviderKey: true,
         isGoalMode: true,
         hasCustomisedAppearance: true,

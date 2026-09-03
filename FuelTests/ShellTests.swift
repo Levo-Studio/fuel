@@ -187,7 +187,7 @@ struct ShellTests {
 
         let model = makeModel(store: store, hasKey: false)
         #expect(model.gettingStarted.items.allSatisfy { $0.isDone == false })
-        #expect(model.gettingStarted.isComplete == false)
+        #expect(model.gettingStarted.isOffered)
     }
 
     @Test("A stored key ticks the key row")
@@ -241,6 +241,8 @@ struct ShellTests {
         let model = makeModel(store: store)
         #expect(model.today.hasEntries == false)
         #expect(model.gettingStarted.isDone(.firstMeal))
+        // And the whole checklist is retired by it, on a day with nothing in.
+        #expect(model.gettingStarted.isOffered == false)
     }
 
     /// The checklist is read from four places that a presented cover can all

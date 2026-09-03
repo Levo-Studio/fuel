@@ -85,25 +85,26 @@ struct TodayGettingStartedTests {
         #expect(list.isDone(.appearance) == false)
     }
 
-    // MARK: - Completion
+    // MARK: - Termination
 
-    @Test("the checklist is complete only when all four are done")
-    func completion() {
-        #expect(checklist(hasProviderKey: true, isGoalMode: true, hasCustomisedAppearance: true).isComplete == false)
-        #expect(
-            checklist(
-                hasProviderKey: true,
-                isGoalMode: true,
-                hasCustomisedAppearance: true,
-                hasLoggedMeal: true
-            ).isComplete
-        )
+    /// The rule that matters most: **the first logged meal retires the
+    /// checklist**, and nothing else does.
+    @Test("The checklist is offered until the first meal is logged")
+    func offeredUntilTheFirstMeal() {
+        #expect(checklist().isOffered)
+        #expect(checklist(hasLoggedMeal: true).isOffered == false)
     }
 
-    @Test("a count-only user who has done everything else is not complete")
-    func countOnlyIsNotComplete() {
-        let list = checklist(hasProviderKey: true, hasCustomisedAppearance: true, hasLoggedMeal: true)
-        #expect(list.isComplete == false)
+    /// The reading a "tick everything" rule would get wrong in both directions.
+    @Test("Every other row being done does not retire the checklist")
+    func tickedRowsDoNotRetireIt() {
+        #expect(checklist(hasProviderKey: true, isGoalMode: true, hasCustomisedAppearance: true).isOffered)
+    }
+
+    @Test("An untouched appearance does not keep the checklist alive")
+    func untouchedAppearanceDoesNotKeepItAlive() {
+        #expect(checklist(hasLoggedMeal: true).isOffered == false)
+        #expect(checklist(hasLoggedMeal: true).isDone(.appearance) == false)
     }
 
     // MARK: - Destinations

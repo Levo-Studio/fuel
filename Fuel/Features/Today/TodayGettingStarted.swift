@@ -73,7 +73,7 @@ nonisolated struct TodayGettingStartedItem: Hashable, Sendable, Identifiable {
 
 // MARK: - Checklist
 
-/// The get-started checklist Today draws while the day has no entries.
+/// The get-started checklist Today draws at the beginning of the app.
 ///
 /// A plain value with no store, no keychain and no view in it, so every rule
 /// above can be pinned without a `ModelContainer` and without a simulator. The
@@ -86,12 +86,17 @@ nonisolated struct TodayGettingStarted: Hashable, Sendable {
 
     let items: [TodayGettingStartedItem]
 
+    /// Kept, rather than only folded into the meal row, because it answers a
+    /// second question the rows cannot: whether there is a checklist at all.
+    private let hasLoggedMeal: Bool
+
     init(
         hasProviderKey: Bool,
         isGoalMode: Bool,
         hasCustomisedAppearance: Bool,
         hasLoggedMeal: Bool
     ) {
+        self.hasLoggedMeal = hasLoggedMeal
         let answers: [TodayGettingStartedStep: Bool] = [
             .key: hasProviderKey,
             .goal: isGoalMode,
@@ -106,12 +111,17 @@ nonisolated struct TodayGettingStarted: Hashable, Sendable {
         }
     }
 
-    /// Every step done.
+    /// Whether Today offers the checklist at all.
     ///
-    /// The checklist is not drawn in this state: a list of four ticks sitting
-    /// under a heading forever is not a beginning, it is furniture. Today draws
-    /// a single quiet line in its place — see `TodayCopy.emptyDayNote`.
-    var isComplete: Bool { items.allSatisfy(\.isDone) }
+    /// **The first logged meal retires it for good**, and it is the only thing
+    /// that does. Not every row being ticked: an accent the user never touched
+    /// would otherwise keep a get-started list alive on someone who has been
+    /// logging meals for a week, which is the opposite of what the list is for.
+    ///
+    /// So the checklist belongs to the beginning of the app rather than to an
+    /// empty day. A later empty day is simply an empty day, drawn as it was
+    /// before this existed.
+    var isOffered: Bool { !hasLoggedMeal }
 
     func isDone(_ step: TodayGettingStartedStep) -> Bool {
         items.first { $0.step == step }?.isDone ?? false

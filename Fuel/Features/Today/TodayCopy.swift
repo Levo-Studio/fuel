@@ -124,12 +124,6 @@ nonisolated enum TodayCopy {
             ? String(localized: "today.gettingStarted.state.done")
             : String(localized: "today.gettingStarted.state.notDone")
     }
-
-    /// What stands in the day list's place once there is nothing left to
-    /// suggest and the day is still empty.
-    static var emptyDayNote: String {
-        String(localized: "today.empty.note")
-    }
 }
 
 // MARK: - Figures

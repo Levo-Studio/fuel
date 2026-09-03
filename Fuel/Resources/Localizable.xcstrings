@@ -1891,18 +1891,6 @@
         }
       }
     },
-    "today.empty.note" : {
-      "comment" : "The whole of what Today draws in the day list's place once the checklist has nothing left to suggest and the day is still empty. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nothing logged yet."
-          }
-        }
-      }
-    },
     "today.entry.meta" : {
       "comment" : "Line under an entry's name on Today: the time, then where the entry came from.",
       "extractionState" : "manual",

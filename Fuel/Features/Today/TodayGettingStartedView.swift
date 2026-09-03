@@ -114,25 +114,3 @@ private struct TodayGettingStartedRow: View {
         .accessibilityValue(Text(TodayCopy.gettingStartedState(isDone: item.isDone)))
     }
 }
-
-// MARK: - Empty day
-
-/// What replaces the checklist once every step is done and the day is still
-/// empty.
-///
-/// One line, and deliberately nothing else. A user who reaches this has logged
-/// before and knows what the plus does; four permanent ticks under a heading
-/// would be furniture, and anything larger would be a second empty state
-/// competing with the first. The mono meta line is Today's own quiet register —
-/// the date above the title and the calories beside a meal heading are set in
-/// it — so the screen gains a status rather than a new kind of thing.
-struct TodayEmptyDayNote: View {
-
-    @Environment(\.fuelPalette) private var palette
-
-    var body: some View {
-        Text(TodayCopy.emptyDayNote)
-            .fuelStyle(FuelTypography.meta)
-            .foregroundStyle(palette.muted)
-    }
-}
