@@ -8,10 +8,12 @@ import SwiftUI
 /// **There is no second drawing here.** It is `MealResultView` — screens 14 and
 /// 15 — with three things handed to it and nothing added: no leading footer
 /// control, because there is no estimate to throw away; `Delete` where `Add`
-/// sits; and no lede, because a stored meal has neither the photograph screen
-/// 14 puts above the label pill nor the sentence screen 15 does. Everything
-/// from the pill down is the same drawing, including the rule that turns the
-/// footer into `Re-analyse` once the breakdown has been changed.
+/// sits; and, in the lede slot, whichever of the photograph or the sentence
+/// this meal was logged with — or, for a meal that has neither, its own name
+/// in that place instead. See `lede` for the rule and `MealDetailModel.photo`
+/// for why a meal can lack both. Everything from the pill down is the same
+/// drawing, including the rule that turns the footer into `Re-analyse` once
+/// the breakdown has been changed.
 ///
 /// The analysis states and the failure state sit over the whole screen, the
 /// way they do over the log flow, because the export gives them no chrome to
@@ -62,10 +64,13 @@ struct MealDetailView: View {
                     title: MealDetailCopy.delete,
                     perform: { isConfirmingDelete = true }
                 ),
-                // A stored meal has no photograph and no typed sentence. What
-                // the export puts above the label pill belongs to the flow that
-                // produced the estimate, and this screen is not in one.
-                lede: { EmptyView() }
+                // The same slot `PhotoResultView`/`TextResultView` fill on the
+                // scan screens, reusing their exact rendering: the photo for a
+                // camera-mode meal, the sentence for a text-mode one. Neither
+                // exists for a meal repeated from Recent or logged before
+                // either was kept, so `MealTitleLede` keeps the slot from
+                // opening on a gap — see `MealDetailModel.photo`.
+                lede: { lede }
             )
 
             switch model.stage {
@@ -112,6 +117,23 @@ struct MealDetailView: View {
             reportOutcome(from: previous, to: current)
         }
         .fuelAnimation(FuelMotion.emphasised, value: model.stage)
+    }
+
+    // MARK: - Lede
+
+    /// What fills the slot screen 14 gives the photo and screen 15 gives the
+    /// quote. Photo first, then the sentence, then the meal's own name — the
+    /// order a meal can actually be in, since a stored entry has at most one
+    /// of the two.
+    @ViewBuilder
+    private var lede: some View {
+        if let photo = model.photo {
+            MealPhotoLede(photo: photo)
+        } else if let typedSentence = model.typedSentence {
+            MealQuoteLede(text: typedSentence)
+        } else {
+            MealTitleLede(title: model.draft.title)
+        }
     }
 
     // MARK: - Editing

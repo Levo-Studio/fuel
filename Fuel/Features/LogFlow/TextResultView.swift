@@ -24,8 +24,6 @@ struct TextResultView: View {
     let onDiscard: (() -> Void)?
     let commit: MealResultAction
 
-    @Environment(\.fuelPalette) private var palette
-
     var body: some View {
         MealResultView(
             draft: draft,
@@ -41,37 +39,8 @@ struct TextResultView: View {
             onDiscard: onDiscard,
             discardConfirmation: MealResultCopy.discardConfirmation,
             commit: commit,
-            lede: { quote }
+            lede: { MealQuoteLede(text: typedText) }
         )
-    }
-
-    // MARK: - Quote
-
-    /// The sentence behind an accent rule: `border-left:2px solid var(--accent)`
-    /// with `padding:2px 0 2px 14px`.
-    ///
-    /// A rule and a gap in a row rather than a border on a box, because CSS
-    /// draws the border outside the padding — the sentence sits 14 from the
-    /// rule and the rule sits at the margin, which is what this arrangement
-    /// gives and what a `.overlay` inside the padding would not.
-    ///
-    /// `Text(verbatim:)` because the words are the user's own: nothing they
-    /// type is read as markup on the way back to them.
-    private var quote: some View {
-        HStack(alignment: .top, spacing: FuelMetrics.Space.s14) {
-            palette.accentColor
-                .frame(width: FuelMetrics.Line.quoteRule)
-
-            Text(verbatim: typedText)
-                .fuelStyle(FuelTypography.body)
-                .foregroundStyle(palette.ink)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, FuelMetrics.Space.s2)
-        }
-        .fixedSize(horizontal: false, vertical: true)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text(TextLogCopy.resultQuoteLabel))
-        .accessibilityValue(Text(verbatim: typedText))
     }
 }
 

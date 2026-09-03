@@ -9,12 +9,14 @@ import Foundation
 /// there, a sentence is sent, an estimate comes back editable, and only `Add`
 /// writes anything down.
 ///
-/// **The sentence the user typed lives here and nowhere else.** It is not
-/// logged, not written to a file, not put in `UserDefaults` and not carried
-/// into an error: `AnalysisFailure` has three cases and no text. The only
-/// place a meal's content is ever written down is the SwiftData entry
-/// `commit()` creates, and even there it is the estimate's title rather than
-/// the wording.
+/// **The sentence the user typed is never logged, never written to a file,**
+/// never put in `UserDefaults` and never carried into an error:
+/// `AnalysisFailure` has three cases and no text. It does reach one place
+/// besides this object: `commit()` passes it to the SwiftData entry, exactly
+/// as typed, so `MealDetailView` can quote it back the way screen 15 does.
+/// That is still the only place any of a meal's content is ever written
+/// down, and it is still on the device the user typed it on — nothing about
+/// where it travels has changed, only what the entry now keeps.
 ///
 /// **Without a stored key there is no request to make.** `hasKey(for:)` is
 /// asked before the client is touched, and it is the only Keychain call the
@@ -467,7 +469,8 @@ final class TextLogModel {
                 loggedAt: enteredAt,
                 source: .text,
                 isFavourite: draft.isFavourite,
-                items: draft.items
+                items: draft.items,
+                typedSentence: typedText
             )
             // Only when the pill was actually tapped. Writing the derived
             // label back as the user's would freeze a value they never chose.

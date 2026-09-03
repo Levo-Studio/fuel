@@ -6,10 +6,14 @@ import SwiftUI
 /// The camera half of the log flow: screen 07, the four analysis states, and
 /// screen 14.
 ///
-/// Everything it holds of the photo lives in memory. The frame is captured,
-/// compressed, sent and released; no temporary file is written, nothing is
-/// logged, and the only place the meal's content is ever written down is the
-/// SwiftData entry `commit()` creates.
+/// The frame is captured, compressed and sent; no temporary file is written
+/// and nothing is logged. A discarded scan's photo goes no further than that
+/// — the in-memory frame is released and nothing about it is ever written
+/// down. A committed one does go further: `commit()` passes the same
+/// compressed bytes the request carried to the SwiftData entry, so
+/// `MealDetailView` can draw the meal's own photograph the way screen 14
+/// does. Either way, the SwiftData entry stays the only place any of a meal's
+/// content is ever written down at all.
 @MainActor
 @Observable
 final class CameraLogModel {
@@ -42,6 +46,15 @@ final class CameraLogModel {
 
     /// The captured frame, kept only while it is being analysed and shown.
     private(set) var photo: UIImage?
+
+    /// The same frame, compressed — the exact bytes the scan sent to the
+    /// model, kept so `commit()` can hand them to the store rather than
+    /// compressing the photo a second time.
+    ///
+    /// Set once compression succeeds and untouched by a re-analysis: that
+    /// request sends the edited item list, not the photograph, so there is
+    /// no fresher compression to replace this with.
+    private(set) var capturedPhotoData: Data?
 
     private(set) var draft: MealResultDraft?
 
@@ -260,6 +273,7 @@ final class CameraLogModel {
             // Compression happens before anything is sent, and before the
             // steps start walking, so an unsendable photo costs no request.
             let compressed = try MealPhotoCompressor.compress(image)
+            capturedPhotoData = compressed.jpegData
 
             let estimate = try await stepping(as: run) { try await self.client.estimate(photo: compressed) }
 
@@ -447,7 +461,8 @@ final class CameraLogModel {
                 loggedAt: capturedAt,
                 source: .photo,
                 isFavourite: draft.isFavourite,
-                items: draft.items
+                items: draft.items,
+                capturedPhotoData: capturedPhotoData
             )
             // Only when the pill was actually tapped. Writing the derived
             // label back as the user's would freeze a value they never chose.
@@ -469,13 +484,18 @@ final class CameraLogModel {
     /// than directly — leaving one only throws the scan away when there is no
     /// draft behind it to go back to.
     ///
-    /// The frame is released here. That is the whole lifetime of the photo:
-    /// captured, sent, drawn, gone.
+    /// **This releases the in-memory frame, not the photo behind a meal that
+    /// was just committed.** On the discard path — no meal was ever written —
+    /// this is the whole lifetime of the photo: captured, sent, drawn, gone.
+    /// `commit()` calls this too, but only after `store.log` has already put
+    /// the compressed bytes in the entry, so a committed meal keeps its
+    /// photograph; what ends here is only this object's own copy of it.
     func discard() {
         retireRun()
         scan = nil
         isReanalysing = false
         photo = nil
+        capturedPhotoData = nil
         draft = nil
         stage = keys.hasKey(for: provider) ? .viewfinder : .noKey
     }

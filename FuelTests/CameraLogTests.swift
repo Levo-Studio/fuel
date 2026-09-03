@@ -549,6 +549,43 @@ struct CameraLogTests {
         ])
     }
 
+    @Test("committing writes the compressed frame behind the entry, not the raw one")
+    func commitWritesTheCompressedPhoto() async throws {
+        let store = try makeStore()
+        let model = makeModel(store: store, client: ScriptedClient(answer: .success(Self.estimate)))
+        await model.scanning(pixel())
+
+        // The model already holds the exact bytes the scan sent — this is the
+        // guard against a second, independent compression sneaking back in at
+        // commit time.
+        let sentToTheModel = try #require(model.capturedPhotoData)
+        #expect(model.commit())
+
+        let entry = try #require(try store.entries(on: at(19, 20)).first)
+        let stored = try #require(entry.capturedPhotoData)
+        #expect(stored == sentToTheModel)
+        // JPEG, not the raw pixel buffer — decodable proves it round-trips as
+        // an image rather than as opaque bytes that merely happen to be equal.
+        #expect(UIImage(data: stored) != nil)
+    }
+
+    @Test("a re-analysis keeps the photo it did not resend")
+    func reanalysisKeepsThePhoto() async throws {
+        let store = try makeStore()
+        let client = ScriptedClient(answers: [.success(Self.estimate), .success(Self.reestimate)])
+        let model = makeModel(store: store, client: client)
+        await model.scanning(pixel())
+        let capturedBeforeReanalysis = try #require(model.capturedPhotoData)
+
+        model.editItem(try #require(model.draft?.items.last?.id), to: "Polenta r50g")
+        await model.reanalysing()
+
+        #expect(model.capturedPhotoData == capturedBeforeReanalysis)
+        #expect(model.commit())
+        let entry = try #require(try store.entries(on: at(19, 20)).first)
+        #expect(entry.capturedPhotoData == capturedBeforeReanalysis)
+    }
+
     @Test("a label the user picked survives the commit as theirs")
     func commitKeepsTheUsersLabel() async throws {
         let store = try makeStore()
@@ -587,6 +624,7 @@ struct CameraLogTests {
         #expect(model.stage == .viewfinder)
         #expect(model.draft == nil)
         #expect(model.photo == nil)
+        #expect(model.capturedPhotoData == nil)
     }
 
     @Test("walking away from a result writes nothing")
@@ -599,6 +637,7 @@ struct CameraLogTests {
 
         #expect(model.stage == .viewfinder)
         #expect(model.draft == nil)
+        #expect(model.capturedPhotoData == nil)
         #expect(try store.entries(on: at(19, 20)).isEmpty)
     }
 

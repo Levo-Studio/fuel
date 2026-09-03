@@ -105,7 +105,9 @@ final class FuelStore {
         loggedAt: Date,
         source: EntrySource,
         isFavourite: Bool = false,
-        items: [RecognisedItem] = []
+        items: [RecognisedItem] = [],
+        capturedPhotoData: Data? = nil,
+        typedSentence: String? = nil
     ) throws -> FoodEntry {
         let entry = FoodEntry(
             title: title,
@@ -114,7 +116,9 @@ final class FuelStore {
             loggedAt: loggedAt,
             source: source,
             isFavourite: isFavourite,
-            items: items
+            items: items,
+            capturedPhotoData: capturedPhotoData,
+            typedSentence: typedSentence
         )
         context.insert(entry)
         try context.save()

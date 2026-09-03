@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import UIKit
 
 @testable import Fuel
 
@@ -26,15 +27,20 @@ struct MealDetailTests {
     private func logMeal(
         in store: FuelStore,
         at moment: Date = at(19, 20),
-        items: [RecognisedItem] = MealDetailTests.twoItems
+        items: [RecognisedItem] = MealDetailTests.twoItems,
+        source: EntrySource = .photo,
+        capturedPhotoData: Data? = nil,
+        typedSentence: String? = nil
     ) throws -> FoodEntry {
         try store.log(
             title: "Salmon with polenta",
             kilocalories: 460,
             macros: MacroTotals(protein: 34, carbs: 28, fat: 23),
             loggedAt: moment,
-            source: .photo,
-            items: items
+            source: source,
+            items: items,
+            capturedPhotoData: capturedPhotoData,
+            typedSentence: typedSentence
         )
     }
 
@@ -117,6 +123,55 @@ struct MealDetailTests {
         #expect(model.draft.label == .dinner)
         // Nothing has changed yet, so the footer is the caller's verb.
         #expect(model.draft.hasItemEdits == false)
+    }
+
+    @Test("a camera-mode meal decodes its stored photo and carries no sentence")
+    func opensWithAStoredPhoto() throws {
+        let store = try makeStore()
+        let entry = try logMeal(in: store, source: .photo, capturedPhotoData: try onePixelJPEG())
+        let model = try makeModel(entry: entry, store: store, client: ScriptedClient(answer: .success(Self.reestimate)))
+
+        #expect(model.photo != nil)
+        #expect(model.typedSentence == nil)
+    }
+
+    @Test("a text-mode meal carries its typed sentence and no photo")
+    func opensWithAStoredSentence() throws {
+        let store = try makeStore()
+        let entry = try logMeal(
+            in: store,
+            source: .text,
+            typedSentence: "2 eggs with 200g cottage cheese and polenta"
+        )
+        let model = try makeModel(entry: entry, store: store, client: ScriptedClient(answer: .success(Self.reestimate)))
+
+        #expect(model.typedSentence == "2 eggs with 200g cottage cheese and polenta")
+        #expect(model.photo == nil)
+    }
+
+    @Test("a Recent-sourced meal carries neither a photo nor a sentence")
+    func openedFromRecentHasNoLedeContent() throws {
+        let store = try makeStore()
+        let entry = try logMeal(in: store, source: .recent)
+        let model = try makeModel(entry: entry, store: store, client: ScriptedClient(answer: .success(Self.reestimate)))
+
+        #expect(model.photo == nil)
+        #expect(model.typedSentence == nil)
+    }
+
+    @Test("a meal logged before the field existed carries neither, the same as Recent")
+    func preExistingMealHasNoLedeContent() throws {
+        // Nothing distinguishes this row from one a build before this feature
+        // wrote: `capturedPhotoData` and `typedSentence` are both optional
+        // with no default that back-fills them, so an older row and a
+        // Recent-sourced one decode to the same `nil, nil` — which is the
+        // whole point of the lightweight migration this leans on.
+        let store = try makeStore()
+        let entry = try logMeal(in: store, source: .photo)
+        let model = try makeModel(entry: entry, store: store, client: ScriptedClient(answer: .success(Self.reestimate)))
+
+        #expect(model.photo == nil)
+        #expect(model.typedSentence == nil)
     }
 
     @Test("a meal that is not in the store has no screen")
@@ -567,4 +622,23 @@ private extension MealDetailModel {
             await Task.yield()
         }
     }
+}
+
+// MARK: - Stand-ins
+
+/// One opaque pixel, compressed through the same path `CameraLogModel` sends
+/// a scan through — a stand-in for `capturedPhotoData`, which on a real entry
+/// is written down through that same call. What is under test where this is
+/// used is the decode on the way back out, not the compression itself, which
+/// has its own suite.
+@MainActor
+private func onePixelJPEG() throws -> Data {
+    let size = CGSize(width: 1, height: 1)
+    let format = UIGraphicsImageRendererFormat.default()
+    format.scale = 1
+    format.opaque = true
+    let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
+        context.fill(CGRect(origin: .zero, size: size))
+    }
+    return try MealPhotoCompressor.compress(image).jpegData
 }

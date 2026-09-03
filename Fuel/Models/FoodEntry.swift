@@ -45,6 +45,23 @@ final class FoodEntry {
     /// than analysing one.
     var items: [RecognisedItem]
 
+    /// The compressed photo behind a camera-mode entry — the same bytes the
+    /// scan itself sent, not a second compression of them.
+    ///
+    /// `nil` for a text-mode or Recent-mode entry, and `nil` for any entry
+    /// logged before this property existed: the field is new and optional, so
+    /// SwiftData loads an older row with nothing here rather than failing to
+    /// load it. `MealDetailView` reads that absence and falls back to the
+    /// meal's own name in the slot this would otherwise fill.
+    var capturedPhotoData: Data?
+
+    /// The sentence behind a text-mode entry, exactly as typed.
+    ///
+    /// `nil` for a camera-mode or Recent-mode entry, and `nil` for any entry
+    /// logged before this property existed, for the same reason
+    /// `capturedPhotoData` is.
+    var typedSentence: String?
+
     init(
         entryID: UUID = UUID(),
         title: String,
@@ -55,7 +72,9 @@ final class FoodEntry {
         label: MealLabel = .snack,
         isLabelUserSet: Bool = false,
         isFavourite: Bool = false,
-        items: [RecognisedItem] = []
+        items: [RecognisedItem] = [],
+        capturedPhotoData: Data? = nil,
+        typedSentence: String? = nil
     ) {
         self.entryID = entryID
         self.title = title
@@ -69,6 +88,8 @@ final class FoodEntry {
         self.isLabelUserSet = isLabelUserSet
         self.isFavourite = isFavourite
         self.items = items
+        self.capturedPhotoData = capturedPhotoData
+        self.typedSentence = typedSentence
     }
 
     // MARK: - Typed accessors
