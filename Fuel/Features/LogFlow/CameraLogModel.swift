@@ -186,9 +186,10 @@ final class CameraLogModel {
 
     /// How long each analysis step is held before the next one.
     ///
-    /// Injected so a test can walk all four instantly. It is not a design
-    /// value: the export draws four states and says nothing about their
-    /// timing, and the steps stand for a single request either way.
+    /// Injected so a test can walk all four instantly. The duration itself is
+    /// `FuelMotion.analysisStepHold` — the export draws four states and says
+    /// nothing about their timing, and a value the design does not dictate
+    /// still belongs to the design layer rather than to this initialiser.
     private let pace: @Sendable () async -> Void
 
     /// The running scan, so `CANCEL` can stop it.
@@ -210,7 +211,7 @@ final class CameraLogModel {
         keys: any MealKeyPresence = KeychainStore(),
         provider: AIProvider = .claude,
         now: @escaping () -> Date = Date.init,
-        pace: @escaping @Sendable () async -> Void = { try? await Task.sleep(for: .milliseconds(700)) }
+        pace: @escaping @Sendable () async -> Void = { try? await Task.sleep(for: FuelMotion.analysisStepHold) }
     ) {
         self.store = store
         self.client = client

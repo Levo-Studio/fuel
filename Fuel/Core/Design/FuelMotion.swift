@@ -108,6 +108,22 @@ nonisolated enum FuelMotion {
     /// than to four restated ones.
     static let allCurves: [Curve] = [standard, emphasised, value, progress]
 
+    // MARK: - Paced sequences
+
+    /// How long one of the four analysis steps is held before the next.
+    ///
+    /// Not a curve, because nothing is being interpolated: the steps are a
+    /// sequence of four states, and this is the dwell between them. It lives
+    /// here for the same reason the curves do — the export draws the four
+    /// analysis frames and says nothing about their timing, which is precisely
+    /// the case that sends a missing value to the design layer rather than to
+    /// the call site that first needed one.
+    ///
+    /// The whole walk is four holds, and the last one is cut short the moment
+    /// the estimate arrives, so this is a pace rather than a floor on how long
+    /// a scan takes.
+    static let analysisStepHold: Duration = .milliseconds(700)
+
     // MARK: - Resolution
 
     /// Turns a curve into the animation to actually run.
