@@ -183,8 +183,7 @@ final class RootShellModel {
         validator: KeyValidating,
         preferences: SettingsPreferences,
         makeCameraLog: @escaping CameraLogFactory = RootShellModel.liveCameraLog,
-        makeTextLog: @escaping TextLogFactory = RootShellModel.liveTextLog,
-        router: ScanRouter = .shared
+        makeTextLog: @escaping TextLogFactory = RootShellModel.liveTextLog
     ) {
         self.store = store
         self.preferences = preferences
@@ -205,11 +204,6 @@ final class RootShellModel {
             store: store,
             onFinished: { [weak self] in self?.showToday() }
         )
-        // Last, because it can call straight back in: a shortcut fired against
-        // a cold launch is waiting here, and everything it touches has to be
-        // built before it is answered. The router keeps only a weak reference,
-        // so this is a registration and not a second owner.
-        router.adopt(self)
     }
 
     // MARK: - Launch decision

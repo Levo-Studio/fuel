@@ -68,8 +68,7 @@ struct ScanIntentTests {
 
     private func makeModel(
         store: FuelStore,
-        keys: any MealKeyPresence = StoredKey(),
-        router: ScanRouter = ScanRouter()
+        keys: any MealKeyPresence = StoredKey()
     ) -> RootShellModel {
         RootShellModel(
             store: store,
@@ -92,20 +91,16 @@ struct ScanIntentTests {
                     provider: provider,
                     pace: {}
                 )
-            },
-            router: router
+            }
         )
     }
 
     /// A shell that has been through onboarding, which is the state every test
     /// but the onboarding one starts from.
-    private func makeTodayModel(
-        keys: any MealKeyPresence = StoredKey(),
-        router: ScanRouter = ScanRouter()
-    ) throws -> RootShellModel {
+    private func makeTodayModel(keys: any MealKeyPresence = StoredKey()) throws -> RootShellModel {
         let store = try makeStore()
         try store.setCountingMode(.goal(.default))
-        return makeModel(store: store, keys: keys, router: router)
+        return makeModel(store: store, keys: keys)
     }
 
     // MARK: - The destination
@@ -246,11 +241,12 @@ struct ScanIntentTests {
     // MARK: - The hand-off
 
     /// Fuel is already running, which is the case the router has least to do
-    /// in: the request goes straight through.
+    /// in: the request goes straight through to the shell that registered.
     @Test("A request reaches the shell that registered with the router")
     func routerForwardsToTheShell() throws {
         let router = ScanRouter()
-        let model = try makeTodayModel(router: router)
+        let model = try makeTodayModel()
+        router.adopt(model)
 
         router.requestScan()
 
@@ -260,14 +256,18 @@ struct ScanIntentTests {
 
     /// The cold-launch case, and the reason the router is not a plain
     /// forwarding call. The app is started by the shortcut, so the request can
-    /// arrive before the shell exists; dropping it there would leave the
+    /// arrive before any shell is on screen; dropping it there would leave the
     /// shortcut working only when Fuel happened to be open already.
-    @Test("A request that arrives before the shell is answered when it appears")
-    func routerHoldsARequestUntilAShellExists() throws {
+    @Test("A request that arrives before the shell is answered when it registers")
+    func routerHoldsARequestUntilAShellRegisters() throws {
         let router = ScanRouter()
         router.requestScan()
 
-        let model = try makeTodayModel(router: router)
+        let model = try makeTodayModel()
+        // Built, and not yet on screen. Building is not registering.
+        #expect(model.destination == nil)
+
+        router.adopt(model)
 
         #expect(model.destination == .logFlow)
         #expect(model.logFlow.selectedTab == .camera)
@@ -275,18 +275,19 @@ struct ScanIntentTests {
 
     /// Held once, not for the life of the process. A request answered at
     /// launch must not open a viewfinder again in front of whatever the user
-    /// is doing later.
-    @Test("A held request is answered once")
+    /// is doing later — and appearing a second time is normal: `RootShell`
+    /// registers on every appearance, so this runs whenever Fuel comes back to
+    /// the front.
+    @Test("A held request is answered once, however often the shell registers")
     func routerHoldsARequestOnlyOnce() throws {
         let router = ScanRouter()
         router.requestScan()
 
-        let model = try makeTodayModel(router: router)
+        let model = try makeTodayModel()
+        router.adopt(model)
         model.dismissDestination()
         #expect(model.destination == nil)
 
-        // What a second shell in one process would be: there is none in Fuel,
-        // and the flag must not survive one either.
         router.adopt(model)
         #expect(model.destination == nil)
     }
@@ -298,9 +299,47 @@ struct ScanIntentTests {
         let router = ScanRouter()
         router.requestScan()
 
-        let model = makeModel(store: try makeStore(), router: router)
+        let model = makeModel(store: try makeStore())
+        router.adopt(model)
 
         #expect(model.stage == .onboarding)
         #expect(model.destination == nil)
+    }
+
+    /// The registration is the view's, on appearance, and not the model's, in
+    /// its initialiser — because a `@State`'s initial value expression runs on
+    /// every initialisation of the struct holding it while `State` keeps only
+    /// the first value. A model that registered itself would let a shell
+    /// SwiftUI built and threw away swallow a request waiting from a cold
+    /// launch, and take the router's weak reference down with it when it
+    /// deallocated.
+    ///
+    /// What this pins is the half that is observable from here: a shell that
+    /// was only built is not what the router answers through. The other half —
+    /// that nothing in `RootShellModel` reaches `ScanRouter.shared` behind the
+    /// suite's back — is structural rather than tested, and deliberately so:
+    /// the initialiser takes no router and the file names the type nowhere, so
+    /// there is no call for a test to catch.
+    ///
+    /// **The shared router is not usable here.** The test host is the Fuel app
+    /// itself, so its own `RootShell` appears and registers the real shell with
+    /// `ScanRouter.shared` before any of this runs — a suite that reached for
+    /// it would be talking to the app around it.
+    @Test("The router answers through the shell that registered, not the one built last")
+    func routerAnswersThroughTheRegisteredShell() throws {
+        let router = ScanRouter()
+        let registered = try makeTodayModel()
+        router.adopt(registered)
+
+        // Built afterwards and never registered: what a discarded initial
+        // value is, and what a self-registering initialiser would have made
+        // the router point at.
+        let unregistered = try makeTodayModel()
+
+        router.requestScan()
+
+        #expect(registered.destination == .logFlow)
+        #expect(registered.logFlow.selectedTab == .camera)
+        #expect(unregistered.destination == nil)
     }
 }

@@ -26,7 +26,18 @@ struct RootShell: View {
     /// relaunch and without anything having to be told about it.
     @State private var preferences: SettingsPreferences
 
-    init(store: FuelStore, validator: KeyValidating, defaults: UserDefaults = .standard) {
+    /// Where a scan request from outside the app arrives. Held rather than
+    /// reached for at the call site so a test can name its own, the way
+    /// `defaults` is injected below.
+    private let router: ScanRouter
+
+    init(
+        store: FuelStore,
+        validator: KeyValidating,
+        defaults: UserDefaults = .standard,
+        router: ScanRouter = .shared
+    ) {
+        self.router = router
         // One instance, handed to both. The model reads the selected provider
         // when a log flow opens and Settings writes it on screen 16, so a
         // second `SettingsPreferences` built from the same suite would work
@@ -75,6 +86,23 @@ struct RootShell: View {
                 )
             }
         }
+        // The shell registers for scan requests here rather than in
+        // `RootShellModel.init`, and the difference is which shell registers.
+        //
+        // A `@State`'s initial value expression runs on every initialisation of
+        // the struct holding it while `State` keeps only the first value it is
+        // handed — the reason `FuelApp` opens the store where it does. A model
+        // built by a construction SwiftUI then discards would, if it registered
+        // itself, consume a request waiting from a cold launch and take the
+        // router's weak reference down with it when it deallocated, leaving the
+        // shortcut a silent no-op for the rest of the process. Registering on
+        // appearance means the shell that is actually in the hierarchy is the
+        // one the router holds, so the failure mode is gone rather than argued
+        // against.
+        //
+        // Repeated appearances are safe and wanted: `adopt` re-points the weak
+        // reference and delivers a request that arrived while nothing held one.
+        .onAppear { router.adopt(model) }
         .fullScreenCover(item: presentedDestination) { destination in
             switch destination {
             case .logFlow:
