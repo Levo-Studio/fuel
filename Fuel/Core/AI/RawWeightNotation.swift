@@ -65,19 +65,48 @@ nonisolated enum RawWeightNotation {
     /// French, plus `Pfund`, which a German speaker uses for 500 g the way an
     /// English speaker uses a pound.
     ///
-    /// **Order does not matter.** An earlier version claimed the array was
+    /// **Order does not matter, and still does not now that the loop returns a
+    /// value rather than a yes.** An earlier version claimed the array was
     /// sorted longest first so `r50 grams` would not stop at the `g`, and that
-    /// was never what did it — `unitFollows(_:from:)` requires the unit to end
-    /// at a word boundary, so `g` followed by `r` is rejected on its own and
-    /// the loop simply carries on to `grams`. The array is alphabetical
-    /// because a list somebody has to add a word to is easier to read that
-    /// way.
-    private static let units = [
-        "g", "gr", "gram", "gramm", "gramme", "grammes", "grams", "grs",
-        "kg", "kgs", "kilo", "kilogram", "kilogramm", "kilogramme",
-        "kilogrammes", "kilograms", "kilos", "lb", "lbs", "ounce", "ounces",
-        "oz", "pfund", "pound", "pounds", "unze", "unzen"
+    /// was never what did it — `unit(_:from:)` requires the unit to end at a
+    /// word boundary, so `g` followed by `r` is rejected on its own and the
+    /// loop simply carries on to `grams`. `r1 kilogram` is a kilogram for the
+    /// same reason and not a `kilo`. The array is alphabetical because a list
+    /// somebody has to add a word to is easier to read that way.
+    ///
+    /// Each entry carries what one of it weighs in grams.
+    ///
+    /// The gram figure was added when the scanner stopped answering only "is
+    /// there a marker" and started answering "how much" — see `weights(in:)`.
+    /// A pound is the international avoirdupois pound and an ounce is a
+    /// sixteenth of it; `Pfund` is the German half-kilo, which is what a German
+    /// speaker means by the word and is not a pound. `Unze` is grouped with
+    /// the ounce rather than with the historical German Unze of 31.25 g,
+    /// because nobody weighing their dinner in 2026 means the older one.
+    private static let units: [(name: String, grams: Double)] = [
+        ("g", 1), ("gr", 1), ("gram", 1), ("gramm", 1), ("gramme", 1),
+        ("grammes", 1), ("grams", 1), ("grs", 1),
+        ("kg", 1000), ("kgs", 1000), ("kilo", 1000), ("kilogram", 1000),
+        ("kilogramm", 1000), ("kilogramme", 1000), ("kilogrammes", 1000),
+        ("kilograms", 1000), ("kilos", 1000),
+        ("lb", 453.592_37), ("lbs", 453.592_37),
+        ("ounce", 28.349_523_125), ("ounces", 28.349_523_125),
+        ("oz", 28.349_523_125),
+        ("pfund", 500), ("pound", 453.592_37), ("pounds", 453.592_37),
+        ("unze", 28.349_523_125), ("unzen", 28.349_523_125)
     ]
+
+    // MARK: - A weight
+
+    /// One mass quantity found in a sentence, in grams, and whether the marker
+    /// was on it.
+    nonisolated struct Weight: Sendable, Hashable {
+
+        var grams: Double
+
+        /// `true` when the quantity carried the leading `r`.
+        var isRaw: Bool
+    }
 
     // MARK: - Reading
 
@@ -89,15 +118,52 @@ nonisolated enum RawWeightNotation {
     /// anyone has ever typed. Tied to a number and a unit it is a shape nobody
     /// writes by accident.
     static func isUsed(in text: String) -> Bool {
-        let characters = Array(text)
+        weights(in: text).contains { $0.isRaw }
+    }
 
-        for index in characters.indices where isMarker(characters, at: index) {
-            if quantityFollows(characters, from: index + 1) {
-                return true
+    /// Every mass quantity in `text`, in the order it was written, each saying
+    /// whether it carried the marker.
+    ///
+    /// **One scanner, two answers.** The rule for what counts as a quantity —
+    /// the unit table, the single space, the fraction written either way round,
+    /// the word boundary that keeps `r50 grammar` out — is the same rule
+    /// whether the question is "did the user use the shorthand" or "how much
+    /// did they say". A second scanner beside this one would be two copies of a
+    /// dozen decisions that have to stay identical, and the day they diverge is
+    /// the day a sentence is read as raw by one and priced by the other.
+    ///
+    /// Unmarked quantities are returned too, which the earlier version had no
+    /// use for. They are what lets a typed `45 g polenta` keep the user's own
+    /// number instead of the model's guess at it: the person who put the food
+    /// on a scale is a better source for its weight than a model reading their
+    /// sentence about it.
+    static func weights(in text: String) -> [Weight] {
+        let characters = Array(text)
+        var found: [Weight] = []
+        var cursor = 0
+
+        while cursor < characters.count {
+            if isMarker(characters, at: cursor),
+               let weight = quantity(characters, from: cursor + 1) {
+                found.append(Weight(grams: weight.grams, isRaw: true))
+                cursor = weight.end
+                continue
             }
+
+            // An unmarked quantity has to start a word too. Without that,
+            // the `50` of `r50 g` would be read a second time as a weight of
+            // its own the moment the marked reading did not consume it.
+            if isBoundary(characters, at: cursor - 1),
+               let weight = quantity(characters, from: cursor) {
+                found.append(Weight(grams: weight.grams, isRaw: false))
+                cursor = weight.end
+                continue
+            }
+
+            cursor += 1
         }
 
-        return false
+        return found
     }
 
     // MARK: - Scanning
@@ -115,7 +181,8 @@ nonisolated enum RawWeightNotation {
         return isBoundary(characters, at: index - 1)
     }
 
-    /// Whether a number and a mass unit follow, starting at `index`.
+    /// The mass quantity starting at `index`, in grams, and where it ends —
+    /// or `nil` if there is not one there.
     ///
     /// A single space is allowed on either side of the number, so `r50g`,
     /// `r 50g`, `r50 g` and `r 50 g` are all the same amount written by
@@ -130,11 +197,15 @@ nonisolated enum RawWeightNotation {
     /// of them look like one space on screen, and a rule that can only see
     /// U+0020 rejects a sentence the user cannot tell apart from one it
     /// accepts.
-    private static func quantityFollows(_ characters: [Character], from index: Int) -> Bool {
+    private static func quantity(
+        _ characters: [Character],
+        from index: Int
+    ) -> (grams: Double, end: Int)? {
         var cursor = skippingSpace(characters, from: index)
+        let numberStart = cursor
 
         guard cursor < characters.count, isDigit(characters[cursor]) else {
-            return false
+            return nil
         }
         while cursor < characters.count, isDigit(characters[cursor]) {
             cursor += 1
@@ -148,7 +219,7 @@ nonisolated enum RawWeightNotation {
         if cursor < characters.count, characters[cursor] == "." || characters[cursor] == "," {
             let afterSeparator = cursor + 1
             guard afterSeparator < characters.count, isDigit(characters[afterSeparator]) else {
-                return false
+                return nil
             }
             cursor = afterSeparator
             while cursor < characters.count, isDigit(characters[cursor]) {
@@ -156,32 +227,44 @@ nonisolated enum RawWeightNotation {
             }
         }
 
-        return unitFollows(characters, from: skippingSpace(characters, from: cursor))
+        let numberText = String(characters[numberStart..<cursor]).replacingOccurrences(of: ",", with: ".")
+        guard let amount = Double(numberText) else {
+            return nil
+        }
+
+        guard let unit = unit(characters, from: skippingSpace(characters, from: cursor)) else {
+            return nil
+        }
+
+        return (grams: amount * unit.grams, end: unit.end)
     }
 
-    /// Whether one of `units` sits at `index` and ends there.
+    /// The unit sitting at `index` and ending there, or `nil`.
     ///
     /// The unit has to end at a boundary, so `r50 grammar` is not fifty grams
     /// of anything.
-    private static func unitFollows(_ characters: [Character], from index: Int) -> Bool {
+    private static func unit(
+        _ characters: [Character],
+        from index: Int
+    ) -> (grams: Double, end: Int)? {
         guard index < characters.count else {
-            return false
+            return nil
         }
 
         for unit in units {
-            let end = index + unit.count
+            let end = index + unit.name.count
             guard end <= characters.count else {
                 continue
             }
-            guard String(characters[index..<end]).lowercased() == unit else {
+            guard String(characters[index..<end]).lowercased() == unit.name else {
                 continue
             }
             if isBoundary(characters, at: end) {
-                return true
+                return (grams: unit.grams, end: end)
             }
         }
 
-        return false
+        return nil
     }
 
     /// `index` advanced past one whitespace character, if there is one there.
