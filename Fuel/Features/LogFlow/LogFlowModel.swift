@@ -40,7 +40,7 @@ final class LogFlowModel {
     /// "here is what you ate" and "nothing yet" — and claiming the second when
     /// the read merely failed would be a lie about the user's own history.
     func reload() {
-        guard let entries = try? store.recentEntries(limit: RecentMeals.historyWindow) else { return }
+        guard let entries = try? store.recentEntries(limit: RecentMeals.entriesRead) else { return }
         recentMeals = RecentMeals.list(from: entries.map(\.nutritionValue))
     }
 
