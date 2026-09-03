@@ -126,9 +126,16 @@ private struct AnalysisSurface<Content: View, Footer: View>: View {
     @ViewBuilder let content: () -> Content
     @ViewBuilder let footer: () -> Footer
 
+    @Environment(\.fuelPalette) private var palette
+
     var body: some View {
         ZStack {
-            FuelPalette.Camera.placeholderBase
+            // The camera surface, the same token screen 07 sits on and the same
+            // one `LogFlowScaffold` uses. It is what shows in the safe-area band
+            // above the frozen frame and in the footer band below it, so it has
+            // to be a surface — `placeholderBase` is a stop in the hatch
+            // gradient and has no business being one.
+            palette.camera
                 .ignoresSafeArea()
 
             VStack(alignment: .center, spacing: .zero) {
