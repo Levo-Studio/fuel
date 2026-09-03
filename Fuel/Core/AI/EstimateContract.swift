@@ -92,11 +92,11 @@ nonisolated enum EstimateContract {
     /// on it — and a title costs the user the list they log from.
     static let rawWeightConvention = """
         A weight written with a leading r — r300g, r 1.5 kg, r8oz — was \
-        weighed raw or dry, before cooking. A weight without it is the amount \
-        as eaten. Price a raw weight as the raw or dry food and not as the \
-        cooked portion, and end that item's name with the raw amount in \
-        brackets, like "Rice (raw 300 g)". Never put it in the meal's title. \
-        A raw weight is a stated amount, so that item's "amount" is \
+        weighed raw or dry, before cooking. A weight without it is the \
+        amount as eaten. Base that item's calories on the raw or dry food \
+        and not on the cooked portion, and end its name with the raw amount \
+        in brackets, like "Rice (raw 300 g)". Never put it in the meal's \
+        title. A raw weight is a stated amount, so that item's "amount" is \
         "recognised".
 
         Read everything else as an ordinary amount, including a count such as \
