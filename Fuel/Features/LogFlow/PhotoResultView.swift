@@ -91,3 +91,27 @@ struct PhotoResultView: View {
     )
     .environment(\.fuelPalette, FuelPalette(theme: .dark, accent: .mono))
 }
+
+/// The screen with nothing to throw away, which is the shape a caller opening
+/// it on a meal that is already in the store will want: no leading control at
+/// all, and the filled button carrying that caller's own verb.
+///
+/// It exists so that branch is drawn somewhere. Neither log mode passes `nil` —
+/// both always have a scan or an estimate to discard — so without this the
+/// footer's one conditional would never be rendered by anything.
+#Preview("Result with nothing to discard") {
+    PhotoResultView(
+        draft: CameraPreviewData.draft,
+        photo: nil,
+        onBack: {},
+        onCycleLabel: {},
+        onToggleFavourite: {},
+        onRemoveItem: { _ in },
+        onEditItem: { _, _ in },
+        onAddItem: { _ in },
+        onReanalyse: {},
+        onDiscard: nil,
+        commit: MealResultAction(title: MealResultCopy.add, perform: {})
+    )
+    .environment(\.fuelPalette, FuelPalette(theme: .light, accent: .blue))
+}
