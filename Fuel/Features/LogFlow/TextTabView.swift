@@ -77,7 +77,12 @@ struct TextTabView: View {
             // it. The text stays on the line the export draws it on — the
             // spacer below absorbs the rest — so nothing drawn moves, and a
             // one-line field is no longer a 28pt target.
-            .frame(minHeight: FuelMetrics.Space.s44, alignment: .top)
+            //
+            // `minimumHitTarget` rather than the identically valued `Space.s44`
+            // on purpose: the ladder is what the export draws, and this is a
+            // rule applied to something drawn. Sharing the name would let a
+            // future change to an onboarding padding move a touch target.
+            .frame(minHeight: FuelMetrics.Control.minimumHitTarget, alignment: .top)
     }
 
     // MARK: - Analyse
