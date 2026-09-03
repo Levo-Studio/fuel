@@ -661,6 +661,13 @@ struct MealResultView<Lede: View>: View {
     /// a breakdown that no longer exists, and logging them would write down a
     /// meal nobody estimated. So the button asks the model again instead.
     ///
+    /// **Unless the list is empty**, in which case there is nothing to ask
+    /// about and the caller's own action comes back. See
+    /// `MealResultDraft.canReanalyse`, which holds both halves of that rule so
+    /// this button and the request it fires cannot disagree — they used to, and
+    /// a footer reading `Re-analyse` over an emptied list did nothing at all
+    /// while hiding the action it had replaced.
+    ///
     /// It is the one thing this screen decides rather than takes as a
     /// parameter, and deliberately: the rule is the same for every caller, and
     /// a caller that forgot it would be a caller that logs a stale figure.
@@ -670,7 +677,7 @@ struct MealResultView<Lede: View>: View {
     /// something has actually changed and never as a second button standing
     /// permanently on the screen. Nothing re-analyses on its own.
     private var primaryAction: MealResultAction {
-        guard draft.hasItemEdits else { return commit }
+        guard draft.canReanalyse else { return commit }
         return MealResultAction(title: MealResultCopy.reanalyse, perform: onReanalyse)
     }
 }

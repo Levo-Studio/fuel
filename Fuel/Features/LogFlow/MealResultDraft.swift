@@ -132,6 +132,32 @@ nonisolated struct MealResultDraft: Equatable, Sendable {
         hasItemEdits = false
     }
 
+    /// Whether `Re-analyse` is a thing the footer can honestly offer.
+    ///
+    /// **Two conditions, and the second one is not pedantry.** The list has to
+    /// have been changed — an unchanged breakdown would spend the user's credit
+    /// on the answer they are already looking at — *and* it has to still have
+    /// something in it. A user who removes every row has changed the list and
+    /// left nothing to send, and a request built from that list would be a
+    /// request about nothing.
+    ///
+    /// Before this existed the two halves lived apart: the footer swapped on
+    /// `hasItemEdits` alone while every re-analysis refused an empty sentence,
+    /// so emptying the list produced a button reading `Re-analyse` that did
+    /// nothing at all — and took the caller's own action off the screen with
+    /// it. On a stored meal that hid `Delete`, which is the one thing that
+    /// screen is for. It is one rule now, read by the footer and by the models,
+    /// so the drawing and the refusal cannot disagree again.
+    ///
+    /// An emptied list is therefore the caller's own action once more: `Add` on
+    /// screens 14 and 15, `Delete` on a meal that is already stored. That a
+    /// meal can be added with no breakdown is not a state this invents —
+    /// `MealEstimate.items` may arrive empty, and a meal repeated from the
+    /// Recent list has never had one.
+    var canReanalyse: Bool {
+        hasItemEdits && !items.isEmpty
+    }
+
     /// The edited list as one line of text, which is what a re-analysis is
     /// asked about.
     ///

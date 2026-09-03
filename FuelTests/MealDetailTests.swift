@@ -356,6 +356,60 @@ struct MealDetailTests {
         #expect(MealDetailCopy.discardEditsConfirmation.confirm != MealResultCopy.discardConfirmation.confirm)
     }
 
+    // MARK: - An emptied breakdown
+
+    /// The one the finding is about: removing every row used to leave a footer
+    /// reading `Re-analyse` that did nothing, with `Delete` — the whole point
+    /// of this screen — no longer on it.
+    ///
+    /// `canReanalyse` is what the footer reads, so `false` here is `Delete`
+    /// being drawn. The request count is the other half: an emptied list is not
+    /// a list to send.
+    @Test("with every item removed the footer offers Delete and it works")
+    func emptiedListStillOffersDelete() async throws {
+        let store = try makeStore()
+        let entry = try logMeal(in: store)
+        let client = ScriptedClient(answer: .success(Self.reestimate))
+        let model = try makeModel(entry: entry, store: store, client: client)
+
+        for item in model.draft.items {
+            model.removeItem(item.id)
+        }
+        #expect(model.draft.items.isEmpty)
+        #expect(model.draft.hasItemEdits)
+
+        // The footer is the caller's own action again, not the dead swap.
+        #expect(model.draft.canReanalyse == false)
+
+        // And a press that got through anyway sends nothing.
+        await model.reanalysing()
+        #expect(client.requests == 0)
+        #expect(model.stage == .detail)
+
+        // Which leaves Delete reachable, and it works.
+        #expect(model.delete())
+        #expect(try store.entry(withID: entry.entryID) == nil)
+    }
+
+    /// An estimate that arrived with no breakdown at all is untouched by the
+    /// rule: nothing has been changed, so the footer was already the caller's.
+    @Test("a meal that never had a breakdown is not offered a re-analysis either")
+    func mealWithoutABreakdownOffersNoReanalysis() throws {
+        let store = try makeStore()
+        let entry = try store.log(
+            title: "Espresso, banana",
+            kilocalories: 110,
+            macros: MacroTotals(protein: 2, carbs: 24, fat: 1),
+            loggedAt: at(15, 5),
+            source: .recent
+        )
+        let model = try makeModel(entry: entry, store: store, client: ScriptedClient(answer: .success(Self.reestimate)))
+
+        #expect(model.draft.items.isEmpty)
+        #expect(model.draft.hasItemEdits == false)
+        #expect(model.draft.canReanalyse == false)
+    }
+
     // MARK: - Deleting
 
     /// The confirmation is the view's `@State` and `delete()` is what answering

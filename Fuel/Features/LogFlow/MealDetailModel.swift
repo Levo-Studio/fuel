@@ -179,14 +179,15 @@ final class MealDetailModel {
     /// sentence the flow no longer holds, or a meal repeated from the Recent
     /// list.
     ///
-    /// **It only ever runs from a tap**, it refuses an unchanged list rather
-    /// than charging for a second identical answer, and with no key stored it
-    /// makes no request at all.
+    /// **It only ever runs from a tap**, it refuses a list that is unchanged
+    /// or empty rather than charging for a request about nothing, and with no
+    /// key stored it makes no request at all.
     func reanalyse() {
-        guard draft.hasItemEdits else { return }
+        // The same rule the footer reads, so a press that reaches here is a
+        // press the button was honestly offering.
+        guard draft.canReanalyse else { return }
 
         let described = draft.itemSentence
-        guard !described.isEmpty else { return }
 
         // No key, no request — and the draft survives, because the failure this
         // lands on returns to the meal rather than throwing the edits away.
