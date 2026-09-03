@@ -19,6 +19,12 @@ struct TextTabView: View {
 
     let onAnalyse: () -> Void
 
+    /// Which example the empty field is showing. View state, and it never
+    /// reaches the model: an example is something to read, not something the
+    /// user has said, so `Analyse` on a field showing one is still an empty
+    /// sentence and is still refused.
+    @State private var placeholder = TextEntryPlaceholder(examples: TextLogCopy.placeholderExamples)
+
     var body: some View {
         if isEstimateAvailable {
             VStack(alignment: .leading, spacing: .zero) {
@@ -51,19 +57,28 @@ struct TextTabView: View {
 
     // MARK: - Field
 
-    /// The meal, in the user's own words.
+    /// The meal, in the user's own words — and, while there are none, an
+    /// example of the kind of words that work.
     ///
-    /// The export draws a filled field and no placeholder, so there is none
-    /// here: the heading above it is what says what to write, and it is the
-    /// field's spoken label for the same reason.
+    /// **The export draws no placeholder here.** What it draws is a filled
+    /// field: a sentence at `#fafafa`, which is typed text. The rotating
+    /// example below was asked for by the owner and is therefore composed out
+    /// of the export's own vocabulary rather than invented — see `prompt` for
+    /// which drawn element each part of it comes from. The heading above the
+    /// field remains what names it, for VoiceOver as well.
     ///
     /// It grows downward as the sentence wraps, which is the only reading of a
-    /// screen that draws prose at `19px/1.5` and gives it no box. Nothing is
-    /// remembered anywhere: the text lives in the model for as long as the flow
-    /// is open, and no autofill, no correction dictionary and no state
-    /// restoration is offered a copy.
+    /// screen that draws prose at `19px/1.5` and gives it no box. **The example
+    /// does not**: a prompt is one line and truncates, so an example that
+    /// outran the line would lose the export's trailing ellipsis to a system
+    /// one. Their widths are held to the design layer's own scaling cap in
+    /// `TextPlaceholderTests`.
+    ///
+    /// Nothing is remembered anywhere: the text lives in the model for as long
+    /// as the flow is open, and no autofill, no correction dictionary and no
+    /// state restoration is offered a copy.
     private var field: some View {
-        TextField("", text: $typedText, axis: .vertical)
+        TextField("", text: $typedText, prompt: prompt, axis: .vertical)
             .fuelStyle(FuelTypography.textEntry)
             .foregroundStyle(FuelPalette.Camera.ink)
             // The caret, not a drawn value: the export renders no cursor. The
@@ -83,6 +98,36 @@ struct TextTabView: View {
             // rule applied to something drawn. Sharing the name would let a
             // future change to an onboarding padding move a touch target.
             .frame(minHeight: FuelMetrics.Control.minimumHitTarget, alignment: .top)
+            // The rotation stops the moment the field has something in it: the
+            // example is gone, and a timer waking up to advance what nobody can
+            // see is work done for nothing. Reduce Motion is the modifier's
+            // business, not this call site's — under it the field shows the
+            // first example and stands still.
+            .fuelPacing(FuelMotion.placeholderExampleHold, isActive: typedText.isEmpty) {
+                placeholder.advance()
+            }
+    }
+
+    /// The example, or nothing once the user has typed.
+    ///
+    /// `prompt:` rather than a `Text` laid over the field, so the example sits
+    /// exactly where the platform puts a placeholder and exactly where the
+    /// user's own first line will land — the same way the onboarding key field
+    /// draws its `sk-ant-…`. It also means the disappearance is not a rule this
+    /// view has to keep: a prompt is drawn only while the field is empty.
+    ///
+    /// Two things keep it from reading as typed text, and neither is invented.
+    /// The ink is `FuelPalette.Camera.inactive`, which the export draws on the
+    /// tab labels that are not the selected one — the lowest step of the four
+    /// on this surface, and the one that already means "a label, but not the
+    /// one in play". Against `#fafafa` typed text at the same size, the
+    /// difference is not subtle. And the line trails off in the ellipsis the
+    /// export draws after each analysis step, so it reads as unfinished rather
+    /// than as a sentence someone left in the field.
+    private var prompt: Text? {
+        guard let example = placeholder.example(whileTyped: typedText) else { return nil }
+        return Text(TextLogCopy.placeholderLine(example))
+            .foregroundStyle(FuelPalette.Camera.inactive)
     }
 
     // MARK: - Analyse
@@ -131,6 +176,17 @@ struct TextTabView: View {
 // MARK: - Previews
 
 #Preview("Text entry") {
+    @Previewable @State var typedText = ""
+
+    ZStack {
+        FuelPalette(theme: .dark, accent: .mono).camera
+            .ignoresSafeArea()
+
+        TextTabView(typedText: $typedText, isEstimateAvailable: true, onAnalyse: {})
+    }
+}
+
+#Preview("Text entry, written in") {
     @Previewable @State var typedText = "2 eggs with 200g cottage cheese and polenta"
 
     ZStack {

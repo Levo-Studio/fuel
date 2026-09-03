@@ -1867,6 +1867,66 @@
         }
       }
     },
+    "text.placeholder.example.chicken" : {
+      "comment" : "Screen 12, an example in the empty field. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "200g chicken with rice"
+          }
+        }
+      }
+    },
+    "text.placeholder.example.eggs" : {
+      "comment" : "Screen 12, an example in the empty field. Names an amount, because the line above the field asks for one. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2 eggs and 40g oats"
+          }
+        }
+      }
+    },
+    "text.placeholder.example.latte" : {
+      "comment" : "Screen 12, an example in the empty field. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "300ml latte, 1 cookie"
+          }
+        }
+      }
+    },
+    "text.placeholder.example.salmon" : {
+      "comment" : "Screen 12, an example in the empty field. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "150g salmon, potatoes"
+          }
+        }
+      }
+    },
+    "text.placeholder.format" : {
+      "comment" : "Screen 12, an example with the trailing ellipsis that makes it read as unfinished. The space before the glyph is the spacing the export draws on the analysis steps. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ …"
+          }
+        }
+      }
+    },
     "text.title" : {
       "comment" : "Screen 12, the heading. Drawn Beschreib die Mahlzeit.",
       "extractionState" : "manual",

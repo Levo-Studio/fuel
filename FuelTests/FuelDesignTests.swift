@@ -353,6 +353,33 @@ struct FuelMotionTests {
         #expect(FuelMotion.resolve(FuelMotion.emphasised, reduceMotion: true) == nil)
     }
 
+    @Test("a paced sequence advances normally, and not at all under reduced motion")
+    func pacingStopsRatherThanSoftens() {
+        // The distinction from `resolve` is the point. A cross-fade would keep
+        // a rotation running and only blur each swap, which is not less motion;
+        // for text that rewrites itself, less motion means none, and the caller
+        // draws the state it is already on.
+        #expect(
+            FuelMotion.resolvePacing(FuelMotion.placeholderExampleHold, reduceMotion: false)
+                == FuelMotion.placeholderExampleHold
+        )
+        #expect(FuelMotion.resolvePacing(FuelMotion.placeholderExampleHold, reduceMotion: true) == nil)
+    }
+
+    @Test("a dwell stays inside the bounds a dwell has")
+    func dwellsStayInsideTheirBounds() {
+        // A bound, not a regression test. Neither dwell is anywhere near
+        // three seconds and no version of either has ever failed this — what
+        // it catches is a future value put in without the reasoning, the way
+        // `durationsStayTight` catches a curve that outlasts its interaction.
+        // The dwells themselves are the design layer's to justify, and
+        // `placeholderExampleHold` says on itself what it was chosen against.
+        for hold in [FuelMotion.analysisStepHold, FuelMotion.placeholderExampleHold] {
+            #expect(hold > .zero)
+            #expect(hold <= .seconds(3))
+        }
+    }
+
     @Test("no curve outlasts the interaction that caused it")
     func durationsStayTight() {
         for curve in FuelMotion.allCurves {
