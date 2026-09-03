@@ -86,3 +86,29 @@ extension KeyTestNote {
     /// The action beside a no-credit note.
     static let billingActionTitle: LocalizedStringKey = "settings.keyTest.topUp"
 }
+
+// MARK: - Counting
+
+extension CountingChoice {
+
+    var settingsSegmentTitle: LocalizedStringKey {
+        switch self {
+        case .withGoal: "settings.counting.withGoal"
+        case .countOnly: "settings.counting.countOnly"
+        }
+    }
+}
+
+// MARK: - Goal targets
+
+extension GoalTarget {
+
+    var settingsRowTitle: LocalizedStringKey {
+        switch self {
+        case .calories: "settings.goal.calories"
+        case .protein: "settings.goal.protein"
+        case .carbs: "settings.goal.carbs"
+        case .fat: "settings.goal.fat"
+        }
+    }
+}
