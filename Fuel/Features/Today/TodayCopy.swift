@@ -21,10 +21,6 @@ nonisolated enum TodayCopy {
         String(localized: "today.title")
     }
 
-    static var settingsGlyph: String {
-        String(localized: "today.settings.glyph")
-    }
-
     static var settingsLabel: String {
         String(localized: "today.settings.label")
     }
@@ -115,11 +111,23 @@ nonisolated enum TodayFormat {
         value.formatted(.number.grouping(.never))
     }
 
-    /// The date above the title. Formatted by the locale rather than pinned to
-    /// the export's German `Mi, 2. September`, because a date is not copy.
+    /// The locale the date above the title is built in.
+    ///
+    /// Pinned rather than taken from the device. The eyebrow is still formatted
+    /// by a locale rather than reproduced from the export's German
+    /// `Mi, 2. September`, because a date is not copy — but Fuel's interface is
+    /// English and only English, and following the device put a German date on
+    /// an English screen: `Thu 3. September`, whose ordinal dot after the day is
+    /// a German form and which drops the comma the export draws after the
+    /// weekday. `en` is the one localization the catalog carries.
+    static let eyebrowLocale = Locale(identifier: "en")
+
+    /// The date above the title, in the drawn field set: abbreviated weekday,
+    /// day, wide month. Their order is the locale's business, so English reads
+    /// `Thu, September 3` where the export reads `Mi, 2. September`.
     static func eyebrowDate(
         _ date: Date,
-        locale: Locale = .current,
+        locale: Locale = eyebrowLocale,
         timeZone: TimeZone = .current
     ) -> String {
         date.formatted(

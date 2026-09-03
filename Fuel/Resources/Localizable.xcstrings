@@ -943,18 +943,6 @@
         }
       }
     },
-    "today.settings.glyph" : {
-      "comment" : "The gear drawn in the circular button top right of Today. A glyph, not an icon asset.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "⚙"
-          }
-        }
-      }
-    },
     "today.settings.label" : {
       "comment" : "Accessibility label of the circular settings button on Today.",
       "extractionState" : "manual",

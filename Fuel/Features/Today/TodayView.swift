@@ -86,7 +86,15 @@ private struct TodayHeader: View {
             Spacer(minLength: .zero)
 
             Button(action: onOpenSettings) {
-                Text(TodayCopy.settingsGlyph)
+                // A symbol stands in for a character the bundled face cannot
+                // draw. The export sets this control's glyph as the text `\u{2699}`
+                // and the browser satisfied it from a fallback font; Plus
+                // Jakarta Sans has no gear, so the drawn markup renders as
+                // tofu on the device. `FuelMetrics.Line.Glyph`'s stroke weights
+                // do not apply to a symbol either — SF draws its own. The drawn
+                // 14pt size, the 34pt circle, its hairline and its colour are
+                // unchanged.
+                Image(systemName: "gearshape")
                     .fuelStyle(FuelTypography.iconGlyph)
                     .foregroundStyle(palette.muted)
                     .frame(
