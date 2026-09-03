@@ -1279,6 +1279,18 @@
         }
       }
     },
+    "result.reanalyse" : {
+      "comment" : "What the filled footer action becomes once the user has changed the breakdown. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Re-analyse"
+          }
+        }
+      }
+    },
     "result.text.flow" : {
       "comment" : "Screen 15, the label top right. Drawn Text-Eintrag; the style uppercases it.",
       "extractionState" : "manual",

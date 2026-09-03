@@ -64,6 +64,25 @@ struct CameraLogTests {
         ]
     )
 
+    /// What the model comes back with once the user has corrected the list.
+    private static let reestimate = MealEstimate(
+        title: "Salmon with polenta",
+        kilocalories: 390,
+        macros: MacroTotals(protein: 33, carbs: 21, fat: 19),
+        items: [
+            RecognisedItem(
+                name: "Salmon fillet, pan-fried",
+                kilocalories: 240,
+                note: .photo(confidence: .confident, approximateGrams: 150)
+            ),
+            RecognisedItem(
+                name: "Polenta",
+                kilocalories: 150,
+                note: .photo(confidence: .confident, approximateGrams: 50)
+            ),
+        ]
+    )
+
     // MARK: - No key
 
     @Test("with no key stored the tab is disabled and no request is made")
@@ -335,6 +354,125 @@ struct CameraLogTests {
         #expect(model.draft?.isFavourite == false)
     }
 
+    // MARK: - Re-analysing
+
+    @Test("a changed breakdown is re-estimated from the edited list, not the photograph")
+    func reanalysingSendsTheEditedList() async throws {
+        let client = ScriptedClient(answers: [.success(Self.estimate), .success(Self.reestimate)])
+        let model = makeModel(store: try makeStore(), client: client)
+        await model.scanning(pixel())
+
+        let polenta = try #require(model.draft?.items.last?.id)
+        model.editItem(polenta, to: "Polenta r50g")
+        await model.reanalysing()
+
+        // The text estimate, which is what carries the list. A second photo
+        // request would ask the model to re-derive what the user overruled.
+        #expect(client.requests == 2)
+        #expect(client.lastText == "Salmon fillet, pan-fried, Polenta r50g")
+
+        #expect(model.stage == .result)
+        #expect(model.draft?.kilocalories == 390)
+        #expect(model.draft?.items.map(\.name) == ["Salmon fillet, pan-fried", "Polenta"])
+        // The new estimate is the model's throughout, so the figures are back.
+        #expect(model.draft?.hasItemEdits == false)
+        #expect(model.draft?.isPriced(try #require(model.draft?.items.last?.id)) == true)
+    }
+
+    @Test("an unchanged breakdown makes no request")
+    func reanalysingWithoutAnEditIsRefused() async throws {
+        let client = ScriptedClient(answer: .success(Self.estimate))
+        let model = makeModel(store: try makeStore(), client: client)
+        await model.scanning(pixel())
+
+        model.reanalyse()
+
+        #expect(client.requests == 1)
+        #expect(model.stage == .result)
+    }
+
+    @Test("a re-analysis keeps the label and the favourite the user set")
+    func reanalysingKeepsTheUsersChoices() async throws {
+        let client = ScriptedClient(answers: [.success(Self.estimate), .success(Self.reestimate)])
+        let model = makeModel(store: try makeStore(), client: client)
+        await model.scanning(pixel())
+
+        model.cycleLabel()
+        model.toggleFavourite()
+        let label = try #require(model.draft?.label)
+
+        model.addItem("Olive oil, 1 tbsp")
+        await model.reanalysing()
+
+        #expect(model.draft?.label == label)
+        #expect(model.draft?.isLabelUserSet == true)
+        #expect(model.draft?.isFavourite == true)
+    }
+
+    @Test("with no key stored a re-analysis makes no request and keeps the draft")
+    func reanalysingWithoutAKey() async throws {
+        let client = ScriptedClient(answers: [.success(Self.estimate), .success(Self.reestimate)])
+        let keys = MutableKeys(hasKey: true)
+        let model = makeModel(store: try makeStore(), client: client, keys: keys)
+        await model.scanning(pixel())
+
+        model.addItem("Olive oil, 1 tbsp")
+        // The key goes away in Settings while the result screen is up.
+        keys.hasKey = false
+        model.reanalyse()
+
+        #expect(client.requests == 1)
+        #expect(model.stage == .failed(.invalidKey))
+
+        // And leaving that state puts the user back on the work they had done.
+        model.dismissFailure()
+        #expect(model.stage == .result)
+        #expect(model.draft?.items.count == 3)
+        #expect(model.draft?.hasItemEdits == true)
+    }
+
+    @Test("a re-analysis that fails leaves the edits where they were")
+    func reanalysingThatFails() async throws {
+        let client = ScriptedClient(answers: [.success(Self.estimate), .failure(.network)])
+        let model = makeModel(store: try makeStore(), client: client)
+        await model.scanning(pixel())
+
+        model.addItem("Olive oil, 1 tbsp")
+        await model.reanalysing()
+
+        #expect(model.stage == .failed(.retry))
+
+        model.dismissFailure()
+        #expect(model.stage == .result)
+        #expect(model.draft?.items.map(\.name).last == "Olive oil, 1 tbsp")
+        #expect(model.draft?.hasItemEdits == true)
+    }
+
+    @Test("trying a failed re-analysis again sends the list, not the frame")
+    func retryingAReanalysis() async throws {
+        let client = ScriptedClient(answers: [
+            .success(Self.estimate),
+            .failure(.network),
+            .success(Self.reestimate),
+        ])
+        let model = makeModel(store: try makeStore(), client: client)
+        await model.scanning(pixel())
+
+        model.removeItem(try #require(model.draft?.items.last?.id))
+        await model.reanalysing()
+        #expect(model.stage == .failed(.retry))
+
+        model.retry()
+        while case .analysing = model.stage {
+            await Task.yield()
+        }
+
+        #expect(client.requests == 3)
+        #expect(client.lastText == "Salmon fillet, pan-fried")
+        #expect(model.stage == .result)
+        #expect(model.draft?.hasItemEdits == false)
+    }
+
     // MARK: - Committing
 
     @Test("committing writes an entry whose macros and items match the estimate")
@@ -437,6 +575,14 @@ private extension CameraLogModel {
     /// production type free of a hook that exists only for tests.
     func scanning(_ image: UIImage) async {
         analyse(image)
+        while case .analysing = stage {
+            await Task.yield()
+        }
+    }
+
+    /// Taps `Re-analyse` and waits for it to settle, for the same reason.
+    func reanalysing() async {
+        reanalyse()
         while case .analysing = stage {
             await Task.yield()
         }

@@ -116,6 +116,22 @@ nonisolated struct MealResultDraft: Equatable, Sendable {
         !userWrittenItems.contains(id)
     }
 
+    /// Puts a fresh estimate over the old one, keeping what the user decided.
+    ///
+    /// The label, whether they set it themselves, and the favourite mark are
+    /// theirs and survive: they were choices about the meal, not about the
+    /// breakdown, and re-deriving them would undo a correction. Everything the
+    /// model owns is replaced wholesale, and with it the two flags that said
+    /// the old estimate was stale.
+    mutating func replaceEstimate(with estimate: MealEstimate) {
+        title = estimate.title
+        kilocalories = estimate.kilocalories
+        macros = estimate.macros
+        items = estimate.items
+        userWrittenItems = []
+        hasItemEdits = false
+    }
+
     /// The edited list as one line of text, which is what a re-analysis is
     /// asked about.
     ///

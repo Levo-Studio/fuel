@@ -51,6 +51,17 @@ struct TextLogTests {
         ]
     )
 
+    /// What the model comes back with once the user has corrected the list.
+    private static let reestimate = MealEstimate(
+        title: "Eggs with cottage cheese and polenta",
+        kilocalories: 520,
+        macros: MacroTotals(protein: 44, carbs: 41, fat: 23),
+        items: [
+            RecognisedItem(name: "2 eggs", kilocalories: 158, note: .text(amount: .recognised)),
+            RecognisedItem(name: "Polenta, raw 50 g", kilocalories: 180, note: .text(amount: .recognised)),
+        ]
+    )
+
     // MARK: - No key
 
     @Test("with no key stored the tab is disabled and no request is made")
@@ -314,6 +325,65 @@ struct TextLogTests {
         #expect(model.draft?.isFavourite == false)
     }
 
+    // MARK: - Re-analysing
+
+    @Test("a changed breakdown is re-estimated from the edited list, not the sentence")
+    func reanalysingSendsTheEditedList() async throws {
+        let client = ScriptedClient(answers: [.success(Self.estimate), .success(Self.reestimate)])
+        let model = makeModel(store: try makeStore(), client: client)
+        model.typedText = Self.sentence
+        await model.estimating()
+
+        let polenta = try #require(model.draft?.items.last?.id)
+        model.editItem(polenta, to: "Polenta r50g")
+        await model.reanalysing()
+
+        #expect(client.requests == 2)
+        #expect(client.lastText == "2 eggs, Polenta r50g")
+        // The sentence itself is untouched: screen 15 still quotes it back and
+        // `‹ Back` still returns to the field holding it.
+        #expect(model.typedText == Self.sentence)
+
+        #expect(model.stage == .result)
+        #expect(model.draft?.kilocalories == 520)
+        #expect(model.draft?.hasItemEdits == false)
+    }
+
+    @Test("an unchanged breakdown makes no request")
+    func reanalysingWithoutAnEditIsRefused() async throws {
+        let client = ScriptedClient(answer: .success(Self.estimate))
+        let model = makeModel(store: try makeStore(), client: client)
+        model.typedText = Self.sentence
+        await model.estimating()
+
+        model.reanalyse()
+
+        #expect(client.requests == 1)
+        #expect(model.stage == .result)
+    }
+
+    @Test("with no key stored a re-analysis makes no request and keeps the draft")
+    func reanalysingWithoutAKey() async throws {
+        let client = ScriptedClient(answers: [.success(Self.estimate), .success(Self.reestimate)])
+        let keys = MutableKeys(hasKey: true)
+        let model = makeModel(store: try makeStore(), client: client, keys: keys)
+        model.typedText = Self.sentence
+        await model.estimating()
+
+        model.addItem("Olive oil, 1 tbsp")
+        // The key goes away in Settings while the result screen is up.
+        keys.hasKey = false
+        model.reanalyse()
+
+        #expect(client.requests == 1)
+        #expect(model.stage == .failed(.invalidKey))
+
+        model.dismissFailure()
+        #expect(model.stage == .result)
+        #expect(model.draft?.items.count == 3)
+        #expect(model.draft?.hasItemEdits == true)
+    }
+
     // MARK: - Committing
 
     @Test("committing writes a text entry whose macros and items match the estimate")
@@ -426,6 +496,14 @@ private extension TextLogModel {
     /// production type free of a hook that exists only for tests.
     func estimating() async {
         analyse()
+        while case .analysing = stage {
+            await Task.yield()
+        }
+    }
+
+    /// Taps `Re-analyse` and waits for it to settle, for the same reason.
+    func reanalysing() async {
+        reanalyse()
         while case .analysing = stage {
             await Task.yield()
         }

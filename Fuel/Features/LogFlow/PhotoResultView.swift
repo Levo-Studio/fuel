@@ -21,8 +21,9 @@ struct PhotoResultView: View {
     let onRemoveItem: (RecognisedItem.ID) -> Void
     let onEditItem: (RecognisedItem.ID, String) -> Void
     let onAddItem: (String) -> Void
+    let onReanalyse: () -> Void
     let onNew: () -> Void
-    let onAdd: () -> Void
+    let commit: MealResultAction
 
     @Environment(\.fuelPalette) private var palette
 
@@ -37,8 +38,9 @@ struct PhotoResultView: View {
             onRemoveItem: onRemoveItem,
             onEditItem: onEditItem,
             onAddItem: onAddItem,
+            onReanalyse: onReanalyse,
             onNew: onNew,
-            onAdd: onAdd,
+            commit: commit,
             lede: { thumbnail }
         )
     }
@@ -83,8 +85,9 @@ struct PhotoResultView: View {
         onRemoveItem: { _ in },
         onEditItem: { _, _ in },
         onAddItem: { _ in },
+        onReanalyse: {},
         onNew: {},
-        onAdd: {}
+        commit: MealResultAction(title: MealResultCopy.add, perform: {})
     )
     .environment(\.fuelPalette, FuelPalette(theme: .dark, accent: .mono))
 }

@@ -1,5 +1,24 @@
 import SwiftUI
 
+// MARK: - Footer action
+
+/// What the filled footer button says and does.
+///
+/// A parameter of the result screen rather than something the screen decides,
+/// because the screen is drawn for more than one errand. After an estimate it
+/// is `Add`; a screen opened on a meal that is already in the store has a
+/// different verb for the same place, and neither should mean a second copy of
+/// the drawing.
+///
+/// There is exactly one thing the screen decides for itself — see
+/// `MealResultView.primaryAction`.
+struct MealResultAction {
+
+    let title: String
+
+    let perform: () -> Void
+}
+
 // MARK: - Meal result
 
 /// Screens 14 and 15: what the model came back with, before any of it is
@@ -53,8 +72,14 @@ struct MealResultView<Lede: View>: View {
     /// The `Add item` row at the foot of the list.
     let onAddItem: (String) -> Void
 
+    /// Re-estimates the meal from the edited list. Drawn only once something
+    /// in that list has changed.
+    let onReanalyse: () -> Void
+
     let onNew: () -> Void
-    let onAdd: () -> Void
+
+    /// The filled footer button as this caller means it.
+    let commit: MealResultAction
 
     /// What the mode puts where the other mode puts its own: the thumbnail on
     /// screen 14, the quoted sentence on screen 15. It is the first thing in
@@ -82,8 +107,9 @@ struct MealResultView<Lede: View>: View {
         onRemoveItem: @escaping (RecognisedItem.ID) -> Void,
         onEditItem: @escaping (RecognisedItem.ID, String) -> Void,
         onAddItem: @escaping (String) -> Void,
+        onReanalyse: @escaping () -> Void,
         onNew: @escaping () -> Void,
-        onAdd: @escaping () -> Void,
+        commit: MealResultAction,
         @ViewBuilder lede: @escaping () -> Lede
     ) {
         self.draft = draft
@@ -95,8 +121,9 @@ struct MealResultView<Lede: View>: View {
         self.onRemoveItem = onRemoveItem
         self.onEditItem = onEditItem
         self.onAddItem = onAddItem
+        self.onReanalyse = onReanalyse
         self.onNew = onNew
-        self.onAdd = onAdd
+        self.commit = commit
         self.lede = lede
     }
 
@@ -468,8 +495,8 @@ struct MealResultView<Lede: View>: View {
             }
             .buttonStyle(.plain)
 
-            Button(action: onAdd) {
-                Text(MealResultCopy.add)
+            Button(action: primaryAction.perform) {
+                Text(primaryAction.title)
                     .fuelStyle(FuelTypography.buttonLabel)
                     .foregroundStyle(palette.onAccent)
                     .frame(maxWidth: .infinity)
@@ -481,6 +508,27 @@ struct MealResultView<Lede: View>: View {
         }
         .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
         .padding(.bottom, FuelMetrics.Space.s34)
+        .fuelAnimation(FuelMotion.standard, value: draft.hasItemEdits)
+    }
+
+    /// What the filled button is right now.
+    ///
+    /// **Not in the export**, which draws `Hinzufügen` and nothing else in this
+    /// place. Once the user has changed the list, the figures above it describe
+    /// a breakdown that no longer exists, and logging them would write down a
+    /// meal nobody estimated. So the button asks the model again instead.
+    ///
+    /// It is the one thing this screen decides rather than takes as a
+    /// parameter, and deliberately: the rule is the same for every caller, and
+    /// a caller that forgot it would be a caller that logs a stale figure.
+    ///
+    /// **It replaces the caller's action rather than sitting beside it.** Every
+    /// press spends the user's own API credit, so it appears only while
+    /// something has actually changed and never as a second button standing
+    /// permanently on the screen. Nothing re-analyses on its own.
+    private var primaryAction: MealResultAction {
+        guard draft.hasItemEdits else { return commit }
+        return MealResultAction(title: MealResultCopy.reanalyse, perform: onReanalyse)
     }
 }
 

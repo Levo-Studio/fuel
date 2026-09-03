@@ -42,7 +42,7 @@ struct LogFlowView: View {
                     failure: failure,
                     backdrop: .photo(camera.photo),
                     onRetry: camera.retry,
-                    onDismiss: camera.discard
+                    onDismiss: camera.dismissFailure
                 )
             case .result:
                 if let draft = camera.draft {
@@ -55,8 +55,9 @@ struct LogFlowView: View {
                         onRemoveItem: camera.removeItem,
                         onEditItem: camera.editItem,
                         onAddItem: camera.addItem,
+                        onReanalyse: camera.reanalyse,
                         onNew: camera.discard,
-                        onAdd: add
+                        commit: MealResultAction(title: MealResultCopy.add, perform: add)
                     )
                 }
             case .viewfinder, .noKey:
@@ -71,7 +72,7 @@ struct LogFlowView: View {
                     failure: failure,
                     backdrop: .text,
                     onRetry: text.retry,
-                    onDismiss: text.returnToEntry
+                    onDismiss: text.dismissFailure
                 )
             case .result:
                 if let draft = text.draft {
@@ -89,8 +90,9 @@ struct LogFlowView: View {
                         onRemoveItem: text.removeItem,
                         onEditItem: text.editItem,
                         onAddItem: text.addItem,
+                        onReanalyse: text.reanalyse,
                         onNew: text.discard,
-                        onAdd: addTypedMeal
+                        commit: MealResultAction(title: MealResultCopy.add, perform: addTypedMeal)
                     )
                 }
             case .entry, .noKey:

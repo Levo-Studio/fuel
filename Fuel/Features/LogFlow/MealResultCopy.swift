@@ -128,4 +128,9 @@ nonisolated enum MealResultCopy {
     static var add: String {
         String(localized: "result.add")
     }
+
+    /// What `Add` becomes once the user has changed the breakdown.
+    static var reanalyse: String {
+        String(localized: "result.reanalyse")
+    }
 }
