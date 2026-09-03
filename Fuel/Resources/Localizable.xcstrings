@@ -1,6 +1,138 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "logFlow.cancel" : {
+      "comment" : "The control top left on every log screen. Drawn as ✕ Abbrechen; the style uppercases it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "✕ Cancel"
+          }
+        }
+      }
+    },
+    "logFlow.cancel.label" : {
+      "comment" : "The same control for VoiceOver, without the glyph.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        }
+      }
+    },
+    "logFlow.recent.add.glyph" : {
+      "comment" : "Screen 13, the + at the end of a Recent row.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+"
+          }
+        }
+      }
+    },
+    "logFlow.recent.add.hint" : {
+      "comment" : "VoiceOver hint on a Recent row, which logs on a single tap.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Logs this meal and returns to Today"
+          }
+        }
+      }
+    },
+    "logFlow.recent.hint" : {
+      "comment" : "Screen 13, the line under the heading.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tapping logs it straight away — the label comes from the time."
+          }
+        }
+      }
+    },
+    "logFlow.recent.kilocalories.value" : {
+      "comment" : "The figure on a Recent row, spoken. Drawn bare.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld kcal"
+          }
+        }
+      }
+    },
+    "logFlow.recent.macros" : {
+      "comment" : "Screen 13, the macro line under a meal's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "P %1$lld · C %2$lld · F %3$lld"
+          }
+        }
+      }
+    },
+    "logFlow.recent.title" : {
+      "comment" : "Screen 13, the heading.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recently eaten"
+          }
+        }
+      }
+    },
+    "logFlow.tab.camera" : {
+      "comment" : "The first of the three log tabs.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Camera"
+          }
+        }
+      }
+    },
+    "logFlow.tab.recent" : {
+      "comment" : "The third of the three log tabs.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recent"
+          }
+        }
+      }
+    },
+    "logFlow.tab.text" : {
+      "comment" : "The second of the three log tabs.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text"
+          }
+        }
+      }
+    },
     "onboarding.cancel" : {
       "comment" : "Screen 02 footer button, while the key test is running.",
       "extractionState" : "manual",
