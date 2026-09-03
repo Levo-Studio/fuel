@@ -205,6 +205,11 @@ nonisolated enum FuelTypography {
     /// `400 12px`. The `kcal` unit beside a large figure.
     static let unit = Style(.mono, weight: 400, size: 12)
 
+    /// `400 12px`. The time range on a Settings label row — the same drawn
+    /// size as `unit`, named separately because it is a line of prose the user
+    /// reads rather than a unit pinned beside a large figure, and so it scales.
+    static let settingsRowTime = Style(.mono, weight: 400, size: 12, scalesRelativeTo: .footnote)
+
     /// `400 11.5px`, tracking `.14em`, uppercase. `Step 1 of 2`, the model
     /// name above a headline, the camera sheet's cancel row.
     static let eyebrow = Style(.mono, weight: 400, size: 11.5, trackingEm: 0.14, uppercased: true)
@@ -391,7 +396,8 @@ nonisolated enum FuelTypography {
     /// synthesised face and look merely slightly wrong.
     static let allDrawnStyles: [Style] = [
         dayTotal, resultCalories, goalValue, macroValueLarge, macroValueCard, macroValue,
-        settingsValue, monoValue, listValue, listValueSmall, totalSuffix, unit, eyebrow,
+        settingsValue, monoValue, listValue, listValueSmall, totalSuffix, unit, settingsRowTime,
+        eyebrow,
         flowLabel, meta, macroRatio, monoNote, timestamp, macroSummary, overlayAction,
         overlayCaption, confidence,
         display, displaySmall, screenTitle, sheetTitle, addGlyph, textEntry, analysisStep,
