@@ -402,9 +402,11 @@ struct MealResultView<Lede: View>: View {
     /// **The export draws no control on this row at all.** The two here are
     /// recomposed from what it does draw: the name and the figure keep their
     /// type, their colour and the row's `s13` padding and `hairSoft` rule, and
-    /// the remove mark is the same `✕` the flow's own cancel control is drawn
-    /// with, in the figure's face and size so the trailing column stays one
-    /// kind of thing. Nothing moved to make room for either.
+    /// the remove mark takes the figure's size and the `muted` the export gives
+    /// a secondary mark. Nothing moved to make room for either.
+    ///
+    /// It does **not** take the figure's face — see `removeControl` for why it
+    /// cannot.
     ///
     /// `RecognisedItem.Note` is untouched: it is stored with the entry and is
     /// read outside this screen. Nothing draws it here any more.
@@ -453,10 +455,25 @@ struct MealResultView<Lede: View>: View {
         }
     }
 
-    /// The `✕` at the trailing edge of a row.
+    /// The remove mark at the trailing edge of a row.
+    ///
+    /// A symbol stands in for a character neither bundled face can draw. The
+    /// obvious mark is the `✕` the export writes into screen 07's cancel
+    /// control, and it cannot be set in DM Mono: **U+2715 is not in that font's
+    /// cmap** — U+00D7 and U+0058 are, U+2715 and U+2699 are not — so what the
+    /// export proves on screen 07 is that the browser satisfied it from a
+    /// fallback face, not that the bundled one carries it. On a device CoreText
+    /// cascades and there is no tofu, but the mark would be drawn in whatever
+    /// system face answers, beside a figure drawn in DM Mono.
+    ///
+    /// That is exactly the situation `TodayView`'s gear is in, and this is the
+    /// same answer: an SF Symbol, disclosed here, so what is drawn is decided
+    /// rather than left to a cascade. `FuelMetrics.Line.Glyph`'s stroke weights
+    /// do not apply to a symbol — SF draws its own. The size and the colour are
+    /// the row's.
     ///
     /// Drawn at its natural width and given a `minimumHitTarget` box to answer
-    /// in, aligned trailing so the glyph itself stays on the margin and the
+    /// in, aligned trailing so the mark itself stays on the margin and the
     /// extra region grows inwards, across the gap it already has to the figure.
     /// The row keeps its drawn height: the box's vertical reach is the row's
     /// own `s13` padding, which is what the `.rect` shape below covers.
@@ -464,7 +481,7 @@ struct MealResultView<Lede: View>: View {
         Button {
             onRemoveItem(item.id)
         } label: {
-            Text(MealResultCopy.itemRemoveGlyph)
+            Image(systemName: "xmark")
                 .fuelStyle(FuelTypography.listValueSmall)
                 .foregroundStyle(palette.muted)
                 .frame(minWidth: FuelMetrics.Control.minimumHitTarget, alignment: .trailing)

@@ -78,15 +78,11 @@ nonisolated enum MealResultCopy {
 
     // MARK: - Breakdown
 
-    /// The `✕` at the trailing edge of a breakdown row.
+    /// The remove mark at the trailing edge of a breakdown row, for VoiceOver.
     ///
-    /// The same character the flow's cancel control is drawn with, which is why
-    /// it is a glyph in the catalog rather than a symbol: DM Mono carries it,
-    /// and the export already proves so on screen 07.
-    static var itemRemoveGlyph: String {
-        String(localized: "result.item.remove.glyph")
-    }
-
+    /// There is no glyph key beside it: the mark is an SF Symbol, because
+    /// neither bundled face carries the `✕` the export writes on screen 07.
+    /// `MealResultView.removeControl` has the cmap evidence and the precedent.
     static var itemRemoveLabel: String {
         String(localized: "result.item.remove.label")
     }

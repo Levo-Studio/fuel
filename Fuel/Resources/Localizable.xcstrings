@@ -1123,20 +1123,8 @@
         }
       }
     },
-    "result.item.remove.glyph" : {
-      "comment" : "The mark at the trailing edge of a breakdown row, the same ✕ the log flow's cancel control is drawn with. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✕"
-          }
-        }
-      }
-    },
     "result.item.remove.label" : {
-      "comment" : "The same control for VoiceOver, without the glyph. Not in the export.",
+      "comment" : "The remove control at the trailing edge of a breakdown row, for VoiceOver. The mark itself is an SF Symbol and so has no key. Not in the export.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
