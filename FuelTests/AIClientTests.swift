@@ -2376,6 +2376,13 @@ struct MealAdjustmentClientTests {
         // No analysis states for a question: the model committed to nothing.
         #expect(!said.contains(.adjusting))
         #expect(said.last == .finished(MealAdjustmentOutcome(reply: answer, meal: nil)))
+        // And it was drawn on the way rather than appearing whole at the end:
+        // prose has no `reply` key to read, so the words themselves are read.
+        let sentences = said.compactMap { event -> String? in
+            if case .sentence(let text) = event { text } else { nil }
+        }
+        #expect(sentences.count > 1)
+        #expect(sentences.last == answer)
     }
 
     /// A reply with nothing readable in it is the case `malformedResponse` is

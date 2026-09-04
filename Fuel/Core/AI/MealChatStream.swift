@@ -26,7 +26,8 @@ nonisolated struct MealChatStreamProgress: Sendable, Equatable {
 
 // MARK: - Reading a partial object
 
-/// Reads an adjustment object that is still being written.
+/// Reads an answer that is still being written — an adjustment object, or the
+/// sentences of a reply that never opened one.
 ///
 /// **Why a reader of its own rather than "try `JSONDecoder` and shrug".** A
 /// half-written object is not malformed JSON that might parse next time — it is
@@ -53,7 +54,21 @@ nonisolated enum MealChatStreamReader {
         // The same tolerance `EstimateContract.firstJSONObject` has: a model
         // that wrote a code fence or a word of prose first has still answered.
         guard let opening = raw.firstIndex(of: "{") else {
-            return MealChatStreamProgress()
+            // **Nothing but words so far, so the words are the sentence.** A
+            // prose answer has no `reply` key to read one out of, and waiting
+            // for a key that is never coming would leave the sheet saying it
+            // was writing until the last token and then produce a finished
+            // paragraph in one jump — the one shape of reply that streams for
+            // nothing. Read as prose it arrives a word at a time like every
+            // other answer.
+            //
+            // A model that is about to open an object has usually already
+            // opened it, and where it wrote a preamble first that preamble is
+            // drawn for as long as it takes the brace to arrive and is then
+            // replaced by the object's own sentence. That costs a redraw on a
+            // reply that ignored "no prose before it"; it never costs a weight,
+            // because nothing here decides one.
+            return MealChatStreamProgress(sentence: Self.prose(in: raw))
         }
 
         var progress = MealChatStreamProgress()
@@ -116,6 +131,22 @@ nonisolated enum MealChatStreamReader {
     private static let additionsKey = "additions"
 
     // MARK: - The sentence
+
+    /// The buffer read as an answer written in sentences, or `nil` where it is
+    /// not one.
+    ///
+    /// `MealChatContract.readsAsProse(_:)` is what says which, and it is the
+    /// same question the finished parse asks, so a reply cannot stream as prose
+    /// and then land as a fragment: a fence that has begun to arrive is not a
+    /// sentence here either. The bound is `boundedProse`'s, for the reason it
+    /// is not the sentence's — and past it this answers `nil` and the last
+    /// thing drawn stays, exactly as an overlong `reply` does.
+    private static func prose(in raw: String) -> String? {
+        guard MealChatContract.readsAsProse(raw) else {
+            return nil
+        }
+        return MealChatContract.boundedProse(raw)
+    }
 
     /// The `reply` value, however much of it there is.
     ///
@@ -314,17 +345,25 @@ nonisolated struct MealChatStreamAssembler {
     /// buys the screen its early warning; it buys the weights nothing, and the
     /// weights are the part that must not be guessed at.
     ///
-    /// Throws `AIError.truncatedReply` where the reply is unreadable *and* the
-    /// provider said it ran into the ceiling — the same order the collected
-    /// path asks the question in, and for the same reason: a model that
-    /// finished its object and was cut off after it has still answered.
+    /// Throws `AIError.truncatedReply` where the provider said it ran into the
+    /// ceiling before an object was finished — and not where it said so after
+    /// one was, because a model that completed its answer and was cut off
+    /// writing the newline behind it has still answered.
+    ///
+    /// **The question is asked before the parse rather than after it, and that
+    /// is what changed when prose became readable.** It used to be enough to
+    /// wait for the parse to fail: a cut-off reply was unreadable by
+    /// definition. A cut-off *sentence* is now perfectly readable, and left to
+    /// itself would land in the transcript looking like a finished answer that
+    /// simply stops mid-word. Both halves of the ceiling — an object that never
+    /// closed and a sentence that never ended — are the same thing to the user,
+    /// and both are the retry state.
     func finish(over meal: AdjustableMeal) throws -> MealChatEvent {
-        let intent: MealAdjustmentIntent
-        do {
-            intent = try MealChatContract.intent(from: raw)
-        } catch {
-            throw ranOutOfTokens ? AIError.truncatedReply : error
+        guard !ranOutOfTokens || MealChatContract.carriesAnObject(raw) else {
+            throw AIError.truncatedReply
         }
+
+        let intent = try MealChatContract.intent(from: raw)
 
         return .finished(
             MealAdjustmentOutcome(

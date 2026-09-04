@@ -21,7 +21,7 @@ struct MealChatStreamReaderTests {
 
     // MARK: - Before there is anything
 
-    @Test("nothing at all says nothing at all", arguments: ["", "  ", "Here you go:"])
+    @Test("nothing at all says nothing at all", arguments: ["", "  ", "\n\t"])
     func nothingYet(raw: String) {
         #expect(progress(raw) == MealChatStreamProgress())
     }
@@ -30,6 +30,40 @@ struct MealChatStreamReaderTests {
     func justOpened() {
         #expect(progress("{") == MealChatStreamProgress())
         #expect(progress(#"{"cha"#) == MealChatStreamProgress())
+    }
+
+    // MARK: - An answer written as prose
+
+    /// A prose reply has no `reply` key to read a sentence out of, so the words
+    /// themselves are the sentence — and they arrive one at a time like any
+    /// other answer rather than in one jump at the end.
+    @Test("words with no object around them are the sentence so far")
+    func proseArrives() {
+        #expect(progress("Polenta").sentence == "Polenta")
+        #expect(progress("Polenta is boiled maize meal.").sentence == "Polenta is boiled maize meal.")
+    }
+
+    /// It says the same thing about the meal that an empty pair of arrays does:
+    /// nothing is moving.
+    @Test("prose never announces an adjustment")
+    func proseMovesNothing() {
+        #expect(!progress("I raised the rice to 300 g for you.").movesSomething)
+    }
+
+    /// A fence is an object on its way, not a sentence, and must not be drawn
+    /// as one.
+    @Test("a fence that has begun to arrive is not prose", arguments: ["`", "```", "```json\n"])
+    func fencesAreNotProse(raw: String) {
+        #expect(progress(raw).sentence == nil)
+    }
+
+    /// Once the object arrives it is the object that is read: the preamble a
+    /// model wrote in front of it is replaced by the sentence it actually
+    /// answered with.
+    @Test("a preamble gives way to the object's own sentence")
+    func preambleGivesWay() {
+        #expect(progress("Here you go:").sentence == "Here you go:")
+        #expect(progress(#"Here you go: {"changes":[],"reply":"Boiled maize meal."}"#).sentence == "Boiled maize meal.")
     }
 
     // MARK: - Whether anything is moving
@@ -193,6 +227,52 @@ struct MealChatStreamAssemblerTests {
     func emptyDelta() {
         var assembler = MealChatStreamAssembler()
         #expect(assembler.append("").isEmpty)
+    }
+
+    /// A prose answer produces the same growing sentence an object's `reply`
+    /// does, so the sheet draws it as it is written rather than in one jump at
+    /// the end.
+    @Test("prose streams as a growing sentence and announces nothing")
+    func proseStreams() {
+        let said = events(feeding: "Polenta is boiled maize meal.")
+        let sentences = said.compactMap { event -> String? in
+            if case .sentence(let text) = event { text } else { nil }
+        }
+
+        #expect(sentences.count > 1)
+        #expect(sentences.last == "Polenta is boiled maize meal.")
+        #expect(!said.contains(.adjusting))
+        for (earlier, later) in zip(sentences, sentences.dropFirst()) {
+            #expect(later.hasPrefix(earlier))
+        }
+    }
+
+    /// **A sentence stopped at the ceiling is not an answer**, and it is
+    /// readable now, which is exactly why the ceiling has to be asked about
+    /// before the parse rather than after it.
+    @Test("prose cut off at the token ceiling is a truncated reply")
+    func truncatedProse() {
+        var assembler = MealChatStreamAssembler()
+        _ = assembler.append("The carrots were probably done in about a tables")
+        assembler.noteRanOutOfTokens()
+
+        #expect(throws: AIError.truncatedReply) {
+            _ = try assembler.finish(over: Self.meal())
+        }
+    }
+
+    /// The other side of that: a model that finished its object and was cut off
+    /// writing what came after it has answered, and the answer stands.
+    @Test("an object finished before the ceiling is still an answer")
+    func truncatedAfterTheObject() throws {
+        var assembler = MealChatStreamAssembler()
+        _ = assembler.append(#"{"changes":[],"additions":[],"reply":"Boiled maize meal."}"#)
+        _ = assembler.append("\n\n")
+        assembler.noteRanOutOfTokens()
+
+        let finished = try assembler.finish(over: Self.meal())
+
+        #expect(finished == .finished(MealAdjustmentOutcome(reply: "Boiled maize meal.", meal: nil)))
     }
 
     /// A reply cut off at the request's own ceiling is reported as that rather
