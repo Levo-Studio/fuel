@@ -79,7 +79,24 @@ struct TodayView: View {
             }
             .fuelScrolling()
 
+            // The band is measured from the frame's own bottom edge, not from
+            // the safe area's, and the flexible frame is what makes that
+            // possible rather than a flourish: `ignoresSafeArea` can only
+            // expand a view that had room to grow, and a bare 120pt band has
+            // none, so the modifier on its own does exactly nothing. Standing
+            // on the safe area it ended 34 points above the screen, and the
+            // list ran on underneath it at full contrast — a row drawn brighter
+            // than the faded row above it, with the edge of the band visible
+            // between them. Same mistake as the result footer's, at the other
+            // end of the same screen: see `mealResultFooter`.
+            //
+            // The add button is deliberately not brought along. Its 32 is a
+            // distance above the home indicator rather than above the frame's
+            // edge — see `Control.addButtonBottomInset` — and it stands over
+            // the band, which is the arrangement the band exists for.
             FuelListFade()
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .ignoresSafeArea(.container, edges: .bottom)
 
             TodayAddButton(action: onAddEntry)
                 .padding(.trailing, FuelMetrics.Control.addButtonTrailingInset)
