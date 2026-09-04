@@ -1,5 +1,7 @@
 import Foundation
+import SwiftUI
 import Testing
+import UIKit
 
 @testable import Fuel
 
@@ -751,5 +753,239 @@ struct MealChatTests {
 
     private enum ChatFixtureFailure: Error {
         case noStoredMeal
+    }
+}
+
+// MARK: - The composer on screen
+
+/// The one thing about the sheet that cannot be answered from the model: what
+/// the keyboard's own `Send` key does.
+///
+/// **Hosted rather than reasoned about**, and hosted in the presentation the
+/// meal-detail screen actually uses — the platform's `.sheet` at `.large` —
+/// because the model's `send()` is provably right on its own and the owner was
+/// still left looking at their sentence. The field is a real
+/// `SwiftUI.VerticalTextView` on a real window on the test host's scene, and
+/// the return key is driven the way the on-screen keyboard drives it:
+/// `insertText("\n")` on the first responder, which is what `UIKeyboardImpl`
+/// sends a `UITextView` for the return key. Nothing here synthesises an event
+/// UIKit would not.
+///
+/// Nothing reaches a network or a Keychain: both are the same stand-ins the
+/// suite above uses.
+@Suite("Meal chat · the composer on screen", .serialized)
+@MainActor
+struct MealChatComposerTests {
+
+    // MARK: - Hosting
+
+    /// `MealChatSheet` exactly as `MealDetailView` presents it, so the field
+    /// under test is the one the user types into rather than a bare copy of it.
+    private struct Presentation: View {
+
+        let model: MealChatModel
+
+        @State private var isTalking = true
+
+        var body: some View {
+            Color.clear
+                .sheet(isPresented: $isTalking) {
+                    MealChatSheet(
+                        model: model,
+                        mealTitle: "Rice and something",
+                        onClose: { isTalking = false }
+                    )
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                }
+        }
+    }
+
+    /// Stands the view on a window of the test host's own scene and lets the
+    /// sheet come up.
+    ///
+    /// Long enough for the presentation to finish: the field lives in a
+    /// presented controller, and there is nothing to find until it is on screen.
+    private func host(_ view: some View) throws -> UIWindow {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = UIHostingController(
+            rootView: view.environment(\.fuelPalette, FuelPalette(theme: .dark, accent: .mono))
+        )
+        window.makeKeyAndVisible()
+        spin(window, for: 1)
+        return window
+    }
+
+    /// A turn of the main actor and a turn of the run loop, twice.
+    ///
+    /// **Both, and the main actor first.** The composer answers the return key
+    /// one main-actor hop later — `MealChatSheet.write` says at length why it
+    /// has to — and a test that only spun the run loop would hold the main
+    /// actor for the whole of it and never let that hop happen. Measured: the
+    /// field kept its blank line for six hundred milliseconds of run loop and
+    /// emptied on the first `yield`. The run loop afterwards is what carries the
+    /// emptied message back down into the text view.
+    private func settle(_ window: UIWindow) async {
+        for _ in 0..<2 {
+            await Task.yield()
+            spin(window, for: 0.15)
+        }
+    }
+
+    private func spin(_ window: UIWindow, for seconds: TimeInterval) {
+        RunLoop.current.run(until: Date().addingTimeInterval(seconds))
+        window.layoutIfNeeded()
+    }
+
+    /// The composer's own text view, out of the presented sheet.
+    ///
+    /// It is the only text input the sheet has, so the first one found is it.
+    private func composer(in window: UIWindow) -> UITextView? {
+        guard let presented = window.rootViewController?.presentedViewController?.view else { return nil }
+        return textView(in: presented)
+    }
+
+    private func textView(in view: UIView) -> UITextView? {
+        for subview in view.subviews {
+            if let found = subview as? UITextView { return found }
+            if let nested = textView(in: subview) { return nested }
+        }
+        return nil
+    }
+
+    // MARK: - Fixtures
+
+    @MainActor
+    private final class StandInSubject: MealChatSubject {
+
+        var adjustableMeal = AdjustableMeal(
+            title: "Rice and something",
+            kilocalories: 460,
+            macros: MacroTotals(protein: 20, carbs: 60, fat: 12),
+            items: [
+                RecognisedItem(
+                    name: "Rice",
+                    kilocalories: 232,
+                    grams: 150,
+                    note: .photo(confidence: .confident, approximateGrams: 150)
+                )
+            ]
+        )
+
+        func apply(_ adjusted: AdjustedMeal) -> Bool { true }
+    }
+
+    /// A model and the subject it only holds weakly.
+    ///
+    /// Handed back together because a test that let the subject go would watch
+    /// `send()` refuse every message — the model treats a meal that is gone as
+    /// nothing to talk about, which is the same guard `deletingStopsTheConversation`
+    /// above relies on.
+    private struct Composer {
+
+        let subject: StandInSubject
+        let model: MealChatModel
+    }
+
+    private func makeComposer() -> Composer {
+        let subject = StandInSubject()
+        return Composer(
+            subject: subject,
+            model: MealChatModel(
+                subject: subject,
+                client: ScriptedClient(adjustments: [.success(MealAdjustmentOutcome(reply: "Done.", meal: nil))]),
+                keys: StoredKey(),
+                provider: .claude,
+                pace: {}
+            )
+        )
+    }
+
+    // MARK: - The keyboard's own send
+
+    /// **The bug the owner saw.** `onSubmit` is never called for a
+    /// `TextField(axis: .vertical)`: the on-screen return key reaches the
+    /// backing `UITextView` as `insertText("\n")` and nothing above it
+    /// intercepts, so the sentence stayed in the field, grew a blank line, and
+    /// nothing was sent.
+    @Test("the keyboard's send key sends what was typed and empties the field")
+    func returnKeySends() async throws {
+        let fixture = makeComposer()
+        let model = fixture.model
+        let window = try host(Presentation(model: model))
+        let field = try #require(composer(in: window))
+
+        #expect(field.becomeFirstResponder())
+        field.insertText("a second, smaller portion")
+        await settle(window)
+
+        #expect(model.message == "a second, smaller portion")
+        #expect(field.text == "a second, smaller portion")
+
+        field.insertText("\n")
+        await settle(window)
+
+        #expect(model.messages.map(\.text) == ["a second, smaller portion"])
+        #expect(model.message.isEmpty, "the model still holds \(model.message.debugDescription)")
+        #expect(field.text.isEmpty, "the field still holds \(field.text.debugDescription)")
+    }
+
+    /// The rule that makes the one above exact: a line break cannot stay in a
+    /// field whose return key is drawn as `Send`.
+    @Test("a return on an empty field sends nothing and leaves no blank line")
+    func returnOnAnEmptyFieldSendsNothing() async throws {
+        let fixture = makeComposer()
+        let model = fixture.model
+        let window = try host(Presentation(model: model))
+        let field = try #require(composer(in: window))
+
+        #expect(field.becomeFirstResponder())
+        field.insertText("\n")
+        await settle(window)
+
+        #expect(model.messages.isEmpty)
+        #expect(model.message.isEmpty, "the model still holds \(model.message.debugDescription)")
+        #expect(field.text.isEmpty, "the field still holds \(field.text.debugDescription)")
+    }
+
+    /// **A paste is text, not an instruction to spend a request on it.** It
+    /// arrives whole, so both the length and the line-break count move by more
+    /// than one and nothing is read as the return key.
+    @Test("a multi-line paste keeps the field and sends nothing")
+    func pasteDoesNotSend() async throws {
+        let fixture = makeComposer()
+        let model = fixture.model
+        let window = try host(Presentation(model: model))
+        let field = try #require(composer(in: window))
+
+        #expect(field.becomeFirstResponder())
+        field.insertText("rice\nand a fried egg")
+        await settle(window)
+
+        #expect(model.messages.isEmpty)
+        #expect(model.message == "rice\nand a fried egg")
+        #expect(field.text == "rice\nand a fried egg")
+    }
+
+    /// The send control's own path, measured on the same hosted field, so the
+    /// two ways in are known to end in the same place.
+    @Test("the send control empties the field too")
+    func sendControlEmptiesTheField() async throws {
+        let fixture = makeComposer()
+        let model = fixture.model
+        let window = try host(Presentation(model: model))
+        let field = try #require(composer(in: window))
+
+        #expect(field.becomeFirstResponder())
+        field.insertText("a second, smaller portion")
+        await settle(window)
+
+        model.send()
+        await settle(window)
+
+        #expect(model.messages.map(\.text) == ["a second, smaller portion"])
+        #expect(model.message.isEmpty, "the model still holds \(model.message.debugDescription)")
+        #expect(field.text.isEmpty, "the field still holds \(field.text.debugDescription)")
     }
 }

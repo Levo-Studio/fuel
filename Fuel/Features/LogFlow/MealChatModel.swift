@@ -241,16 +241,17 @@ final class MealChatModel {
 
     /// The send control.
     ///
-    /// **It only ever runs from a tap**, it refuses an empty field rather than
-    /// charging for a request about nothing, and with no key stored it makes
-    /// no request at all — the same three rules the two log modes and the
-    /// re-analysis hold to, for the same reason: every request spends the
-    /// user's own credit.
+    /// **It only ever runs from a press** — the send mark, or the keyboard's
+    /// own `Send` key — it refuses an empty field rather than charging for a
+    /// request about nothing, and with no key stored it makes no request at
+    /// all: the same three rules the two log modes and the re-analysis hold to,
+    /// for the same reason: every request spends the user's own credit.
     func send() {
         let written = message.trimmingCharacters(in: .whitespacesAndNewlines)
         // One message at a time. The composer draws a stop rather than a send
         // while one is in flight, and the keyboard's own return key is the
-        // other way in here.
+        // other way in here — see `MealChatSheet.write` for what that key
+        // actually arrives as, which is not what it looks like.
         guard !written.isEmpty, !isAnswering, subject != nil else { return }
 
         message = ""
