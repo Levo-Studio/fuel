@@ -79,7 +79,36 @@ struct TodayView: View {
             }
             .fuelScrolling()
 
+            // The band is measured from the frame's own bottom edge, not from
+            // the safe area's, and the flexible frame is what makes that
+            // possible rather than a flourish: `ignoresSafeArea` can only
+            // expand a view that had room to grow, and a bare 120pt band has
+            // none, so the modifier on its own does exactly nothing. Standing
+            // on the safe area it ended 34 points above the screen, and the
+            // list ran on underneath it at full contrast — a row drawn brighter
+            // than the faded row above it, with the edge of the band visible
+            // between them. Same mistake as the result footer's, at the other
+            // end of the same screen: see `mealResultFooter`.
+            //
+            // The add button is deliberately not brought along. Its 32 is a
+            // distance above the home indicator rather than above the frame's
+            // edge — see `Control.addButtonBottomInset` — and it stands over
+            // the band, which is the arrangement the band exists for.
             FuelListFade()
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .ignoresSafeArea(.container, edges: .bottom)
+
+            // The same reading of the frame's edge at the other end, and the
+            // same reason for it: the status row is inside the frame, so a band
+            // hung on the safe area would leave exactly the strip the clock is
+            // drawn in uncovered. The reader is the one thing that knows how
+            // deep that strip is, and it has to keep its own safe area to be
+            // able to say — so it is the band inside it that ignores it.
+            GeometryReader { proxy in
+                FuelListTopFade(statusBar: proxy.safeAreaInsets.top)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .ignoresSafeArea(.container, edges: .top)
+            }
 
             TodayAddButton(action: onAddEntry)
                 .padding(.trailing, FuelMetrics.Control.addButtonTrailingInset)
