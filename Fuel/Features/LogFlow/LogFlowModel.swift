@@ -19,6 +19,12 @@ final class LogFlowModel {
 
     private(set) var recentMeals: [RecentMeal] = []
 
+    /// The same rows, narrowed to the meals the user starred on a result
+    /// screen. Held beside the recent list rather than derived from it, because
+    /// it is read from a fetch of its own — see
+    /// `FuelStore.favouriteEntries(limit:)`.
+    private(set) var favouriteMeals: [RecentMeal] = []
+
     private let store: FuelStore
 
     /// When a tapped meal is logged. Injected so a test can put the entry at a
@@ -33,7 +39,7 @@ final class LogFlowModel {
 
     // MARK: - Reading
 
-    /// Rebuilds the Recent list from what has been logged so far.
+    /// Rebuilds both of the tab's lists from what has been logged so far.
     ///
     /// A failed read leaves the list as it was rather than emptying it. Screen
     /// 13 draws no error state, so the only two things the tab can say are
@@ -43,9 +49,17 @@ final class LogFlowModel {
     /// The second is what `RecentMealsView` draws for an empty list: the
     /// heading alone, without the hint that explains a tap there is nothing to
     /// make.
+    ///
+    /// The two reads are guarded separately for that same reason. They are
+    /// separate fetches, so one of them can fail on its own, and blanking the
+    /// list that did come back would be the same lie told about the other half.
     func reload() {
-        guard let entries = try? store.recentEntries(limit: RecentMeals.entriesRead) else { return }
-        recentMeals = RecentMeals.list(from: entries.map(\.nutritionValue))
+        if let entries = try? store.recentEntries(limit: RecentMeals.entriesRead) {
+            recentMeals = RecentMeals.list(from: entries.map(\.recentValue))
+        }
+        if let entries = try? store.favouriteEntries(limit: RecentMeals.entriesRead) {
+            favouriteMeals = RecentMeals.list(from: entries.map(\.recentValue))
+        }
     }
 
     // MARK: - Logging
@@ -56,6 +70,18 @@ final class LogFlowModel {
     /// re-derives the whole day through `MealLabeler`, which is the one place
     /// the course-of-the-day rule lives; a second derivation at this call site
     /// would be a second rule to keep in step with the first.
+    ///
+    /// The breakdown comes with it. A repeat is the same plate as the meal it
+    /// repeats, and that meal's items were settled the first time round — by
+    /// the model, and where a food resolved against the table, by
+    /// `FoodTableGrounding`. Handing them straight to the store costs no
+    /// request, spends none of the user's credit, and gives back the figures
+    /// they already accepted rather than a second opinion on them.
+    ///
+    /// The photo and the typed sentence do **not** come with it, and that is
+    /// not the same omission: those are the record of one particular capture,
+    /// and this is a new meal at a new time that was never photographed or
+    /// typed. `source` says `.recent` for exactly that reason.
     ///
     /// The `Bool` says whether the write happened, so the flow stays open on a
     /// failure instead of returning to Today as though something had been
@@ -68,7 +94,8 @@ final class LogFlowModel {
                 kilocalories: meal.kilocalories,
                 macros: meal.macros,
                 loggedAt: now(),
-                source: .recent
+                source: .recent,
+                items: meal.items
             )
             return true
         } catch {

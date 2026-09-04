@@ -91,11 +91,39 @@ struct SettingsSection<Content: View>: View {
 
 // MARK: - Segmented control
 
-/// The two-segment pill control: `Claude / Mistral`, `Light / Dark`, and on
-/// screen 17 `With a goal / Count only`.
+/// Which surface a `SettingsSegmentedControl` stands on, and therefore where
+/// its four colours are read from.
 ///
-/// The selected segment is filled with the accent and takes the accent's own
-/// on-colour; the unselected one is a `hair` outline over the page.
+/// The drawing is the same either way — the same pill, the same padding, the
+/// same fill-and-outline pair. Only the inks differ, which is why this is a
+/// surface rather than a second control.
+nonisolated enum FuelSegmentedSurface {
+
+    /// The page, in whichever theme is set. Both Settings screens.
+    case theme
+
+    /// The log flow's own surface, which is the same near-black in **both**
+    /// themes — so everything on it is lettered in the fixed
+    /// `FuelPalette.Camera` inks rather than the theme's.
+    ///
+    /// A filled control there takes those inks too, and not the accent. The one
+    /// the export draws on this surface is screen 12's `Analyse` button, written
+    /// `background:#fafafa;color:#111213` as a literal, unchanged across all
+    /// four theme/accent frames the wrapper renders — so the accent does not
+    /// reach this surface. Both alternatives would also be unreadable: the
+    /// theme's `ink` is `#121212` in light mode, and the `mono` accent, which is
+    /// the default, is the same value, so either would put a near-black segment
+    /// on a near-black page.
+    case camera
+}
+
+/// The two-segment pill control: `Claude / Mistral`, `Light / Dark`, on screen
+/// 17 `With a goal / Count only`, and — on the camera surface — the Recent
+/// tab's `Recent / Favourites`.
+///
+/// On the page, the selected segment is filled with the accent and takes the
+/// accent's own on-colour, and the unselected one is a `hair` outline. See
+/// `FuelSegmentedSurface` for what the camera surface substitutes and why.
 ///
 /// The padding is a parameter because the export draws two: `11` for the
 /// provider control and `12` for every other one. That is a two-point
@@ -108,6 +136,9 @@ struct SettingsSegmentedControl<Value: Hashable>: View {
     let titleKey: (Value) -> LocalizedStringKey
     @Binding var selection: Value
     var padding: CGFloat = FuelMetrics.Space.s12
+
+    /// Defaulted to the page, which is what all three Settings call sites draw.
+    var surface: FuelSegmentedSurface = .theme
 
     var body: some View {
         HStack(spacing: FuelMetrics.Space.s8) {
@@ -125,17 +156,17 @@ struct SettingsSegmentedControl<Value: Hashable>: View {
         } label: {
             Text(titleKey(option))
                 .fuelStyle(FuelTypography.segmentLabel)
-                .foregroundStyle(isSelected ? palette.onAccent : palette.ink)
+                .foregroundStyle(isSelected ? selectedInk : ink)
                 .frame(maxWidth: .infinity)
                 .padding(padding)
                 .background(
                     RoundedRectangle(cornerRadius: FuelMetrics.Radius.pill)
-                        .fill(isSelected ? palette.accentColor : .clear)
+                        .fill(isSelected ? fill : .clear)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: FuelMetrics.Radius.pill)
                         .strokeBorder(
-                            isSelected ? palette.accentColor : palette.hair,
+                            isSelected ? fill : outline,
                             lineWidth: FuelMetrics.Line.hairline
                         )
                 )
@@ -143,6 +174,40 @@ struct SettingsSegmentedControl<Value: Hashable>: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+    }
+
+    // MARK: - Inks
+
+    /// The label of an unselected segment.
+    private var ink: Color {
+        switch surface {
+        case .theme: palette.ink
+        case .camera: FuelPalette.Camera.ink
+        }
+    }
+
+    /// The outline of an unselected segment.
+    private var outline: Color {
+        switch surface {
+        case .theme: palette.hair
+        case .camera: FuelPalette.Camera.hair
+        }
+    }
+
+    /// What the selected segment is filled and bordered with.
+    private var fill: Color {
+        switch surface {
+        case .theme: palette.accentColor
+        case .camera: FuelPalette.Camera.ink
+        }
+    }
+
+    /// The label sitting on that fill.
+    private var selectedInk: Color {
+        switch surface {
+        case .theme: palette.onAccent
+        case .camera: FuelPalette.Camera.onInk
+        }
     }
 }
 

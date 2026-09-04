@@ -37,12 +37,24 @@ nonisolated enum LogFlowCopy {
 
     // MARK: - Recent
 
-    static var recentTitle: String {
-        String(localized: "logFlow.recent.title")
+    /// The heading, which names whichever of the two lists is showing. Screen
+    /// 13 draws only the first of them.
+    static func listTitle(_ list: RecentList) -> String {
+        switch list {
+        case .recent: String(localized: "logFlow.recent.title")
+        case .favourites: String(localized: "logFlow.favourites.title")
+        }
     }
 
     static var recentHint: String {
         String(localized: "logFlow.recent.hint")
+    }
+
+    /// The one line an empty Favourites list shows in place of its rows. It
+    /// says where a favourite is made, because there is nothing on this screen
+    /// that makes one.
+    static var favouritesEmpty: String {
+        String(localized: "logFlow.favourites.empty")
     }
 
     /// The `P 32 · C 48 · F 9` line under a meal's name.

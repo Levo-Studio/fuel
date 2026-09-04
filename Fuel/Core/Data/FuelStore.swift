@@ -77,6 +77,23 @@ final class FuelStore {
         return try context.fetch(descriptor)
     }
 
+    /// The most recently logged entries the user marked as a favourite, newest
+    /// first, for the Recent tab's second list.
+    ///
+    /// A fetch of its own rather than a filter over `recentEntries(limit:)`. A
+    /// favourite is a meal the user asked to keep, so one starred before the
+    /// last `limit` meals were logged has to still be in the list; filtering
+    /// that window would quietly drop it the moment enough other meals were
+    /// logged on top of it.
+    func favouriteEntries(limit: Int) throws -> [FoodEntry] {
+        var descriptor = FetchDescriptor<FoodEntry>(
+            predicate: #Predicate { $0.isFavourite },
+            sortBy: [SortDescriptor(\.loggedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = limit
+        return try context.fetch(descriptor)
+    }
+
     /// One stored meal, by the identity that survives the boundary.
     ///
     /// `entryID` rather than `persistentModelID`, because the identity a screen
@@ -269,6 +286,24 @@ extension FoodEntry {
             source: source,
             label: label,
             isLabelUserSet: isLabelUserSet
+        )
+    }
+
+    /// The hand-off value the Recent list reads.
+    ///
+    /// A second value at the same boundary rather than a widening of the first.
+    /// The Recent list repeats a meal whole — its line items included, so the
+    /// figures the user accepted come back rather than being estimated a second
+    /// time — and the items are exactly what `nutritionValue` leaves behind.
+    /// Adding them there would hand the nutrition core a field it has no use
+    /// for; see `RecentEntry`.
+    var recentValue: RecentEntry {
+        RecentEntry(
+            id: entryID,
+            title: title,
+            kilocalories: kilocalories,
+            macros: macros,
+            items: items
         )
     }
 }

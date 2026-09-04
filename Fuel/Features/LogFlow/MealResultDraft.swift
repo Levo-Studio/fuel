@@ -179,9 +179,14 @@ nonisolated struct MealResultDraft: Equatable, Sendable {
     /// by some other route. The two are a pair, not one propping up the other.
     ///
     /// A list that was empty when it arrived stays the caller's own action:
-    /// `MealEstimate.items` may arrive empty, and a meal repeated from the
-    /// Recent list has never had a breakdown, so `Add` and `Delete` are already
-    /// what those screens offer over an empty heading.
+    /// `MealEstimate.items` may arrive empty, and so may a stored meal's, so
+    /// `Add` and `Delete` are already what those screens offer over an empty
+    /// heading.
+    ///
+    /// A meal repeated from the Recent list used to be the clearest case of
+    /// that and is no longer one at all: it carries the breakdown of the meal
+    /// it repeats, item for item, so it arrives here empty only when that meal
+    /// had none of its own.
     var canReanalyse: Bool {
         hasItemEdits && !items.isEmpty
     }
