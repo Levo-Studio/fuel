@@ -151,6 +151,27 @@ final class RootShellModel {
     /// the only moment its inputs can have changed while no log flow exists.
     private(set) var today: TodayPresentation
 
+    /// Which day Today is showing, and which days it can move to.
+    ///
+    /// **The export draws no navigation on screens 05 and 06** — one day, and
+    /// no way to leave it. Browsing back is the owner's instruction; the rules
+    /// of it are `TodayDayNavigation`'s, and what is held here is only which
+    /// day is up.
+    ///
+    /// Rebuilt with the presentation and never separately, because its two
+    /// bounds are read from the same store: the day it stops at is the day of
+    /// the first meal ever logged, and deleting that meal moves it.
+    private(set) var dayNavigation: TodayDayNavigation
+
+    /// Whether the last day change moved to an earlier day.
+    ///
+    /// Held rather than worked out where the day is drawn, because a transition
+    /// has to be chosen *before* the change is applied and a view watching the
+    /// day can only see it afterwards. It is also the one thing the three
+    /// controls share: a swipe, an arrow and a jump to the same day all travel
+    /// the same way because all three set this.
+    private(set) var dayTravelIsBackward = false
+
     /// What Today draws in the day list's place while the day is empty.
     ///
     /// Recomputed with `today` and never separately. Its three answers come
@@ -278,7 +299,12 @@ final class RootShellModel {
         self.makeTextLog = makeTextLog
         self.makeMealDetail = makeMealDetail
         self.stage = Self.launchStage(for: store)
-        self.today = Self.presentation(for: store)
+        // The app opens on the current day, always. A browsed day is not a
+        // preference and is not stored: it is where the user walked to in this
+        // session, and a launch is not a continuation of it.
+        let navigation = Self.navigation(for: store, showing: nil)
+        self.dayNavigation = navigation
+        self.today = Self.presentation(for: store, on: navigation.day)
         self.gettingStarted = Self.checklist(store: store, preferences: preferences)
         self.logFlow = LogFlowModel(store: store)
         // One read, spent on both halves. Two reads could not disagree today —
@@ -340,12 +366,43 @@ final class RootShellModel {
         )
     }
 
-    private static func presentation(for store: FuelStore) -> TodayPresentation {
-        let now = Date()
-        return TodayPresentation(
-            entries: (try? store.nutritionEntries(on: now)) ?? [],
+    /// The day being shown, in whichever mode the user is counting in.
+    ///
+    /// **The mode is read for the browse as a whole and not for the day**, and
+    /// that is the right reading rather than a shortcut: goal or count-only is
+    /// a preference on screen 17, not a property a day carries. A past day
+    /// therefore draws whichever of screens 05 and 06 the user is in now, and
+    /// its total stands against the goal they hold now. The alternative would
+    /// be to store the mode and the targets alongside every entry, which is a
+    /// different product.
+    private static func presentation(for store: FuelStore, on day: Date) -> TodayPresentation {
+        TodayPresentation(
+            entries: (try? store.nutritionEntries(on: day)) ?? [],
             mode: (try? store.countingMode()) ?? .goal(.default),
-            date: now
+            date: day
+        )
+    }
+
+    /// Which days can be browsed, read from the store each time.
+    ///
+    /// A store that cannot be read has no history to walk into, and `nil` there
+    /// leaves the current day as the whole range — both arrows dead, the date
+    /// jump offering one day. Failing towards "there is nothing behind you" is
+    /// the recoverable direction: the worst of it is that a walk back is
+    /// refused for one launch, where failing the other way would offer a walk
+    /// into days the store cannot answer for.
+    ///
+    /// - Parameter day: the day to keep showing, or `nil` for the current one.
+    private static func navigation(for store: FuelStore, showing day: Date?) -> TodayDayNavigation {
+        let now = Date()
+        return TodayDayNavigation(
+            showing: day ?? now,
+            now: now,
+            firstEntry: (try? store.earliestEntryDate()) ?? nil,
+            // The store's own calendar, not `.current`. Which day an entry
+            // belongs to is already its question, and a second calendar here
+            // would file a meal into one day and browse to another.
+            calendar: store.calendar
         )
     }
 
@@ -361,13 +418,59 @@ final class RootShellModel {
 
     /// Re-reads everything Today draws.
     ///
-    /// One call rather than two at each site: the checklist and the day are
-    /// read from the same store at the same moment, and a site that refreshed
-    /// only one of them would show a day with an entry in it beside a row still
-    /// asking for the first meal.
+    /// One call rather than three at each site: the checklist, the day and the
+    /// range it sits in are read from the same store at the same moment, and a
+    /// site that refreshed only one of them would show a day with an entry in
+    /// it beside a row still asking for the first meal.
+    ///
+    /// The range is re-read with the rest and not treated as fixed. Its far end
+    /// is the day of the first meal ever logged, and that meal can be deleted;
+    /// the day being shown is handed back to `TodayDayNavigation`, which clamps
+    /// it, so a browse standing on a day that has just fallen out of the range
+    /// lands on the nearest one still in it.
     private func refreshToday() {
-        today = Self.presentation(for: store)
+        dayNavigation = Self.navigation(for: store, showing: dayNavigation.day)
+        today = Self.presentation(for: store, on: dayNavigation.day)
         gettingStarted = Self.checklist(store: store, preferences: preferences)
+    }
+
+    // MARK: - Moving between days
+
+    /// The back arrow in the header, and a drag to the right.
+    func showPreviousDay() {
+        show(dayNavigation.backward())
+    }
+
+    /// The forward arrow, and a drag to the left. Both are refused on today —
+    /// the future is not browsable — and the arrow is drawn disabled to say so.
+    func showNextDay() {
+        show(dayNavigation.forward())
+    }
+
+    /// A day chosen in the picker the date opens.
+    func showDay(_ day: Date) {
+        show(dayNavigation.jumping(to: day))
+    }
+
+    /// Comes back to the current day, which is where a logged meal landed.
+    func showCurrentDay() {
+        show(dayNavigation.jumping(to: dayNavigation.today))
+    }
+
+    /// The one place a day change happens, so the three controls cannot differ
+    /// in what one is.
+    ///
+    /// A move that lands where it already stood is dropped rather than applied:
+    /// at either bound the arrows are disabled and a swipe simply does nothing,
+    /// and re-assigning the same day would run the travel over a screen that is
+    /// not changing.
+    private func show(_ moved: TodayDayNavigation) {
+        guard moved.day != dayNavigation.day else { return }
+        dayTravelIsBackward = moved.isBackward(from: dayNavigation)
+        dayNavigation = moved
+        // The day only — the checklist and the range have not moved, and a full
+        // refresh here would re-read the whole store on every swipe.
+        today = Self.presentation(for: store, on: moved.day)
     }
 
     // MARK: - Leaving and returning to Today
@@ -475,6 +578,23 @@ final class RootShellModel {
 
         refreshToday()
         destination = nil
+    }
+
+    /// The one dismissal that is not the same as the others: a meal was logged.
+    ///
+    /// **A meal is logged now, whatever day Today happens to be showing.** The
+    /// log flow takes the device clock — screens 07, 12 and 13 draw no control
+    /// for choosing a date, and there is none — so a flow opened while browsing
+    /// Tuesday still writes to today. Coming back onto Tuesday would leave the
+    /// user looking at a day their meal is not on, with nothing to say where it
+    /// went; the honest close is onto the day it landed in.
+    ///
+    /// Only this exit moves the day. `✕ Cancel` goes through
+    /// `dismissDestination` and leaves the browse where it was, because nothing
+    /// was written and there is nowhere else to be.
+    func dismissDestinationAfterLogging() {
+        showCurrentDay()
+        dismissDestination()
     }
 
     // MARK: - Arriving from outside
