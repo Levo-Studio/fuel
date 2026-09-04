@@ -37,6 +37,22 @@ nonisolated struct MealResultDraft: Equatable, Sendable {
     /// drew before the line existed. See `MealEstimate.advice`.
     var advice: String?
 
+    /// How sure the model is of this estimate, as a whole percent, or `nil`
+    /// where nothing estimated it.
+    ///
+    /// **Carried rather than computed from `items` on demand**, which looks
+    /// like the longer way round and is the only correct one. A meal repeated
+    /// from the Recent list holds the breakdown of the meal it repeats,
+    /// confidences and all, so a property that averaged the rows every time it
+    /// was read would print a percentage on a screen where nothing was
+    /// estimated. The figure is derived once, at the moment an estimate
+    /// produces one, and then travels with the draft exactly as `advice` does.
+    ///
+    /// `EstimateConfidence.percent(of:)` is the only thing that ever produces a
+    /// value for it, and it is re-derived wherever the estimate is — a whole
+    /// replacement and a splice both write it, from the rows that then stand.
+    var estimateConfidencePercent: Int?
+
     var items: [RecognisedItem]
 
     /// What the meal-label rule gives this moment, until the user says
@@ -121,6 +137,12 @@ nonisolated struct MealResultDraft: Equatable, Sendable {
         // the screen stops drawing it, so this is the same subtraction either
         // way: what that row contributed to the total is what comes back out.
         kilocalories = max(0, kilocalories - removed.kilocalories)
+        // And the accuracy figure is re-averaged over what is left. A row the
+        // user threw out is not part of this meal, so how sure the model was
+        // about it is not part of how sure it is about this meal. Nothing is
+        // invented by doing so — the surviving rows' figures are the same
+        // answers they always were, over a shorter list.
+        estimateConfidencePercent = EstimateConfidence.percent(of: items.map(\.confidence))
     }
 
     /// Rewrites a line as the user's own words — `Polenta r50g` for something
@@ -135,8 +157,15 @@ nonisolated struct MealResultDraft: Equatable, Sendable {
         guard items[index].name != written else { return }
 
         items[index].name = written
+        // The confidence goes with the old words. It said how sure the model
+        // was about a food it had read, and it has not read this one — the same
+        // reason `isPriced` stops drawing the row's calorie figure the moment
+        // it is rewritten. Leaving it would let a rewritten line go on
+        // vouching for itself until a re-analysis happened to replace it.
+        items[index].confidence = nil
         userWrittenItems.insert(id)
         hasItemEdits = true
+        estimateConfidencePercent = EstimateConfidence.percent(of: items.map(\.confidence))
     }
 
     /// Adds a line the model missed, at the end of the list where the `Add
@@ -179,6 +208,7 @@ nonisolated struct MealResultDraft: Equatable, Sendable {
         macros = estimate.macros
         advice = estimate.advice
         items = estimate.items
+        estimateConfidencePercent = estimate.confidencePercent
         userWrittenItems = []
         hasItemEdits = false
     }
@@ -238,6 +268,12 @@ nonisolated struct MealResultDraft: Equatable, Sendable {
 
         var merged = self
         merged.items = splicing(estimate.items)
+        // Averaged over the list that now stands, which is the untouched rows'
+        // own answers plus the reply's answers about the rows it was asked
+        // about. Every figure in it is the model's about the food it names, so
+        // there is nothing here to apportion — unlike the macros a paragraph
+        // up, which the model was never asked to split.
+        merged.estimateConfidencePercent = EstimateConfidence.percent(of: merged.items.map(\.confidence))
         // The rows that did not change contribute the figures they already
         // carry, and the rows that did contribute the model's own total for
         // exactly what it was asked to price. Both halves are numbers a model

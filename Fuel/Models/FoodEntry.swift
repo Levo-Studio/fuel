@@ -84,6 +84,25 @@ final class FoodEntry {
     /// here rather than failing to open it, exactly as `typedSentence` did.
     var advice: String?
 
+    /// How sure the model was of the estimate this meal was logged from, as a
+    /// whole percent — the figure drawn beside the kilocalories.
+    ///
+    /// **Stored rather than derived from `items`, and the Recent list is why.**
+    /// A meal repeated from the Recent list carries the breakdown of the meal
+    /// it repeats, confidences and all, because those figures were settled the
+    /// first time round. Deriving the meal's figure from that breakdown would
+    /// print a percentage for an estimate that never ran — the model was not
+    /// asked anything about this plate at this time. Writing the figure down
+    /// when an estimate produces one, and leaving it alone otherwise, is what
+    /// makes the absence say what it means.
+    ///
+    /// `nil` for a meal repeated from the Recent list, for an estimate whose
+    /// model answered nothing readable, and for any entry logged before this
+    /// property existed — optional and new, so SwiftData opens an older row
+    /// with nothing here rather than failing to open it, exactly as `advice`
+    /// and `typedSentence` did.
+    var estimateConfidencePercent: Int?
+
     init(
         entryID: UUID = UUID(),
         title: String,
@@ -95,6 +114,7 @@ final class FoodEntry {
         isLabelUserSet: Bool = false,
         isFavourite: Bool = false,
         advice: String? = nil,
+        estimateConfidencePercent: Int? = nil,
         items: [RecognisedItem] = [],
         capturedPhotoData: Data? = nil,
         typedSentence: String? = nil
@@ -111,6 +131,7 @@ final class FoodEntry {
         self.isLabelUserSet = isLabelUserSet
         self.isFavourite = isFavourite
         self.advice = advice
+        self.estimateConfidencePercent = estimateConfidencePercent
         self.items = items
         self.capturedPhotoData = capturedPhotoData
         self.typedSentence = typedSentence

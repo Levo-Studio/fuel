@@ -144,6 +144,7 @@ final class FuelStore {
         source: EntrySource,
         isFavourite: Bool = false,
         advice: String? = nil,
+        estimateConfidencePercent: Int? = nil,
         items: [RecognisedItem] = [],
         capturedPhotoData: Data? = nil,
         typedSentence: String? = nil
@@ -156,6 +157,7 @@ final class FuelStore {
             source: source,
             isFavourite: isFavourite,
             advice: advice,
+            estimateConfidencePercent: estimateConfidencePercent,
             items: items,
             capturedPhotoData: capturedPhotoData,
             typedSentence: typedSentence
@@ -221,18 +223,27 @@ final class FuelStore {
     /// is gone. A defaulted `nil` would erase it on every caller that forgot,
     /// and a parameter left out of this signature would strand it on a meal
     /// whose figures no longer match it.
+    ///
+    /// **`estimateConfidencePercent` is the same argument about a number.** It
+    /// describes the estimate the meal's figures came from, so a caller that
+    /// replaced those figures has to say how sure the model is of the new ones
+    /// — including saying it does not know. Left out, a meal re-priced from a
+    /// reply that answered nothing readable would keep the old estimate's
+    /// percentage over a set of numbers it was never about.
     func update(
         _ entry: FoodEntry,
         title: String,
         kilocalories: Int,
         macros: MacroTotals,
         advice: String?,
+        estimateConfidencePercent: Int?,
         items: [RecognisedItem]
     ) throws {
         entry.title = title
         entry.kilocalories = kilocalories
         entry.macros = macros
         entry.advice = advice
+        entry.estimateConfidencePercent = estimateConfidencePercent
         entry.items = items
         try context.save()
     }
@@ -307,6 +318,12 @@ extension FoodEntry {
     /// The hand-off value. Line items and the favourite flag stay behind: the
     /// nutrition core has no use for either, and what it cannot see it cannot
     /// come to depend on.
+    ///
+    /// The accuracy figure travels, for the same reason `title` and `source`
+    /// do: the day list draws it on the row, and a row is built from this value
+    /// and nothing else. It travels as the stored percentage rather than as the
+    /// items it was averaged from, so nothing downstream can re-derive a figure
+    /// for a meal that never had an estimate.
     var nutritionValue: NutritionEntry {
         NutritionEntry(
             id: entryID,
@@ -316,7 +333,8 @@ extension FoodEntry {
             loggedAt: loggedAt,
             source: source,
             label: label,
-            isLabelUserSet: isLabelUserSet
+            isLabelUserSet: isLabelUserSet,
+            estimateConfidencePercent: estimateConfidencePercent
         )
     }
 
@@ -328,13 +346,26 @@ extension FoodEntry {
     /// time — and the items are exactly what `nutritionValue` leaves behind.
     /// Adding them there would hand the nutrition core a field it has no use
     /// for; see `RecentEntry`.
+    ///
+    /// **The confidences do not come with them, and that is the same omission
+    /// the photo and the typed sentence get.** A row's figures are facts about
+    /// a food and repeat with it; a confidence is the record of one particular
+    /// act of estimating, and a repeat estimates nothing — no model is asked
+    /// anything about this plate at this time. Carrying them would let the
+    /// repeated meal average them back into an accuracy figure and present it
+    /// as the model's opinion of a request that was never made. Stripped here,
+    /// at the boundary, so nothing downstream has to remember to.
     var recentValue: RecentEntry {
         RecentEntry(
             id: entryID,
             title: title,
             kilocalories: kilocalories,
             macros: macros,
-            items: items
+            items: items.map { item in
+                var repeated = item
+                repeated.confidence = nil
+                return repeated
+            }
         )
     }
 }

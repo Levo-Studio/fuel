@@ -391,6 +391,7 @@ final class CameraLogModel {
             kilocalories: estimate.kilocalories,
             macros: estimate.macros,
             advice: estimate.advice,
+            estimateConfidencePercent: estimate.confidencePercent,
             items: estimate.items,
             label: store.provisionalLabel(at: capturedAt),
             isLabelUserSet: false,
@@ -514,6 +515,7 @@ final class CameraLogModel {
                 source: .photo,
                 isFavourite: draft.isFavourite,
                 advice: draft.advice,
+                estimateConfidencePercent: draft.estimateConfidencePercent,
                 items: draft.items,
                 capturedPhotoData: capturedPhotoData
             )
