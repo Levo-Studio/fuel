@@ -118,25 +118,20 @@ struct RootShell: View {
                 }
             }
         }
-        // Raised by a pop the user made with the system's gesture, never by
-        // `‹ Back`: that control has its own confirmation inside
-        // `MealResultView`, which this one deliberately repeats word for word.
+        // Raised by a pop the user made with the gesture, never by `‹ Back`:
+        // that control has its own confirmation inside `MealResultView`, and
+        // this is not a copy of its words but the same value, so the two cannot
+        // drift into asking the same question differently.
         //
         // It sits here rather than on the meal screen because the gesture is
         // not something that screen can see. An interactive pop arrives as a
         // write to the path, which is held here, and the path is also the only
         // thing that can undo it.
-        .confirmationDialog(
-            MealDetailCopy.discardEditsConfirmation.title,
+        .fuelDialog(
+            MealDetailCopy.discardEditsConfirmation,
             isPresented: $isConfirmingPop,
-            titleVisibility: .visible
-        ) {
-            Button(MealDetailCopy.discardEditsConfirmation.confirm, role: .destructive) {
-                model.dismissMealDetail()
-            }
-
-            Button(MealDetailCopy.discardEditsConfirmation.cancel, role: .cancel) {}
-        }
+            onConfirm: model.dismissMealDetail
+        )
     }
 
     /// The stack's path, and the one place an interactive pop can be caught.

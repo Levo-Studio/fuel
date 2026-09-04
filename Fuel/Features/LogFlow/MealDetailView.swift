@@ -109,21 +109,30 @@ struct MealDetailView: View {
                 EmptyView()
             }
         }
-        // The platform's own confirmation, and deliberately the same one the
-        // discard control uses on the scan screens: `confirmationDialog`, the
-        // destructive verb in the role the platform draws destructive verbs in,
-        // and a cancel that does nothing at all. The export draws no modal of
-        // any kind, so a drawn one would be a second undrawn surface where iOS
-        // already has the honest answer.
-        .confirmationDialog(
-            MealDetailCopy.deleteTitle,
+        // Fuel's own question, and deliberately the same one the discard
+        // control asks on the scan screens: one sentence, the destructive verb
+        // on the answer that goes ahead, and a way out that does nothing at
+        // all. The export draws no modal of any kind, so what a dialog looks
+        // like coming up is the platform's — see `FuelDialog`, which is a sheet
+        // for exactly that reason — and what it says while it is up is this
+        // app's rather than iOS's.
+        //
+        // **Harder to answer by accident than the sheet it replaces, not
+        // easier.** The way out is the leading pill, under the corner the trash
+        // mark it was raised from occupies, and it is also the wide one; the
+        // destructive verb hugs its own label at the far end of the row. Every
+        // dismissal that is not that one small pill — the swipe, the tap
+        // outside, the app going to the background — keeps the entry.
+        .fuelDialog(
+            FuelDialogCopy(
+                title: MealDetailCopy.deleteTitle,
+                confirm: MealDetailCopy.deleteConfirm,
+                cancel: MealDetailCopy.deleteCancel,
+                destroys: true
+            ),
             isPresented: $isConfirmingDelete,
-            titleVisibility: .visible
-        ) {
-            Button(MealDetailCopy.deleteConfirm, role: .destructive) { delete() }
-
-            Button(MealDetailCopy.deleteCancel, role: .cancel) {}
-        }
+            onConfirm: delete
+        )
         // **The platform's own presentation, at the platform's own large
         // detent.** The owner asked for a sheet that rises to near the top of
         // the screen and named iOS's standard behaviour for it; the export

@@ -314,7 +314,7 @@
       }
     },
     "detail.delete" : {
-      "comment" : "The filled footer action on a logged meal, in the place screens 14 and 15 draw Hinzufügen. Not in the export.",
+      "comment" : "What VoiceOver calls the trash mark in the leading corner of a logged meal's footer. Not in the export.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -350,13 +350,13 @@
       }
     },
     "detail.delete.title" : {
-      "comment" : "The delete confirmation's own title. Not in the export.",
+      "comment" : "The delete question's own sentence, which is the whole of what it says. The owner's words, and their noun — entry, not meal. Not in the export.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Delete this meal?"
+            "value" : "Do you really want to delete this entry?"
           }
         }
       }
@@ -1532,7 +1532,7 @@
       }
     },
     "result.item.edit.message" : {
-      "comment" : "Under the item field, saying what belongs in it. Not in the export.",
+      "comment" : "Under the item field's title and over the field itself, saying what belongs in it. Not in the export.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {

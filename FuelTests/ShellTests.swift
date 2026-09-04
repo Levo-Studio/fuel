@@ -1258,7 +1258,7 @@ struct MealDetailBackGestureTests {
 // MARK: - The gesture Fuel owns
 
 /// `RootShell.todayStack`, reproduced down to the path binding and the discard
-/// confirmation hanging off it, with a real `RootShellModel` behind it.
+/// question hanging off it, with a real `RootShellModel` behind it.
 ///
 /// **The binding is the point of building it this way.** What the suite below
 /// asks is not only whether the navigation stack shrinks but whether the shell
@@ -1267,8 +1267,14 @@ struct MealDetailBackGestureTests {
 /// `MealDetailModel` directly — `PushedMealProbe` above — cannot be asked it.
 ///
 /// `RootShell` itself is not hosted because its model is `@State` and private,
-/// so nothing outside it can push a meal onto it; everything from the stack
-/// downwards is the same code.
+/// so nothing outside it can push a meal onto it. Everything from the stack
+/// downwards is the same code, and the question hanging off it is raised the
+/// same way — `fuelDialog`, with the answer carried out once the sheet has
+/// gone. It is worth keeping the two in step rather than leaving a probe that
+/// drives a mechanism the app no longer has: these suites are the only place
+/// the gesture and the question are exercised together, and a probe that raised
+/// a system dialog while `RootShell` raised Fuel's own would go on passing
+/// whatever happened to the real one.
 private struct BackPopShellProbe: View {
 
     let model: RootShellModel
@@ -1311,17 +1317,11 @@ private struct BackPopShellProbe: View {
                 }
             }
         }
-        .confirmationDialog(
-            MealDetailCopy.discardEditsConfirmation.title,
+        .fuelDialog(
+            MealDetailCopy.discardEditsConfirmation,
             isPresented: $isConfirmingPop,
-            titleVisibility: .visible
-        ) {
-            Button(MealDetailCopy.discardEditsConfirmation.confirm, role: .destructive) {
-                model.dismissMealDetail()
-            }
-
-            Button(MealDetailCopy.discardEditsConfirmation.cancel, role: .cancel) {}
-        }
+            onConfirm: model.dismissMealDetail
+        )
         .environment(\.fuelPalette, FuelPalette(theme: .dark, accent: .mono))
     }
 }

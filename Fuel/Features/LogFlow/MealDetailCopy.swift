@@ -39,8 +39,10 @@ nonisolated enum MealDetailCopy {
 
     // MARK: - Footer
 
-    /// The filled footer button, in the place and the shape `Add` occupies on
-    /// screens 14 and 15.
+    /// What VoiceOver calls the trash mark in the leading corner of the
+    /// footer. It is the only thing this word is used for — the control it
+    /// names draws a symbol and no label, and the question it raises carries
+    /// its own three words below.
     static var delete: String {
         String(localized: "detail.delete")
     }
@@ -67,11 +69,12 @@ nonisolated enum MealDetailCopy {
     /// false twice — nothing is discarded, and the meal is in the store and
     /// stays there whichever button is pressed. What is actually at stake is
     /// the breakdown edits the user has just made and has not had priced.
-    static var discardEditsConfirmation: MealResultConfirmation {
-        MealResultConfirmation(
+    static var discardEditsConfirmation: FuelDialogCopy {
+        FuelDialogCopy(
             title: String(localized: "detail.discardEdits.title"),
             confirm: String(localized: "detail.discardEdits.confirm"),
-            cancel: String(localized: "detail.discardEdits.cancel")
+            cancel: String(localized: "detail.discardEdits.cancel"),
+            destroys: true
         )
     }
 }

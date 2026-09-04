@@ -19,32 +19,6 @@ struct MealResultAction {
     let perform: () -> Void
 }
 
-// MARK: - Footer confirmation
-
-/// The words on the dialog that stands in front of throwing the user's work
-/// away.
-///
-/// A parameter for the same reason `MealResultAction`'s title is one: the
-/// mechanism is identical on every errand and the sentence is not. After an
-/// estimate, what is at stake is the estimate — nothing has been written down
-/// yet, and `Discard` is literally what happens to it. On a meal that is
-/// already in the store, nothing is discarded and the meal survives either way;
-/// what is at stake is the breakdown edits the user has just made.
-///
-/// One value rather than two, because one dialog stands in front of both
-/// controls that can reach it — the trash mark and `‹ Back` — and on any screen
-/// that draws both, both risk the same thing.
-nonisolated struct MealResultConfirmation {
-
-    let title: String
-
-    /// The destructive verb.
-    let confirm: String
-
-    /// The way out, which changes nothing.
-    let cancel: String
-}
-
 // MARK: - Meal result
 
 /// Screens 14 and 15: what the model came back with, before any of it is
@@ -114,9 +88,20 @@ struct MealResultView<Lede: View>: View {
     /// nothing to discard, and draws no leading control at all.
     let onDiscard: (() -> Void)?
 
-    /// What the confirmation in front of both of those says. Handed in the way
-    /// `flowLabel` is: the screen draws it, the caller knows what is at stake.
-    let discardConfirmation: MealResultConfirmation
+    /// What the question in front of both of those says.
+    ///
+    /// Handed in for the same reason `MealResultAction`'s title is: the
+    /// mechanism is identical on every errand and the sentence is not. After an
+    /// estimate, what is at stake is the estimate — nothing has been written
+    /// down yet, and `Discard` is literally what happens to it. On a meal that
+    /// is already in the store, nothing is discarded and the meal survives
+    /// either way; what is at stake is the breakdown edits the user has just
+    /// made.
+    ///
+    /// One value rather than two, because one dialog stands in front of both
+    /// controls that can reach it — the trash mark and `‹ Back` — and on any
+    /// screen that draws both, both risk the same thing.
+    let discardConfirmation: FuelDialogCopy
 
     /// The filled footer button as this caller means it.
     ///
@@ -167,7 +152,7 @@ struct MealResultView<Lede: View>: View {
         onAddItem: @escaping (String) -> Void,
         onReanalyse: @escaping () -> Void,
         onDiscard: (() -> Void)?,
-        discardConfirmation: MealResultConfirmation,
+        discardConfirmation: FuelDialogCopy,
         commit: MealResultAction?,
         @ViewBuilder lede: @escaping () -> Lede
     ) {
@@ -213,40 +198,49 @@ struct MealResultView<Lede: View>: View {
             // layout with the footer at `bottom:34`, and there is no drawn
             // second position for it. Nothing here needs the screen to move
             // either: the one field this screen can open is the item editor,
-            // and it lives in a system alert, which the platform lifts clear
-            // of the keyboard itself.
+            // and it lives on a sheet, which the platform lifts clear of the
+            // keyboard itself — the same reason this was safe while that field
+            // lived in a system alert.
             .ignoresSafeArea(.keyboard, edges: .bottom)
         }
-        // A system alert with one field, rather than a sheet drawn in the
-        // app's own language. The export has no editor of any kind, so
-        // anything here is undrawn; the platform's own answer is the honest
-        // one, and it brings the ordinary keyboard, the cancel that changes
-        // nothing and the focus behaviour for free.
-        .alert(MealResultCopy.itemEditTitle, isPresented: $isEditingItem) {
-            TextField(MealResultCopy.itemEditPlaceholder, text: $editedText)
-
-            Button(MealResultCopy.itemEditCancel, role: .cancel) {}
-
-            Button(MealResultCopy.itemEditConfirm) { commitItemEdit() }
-        } message: {
-            Text(MealResultCopy.itemEditMessage)
-        }
-        // The platform's own confirmation, for the same reason the item field
-        // is: the export draws no modal of any kind, so a drawn one would be a
-        // second undrawn surface where iOS already has the honest answer.
-        // `confirmationDialog` rather than `alert` because this is a
-        // destructive action being confirmed, which is the sheet's whole
-        // subject, and it puts the destructive verb where the platform's users
-        // look for it.
-        .confirmationDialog(
-            discardConfirmation.title,
+        // The field an item is written into, drawn in the app's own language
+        // rather than inside a system alert. The export has no editor of any
+        // kind, so anything here is undrawn — but what a sheet leaves undrawn
+        // is only how it arrives, and `FuelDialog` keeps all of that the
+        // platform's: the keyboard, the corner, the dimming, and the swipe
+        // that puts it away without writing anything.
+        //
+        // Screen 12's own arrangement, because this is screen 12's own errand:
+        // a heading, the line that says how to answer it, and one field under
+        // them.
+        .fuelDialog(
+            FuelDialogCopy(
+                title: MealResultCopy.itemEditTitle,
+                hint: MealResultCopy.itemEditMessage,
+                confirm: MealResultCopy.itemEditConfirm,
+                cancel: MealResultCopy.itemEditCancel,
+                // The only question this app asks that destroys nothing: what
+                // it does with an answer is write a line down.
+                destroys: false
+            ),
+            isPresented: $isEditingItem,
+            entry: FuelDialogEntry(
+                text: $editedText,
+                prompt: MealResultCopy.itemEditPlaceholder,
+                accessibilityLabel: MealResultCopy.itemEditTitle
+            ),
+            onConfirm: commitItemEdit,
+            onCancel: cancelItemEdit
+        )
+        // The same question the meal screen asks before a meal is deleted, in
+        // the same drawing: the export draws no modal of any kind, so how it
+        // comes up is the platform's and what it says is this app's.
+        .fuelDialog(
+            discardConfirmation,
             isPresented: $isConfirmingDiscard,
-            titleVisibility: .visible
-        ) {
-            Button(discardConfirmation.confirm, role: .destructive) { pendingDiscard?() }
-
-            Button(discardConfirmation.cancel, role: .cancel) { pendingDiscard = nil }
-        }
+            onConfirm: { pendingDiscard?() },
+            onCancel: { pendingDiscard = nil }
+        )
     }
 
     /// Puts the confirmation in front of something that throws the user's work
@@ -328,6 +322,20 @@ struct MealResultView<Lede: View>: View {
         } else {
             onAddItem(editedText)
         }
+        clearItemEdit()
+    }
+
+    /// What every other way out of the field does, which is nothing to the
+    /// breakdown — the swipe down and the tap outside included.
+    ///
+    /// It clears what was in the field, which the system alert did not need to:
+    /// a line the user backed out of is not a line, and the next thing to open
+    /// this field opens it on its own text rather than on the one before it.
+    private func cancelItemEdit() {
+        clearItemEdit()
+    }
+
+    private func clearItemEdit() {
         editedText = ""
         editedItem = nil
     }
