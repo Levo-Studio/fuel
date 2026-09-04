@@ -30,13 +30,17 @@ struct LogFlowView: View {
     /// The image the gallery picker handed back, held only until it is loaded.
     @State private var pickedPhoto: PhotosPickerItem?
 
-    /// Whether the text tab's field is holding the keyboard.
+    /// Which of the flow's two fields is holding the keyboard, if either is.
     ///
-    /// Owned here rather than inside `TextTabView`, because what has to let it
+    /// Owned here rather than inside the tabs, because what has to let a field
     /// go is a change of stage and the stage is what this view has. See
-    /// `LogFlowChrome.canHoldTextFocus` for why a field down in the scaffold
-    /// can outlive the screen it belongs to.
-    @FocusState private var isWritingMeal: Bool
+    /// `LogFlowChrome.canHoldFocus` for why a field down in the scaffold can
+    /// outlive the screen it belongs to.
+    ///
+    /// One value for both fields rather than a flag each: the release below
+    /// then has one thing to ask about, and two fields can never both believe
+    /// they have the keyboard.
+    @FocusState private var writing: LogFlowField?
 
     var body: some View {
         ZStack {
@@ -109,10 +113,12 @@ struct LogFlowView: View {
         }
         .fuelAnimation(FuelMotion.emphasised, value: camera.stage)
         .fuelAnimation(FuelMotion.emphasised, value: text.stage)
-        // Both halves of the rule, watched separately because either can move
-        // on its own: the stage when the sentence is submitted, an estimate
-        // comes back or a failure does, and the tab when the user walks to
-        // another log mode with the field still open.
+        // Every half of the rule, watched separately because each can move on
+        // its own: either mode's stage when a request is submitted, an estimate
+        // comes back or a failure does — the camera's included, because the
+        // shutter fires while the context field may still be open — and the tab
+        // when the user walks to another log mode with a field still open.
+        .onChange(of: camera.stage) { _, _ in releaseKeyboardIfUnreachable() }
         .onChange(of: text.stage) { _, _ in releaseKeyboardIfUnreachable() }
         .onChange(of: model.selectedTab) { _, _ in releaseKeyboardIfUnreachable() }
         .task(id: pickedPhoto) { await loadPickedPhoto() }
@@ -132,7 +138,7 @@ struct LogFlowView: View {
             // dismissal has been animated; letting go first means the keyboard
             // leaves with the flow rather than after it.
             onCancel: {
-                isWritingMeal = false
+                writing = nil
                 onCancel()
             },
             headerAccessory: { tab in
@@ -149,13 +155,15 @@ struct LogFlowView: View {
                     CameraTabView(
                         preview: camera.camera.preview,
                         isScanAvailable: camera.stage != .noKey,
+                        context: $camera.context,
+                        writing: $writing,
                         onShutter: { Task { await camera.capture() } }
                     )
                 case .text:
                     TextTabView(
                         typedText: $text.typedText,
                         isEstimateAvailable: text.stage != .noKey,
-                        isWriting: $isWritingMeal,
+                        writing: $writing,
                         onAnalyse: text.analyse
                     )
                 case .recent:
@@ -172,11 +180,18 @@ struct LogFlowView: View {
 
     // MARK: - Actions
 
-    /// Lets the field go the moment the screen it belongs to is no longer the
-    /// one on show.
+    /// Lets a field go the moment the screen it belongs to is no longer the one
+    /// on show.
     private func releaseKeyboardIfUnreachable() {
-        guard !LogFlowChrome.canHoldTextFocus(stage: text.stage, tab: model.selectedTab) else { return }
-        isWritingMeal = false
+        guard let writing else { return }
+        let isReachable = LogFlowChrome.canHoldFocus(
+            writing,
+            camera: camera.stage,
+            text: text.stage,
+            tab: model.selectedTab
+        )
+        guard !isReachable else { return }
+        self.writing = nil
     }
 
     private func log(_ meal: RecentMeal) {

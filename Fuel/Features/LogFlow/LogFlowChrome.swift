@@ -1,5 +1,24 @@
 import SwiftUI
 
+// MARK: - Fields
+
+/// The two fields the log flow can put a keyboard up for.
+///
+/// One focus value for the whole flow, named by field, rather than a `Bool`
+/// beside each: two independent flags can both be true, and the release rule
+/// below has to be able to say *which* field it is letting go of. `nil` is
+/// nothing focused.
+nonisolated enum LogFlowField: Hashable, Sendable {
+
+    /// Screen 12's field — the meal, in the user's own words.
+    case mealSentence
+
+    /// The line under screen 07's viewfinder: detail a photograph cannot carry.
+    /// **Not in the export**, which draws no field on that screen. See
+    /// `CameraTabView.contextField`.
+    case photoContext
+}
+
 // MARK: - Chrome scheme
 
 /// Which appearance the system chrome — the status bar above all — takes while
@@ -63,5 +82,34 @@ nonisolated enum LogFlowChrome {
     /// clock-free rule has to catch.
     static func canHoldTextFocus(stage: TextLogModel.Stage, tab: LogFlowTab) -> Bool {
         stage == .entry && tab == .text
+    }
+
+    /// The same rule for the context line under the viewfinder.
+    ///
+    /// The viewfinder is the only camera stage that draws it: the analysis
+    /// states and the result cover the flow, and a shutter that fires while the
+    /// field is open has to take the keyboard down with it. `noKey` is not the
+    /// viewfinder either — that tab draws the keyless notice and no field at
+    /// all, which is the case a key removed in Settings mid-flow has to reach.
+    static func canHoldPhotoContextFocus(stage: CameraLogModel.Stage, tab: LogFlowTab) -> Bool {
+        stage == .viewfinder && tab == .camera
+    }
+
+    /// Whether the field currently holding the keyboard is still on a screen
+    /// the user can see.
+    ///
+    /// The dispatch is here rather than at the call site so the flow asks one
+    /// question — "may this field keep the keyboard?" — and a field added later
+    /// is answered in this file rather than in a `switch` in a view.
+    static func canHoldFocus(
+        _ field: LogFlowField,
+        camera: CameraLogModel.Stage,
+        text: TextLogModel.Stage,
+        tab: LogFlowTab
+    ) -> Bool {
+        switch field {
+        case .mealSentence: canHoldTextFocus(stage: text, tab: tab)
+        case .photoContext: canHoldPhotoContextFocus(stage: camera, tab: tab)
+        }
     }
 }

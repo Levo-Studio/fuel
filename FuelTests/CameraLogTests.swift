@@ -671,6 +671,87 @@ struct CameraLogTests {
         #expect(!model.commit())
         #expect(try store.entries(on: at(19, 20)).isEmpty)
     }
+
+    // MARK: - The context line
+
+    @Test("a scan with nothing typed under the viewfinder carries no context")
+    func contextStartsEmpty() throws {
+        let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .success(Self.estimate)))
+
+        #expect(model.context.isEmpty)
+        #expect(model.photoContext == nil)
+    }
+
+    @Test("a field holding only whitespace is a field nothing was typed into")
+    func whitespaceIsNoContext() throws {
+        let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .success(Self.estimate)))
+
+        model.context = "   \n "
+
+        #expect(model.photoContext == nil)
+    }
+
+    @Test("what the request would carry is the typed line, trimmed")
+    func contextIsTrimmed() throws {
+        let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .success(Self.estimate)))
+
+        model.context = "  Fried in butter, not oil\n"
+
+        #expect(model.photoContext == "Fried in butter, not oil")
+    }
+
+    /// The field is optional, and optional has to mean the scan is unchanged by
+    /// an empty one — same request, same result, same drawn screen.
+    @Test("an empty field leaves the scan exactly as it was")
+    func emptyContextChangesNothing() async throws {
+        let client = ScriptedClient(answer: .success(Self.estimate))
+        let model = makeModel(store: try makeStore(), client: client)
+
+        await model.scanning(pixel())
+
+        #expect(model.stage == .result)
+        #expect(client.requests == 1)
+        #expect(model.draft?.kilocalories == 460)
+    }
+
+    @Test("a typed line survives the scan it was written for")
+    func contextSurvivesTheScan() async throws {
+        let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .success(Self.estimate)))
+
+        model.context = "The sauce has cream"
+        await model.scanning(pixel())
+
+        #expect(model.photoContext == "The sauce has cream")
+    }
+
+    /// The note was written about one plate. Carrying it back to the viewfinder
+    /// would attach it to the next photograph without the user seeing it
+    /// happen, because the field is not what they are looking at when they
+    /// press the shutter again.
+    @Test("the line goes with the frame when the scan is thrown away")
+    func discardClearsTheContext() async throws {
+        let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .success(Self.estimate)))
+
+        model.context = "Half of what you see"
+        await model.scanning(pixel())
+        model.discard()
+
+        #expect(model.context.isEmpty)
+        #expect(model.photoContext == nil)
+    }
+
+    @Test("the line goes with the frame when the meal is logged")
+    func commitClearsTheContext() async throws {
+        let store = try makeStore()
+        let model = makeModel(store: store, client: ScriptedClient(answer: .success(Self.estimate)))
+
+        model.context = "Oat milk, no sugar"
+        await model.scanning(pixel())
+        #expect(model.commit())
+
+        #expect(model.context.isEmpty)
+        #expect(model.photoContext == nil)
+    }
 }
 
 // MARK: - Driving a scan

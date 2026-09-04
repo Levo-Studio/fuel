@@ -1,6 +1,78 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "camera.context.example.milk" : {
+      "comment" : "Screen 07, an example in the empty context field. Names something the photograph cannot show. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oat milk, no sugar"
+          }
+        }
+      }
+    },
+    "camera.context.example.oil" : {
+      "comment" : "Screen 07, an example in the empty context field. Names something the photograph cannot show. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fried in olive oil"
+          }
+        }
+      }
+    },
+    "camera.context.example.portion" : {
+      "comment" : "Screen 07, an example in the empty context field. Names something the photograph cannot show. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Half of what you see"
+          }
+        }
+      }
+    },
+    "camera.context.example.sauce" : {
+      "comment" : "Screen 07, an example in the empty context field. Names something the photograph cannot show. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The sauce has cream"
+          }
+        }
+      }
+    },
+    "camera.context.label" : {
+      "comment" : "Accessibility label of the context field under screen 07's viewfinder, which has no heading over it. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extra detail for the estimate"
+          }
+        }
+      }
+    },
+    "camera.context.placeholder.format" : {
+      "comment" : "Screen 07, an example with the trailing ellipsis that makes it read as unfinished. The space before it is the export's own spacing on the analysis screens. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ …"
+          }
+        }
+      }
+    },
     "camera.gallery.label" : {
       "comment" : "Accessibility label of the circular gallery button on screen 07. Not in the export.",
       "extractionState" : "manual",

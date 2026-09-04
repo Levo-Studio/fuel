@@ -98,4 +98,59 @@ struct LogFlowChromeTests {
     func anotherTabDoesNotHoldFocus(tab: LogFlowTab) {
         #expect(LogFlowChrome.canHoldTextFocus(stage: .entry, tab: tab) == false)
     }
+
+    // MARK: - The context line
+
+    /// The one arrangement in which the line under the viewfinder is on screen.
+    @Test("the viewfinder in its own tab is the one place the context line is reachable")
+    func viewfinderHoldsFocus() {
+        #expect(LogFlowChrome.canHoldPhotoContextFocus(stage: .viewfinder, tab: .camera))
+    }
+
+    /// The shutter is the case this exists for: it fires while the field may
+    /// still be open, and every stage it leads to covers the flow with a screen
+    /// that draws no field at all.
+    @Test(
+        "no stage past the viewfinder may hold the keyboard",
+        arguments: [
+            CameraLogModel.Stage.analysing(.analysingMeal),
+            .analysing(.identifyingIngredients),
+            .analysing(.estimatingAmounts),
+            .analysing(.calculatingNutrition),
+            .failed(.retry(.transport)),
+            .result,
+            .noKey
+        ]
+    )
+    func onlyTheViewfinderHoldsFocus(stage: CameraLogModel.Stage) {
+        #expect(LogFlowChrome.canHoldPhotoContextFocus(stage: stage, tab: .camera) == false)
+    }
+
+    @Test("another tab does not hold the context line", arguments: [LogFlowTab.text, .recent])
+    func anotherTabDoesNotHoldTheContextLine(tab: LogFlowTab) {
+        #expect(LogFlowChrome.canHoldPhotoContextFocus(stage: .viewfinder, tab: tab) == false)
+    }
+
+    // MARK: - Which field is asked about
+
+    /// The dispatch, not the two rules under it: each field is answered by its
+    /// own mode's stage and never by the other's. Without this a viewfinder
+    /// left showing would keep the keyboard up for the *text* field on screens
+    /// 08 to 11 — the arrangement `LogFlowView` reaches every time a scan runs
+    /// with the text tab's sentence still focused.
+    @Test("each field is answered by its own mode's stage")
+    func focusIsAnsweredPerField() {
+        #expect(
+            LogFlowChrome.canHoldFocus(.mealSentence, camera: .viewfinder, text: .entry, tab: .text)
+        )
+        #expect(
+            LogFlowChrome.canHoldFocus(.mealSentence, camera: .viewfinder, text: .result, tab: .text) == false
+        )
+        #expect(
+            LogFlowChrome.canHoldFocus(.photoContext, camera: .viewfinder, text: .result, tab: .camera)
+        )
+        #expect(
+            LogFlowChrome.canHoldFocus(.photoContext, camera: .result, text: .entry, tab: .camera) == false
+        )
+    }
 }

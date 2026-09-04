@@ -56,6 +56,36 @@ final class CameraLogModel {
     /// no fresher compression to replace this with.
     private(set) var capturedPhotoData: Data?
 
+    /// What the user typed under the viewfinder: detail a photograph cannot
+    /// carry — the oil something was fried in, what is in a sauce, a portion
+    /// that is smaller than it looks.
+    ///
+    /// **Optional in the plainest sense.** An empty field is the screen the
+    /// export draws, and a scan made over one behaves exactly as it did before
+    /// the field existed: nothing is required, nothing is refused, and the
+    /// shutter does not ask.
+    ///
+    /// Writable from the outside because the field binds straight to it. It is
+    /// held on the model rather than in the view for the reason `typedText` is
+    /// on the text model: the request is what will carry it, and a value the
+    /// request needs cannot live somewhere the request cannot reach.
+    var context = ""
+
+    /// The context as a request would carry it, or `nil` when there is none.
+    ///
+    /// Trimmed, because a field holding only a space is a field the user typed
+    /// nothing into, and sending it would spend tokens saying so.
+    ///
+    /// **Nothing sends this yet.** `AIClient.estimate(photo:)` takes a frame
+    /// and nothing else, and `Fuel/Core/AI/` is not this change's to widen —
+    /// the parameter and the prompt it lands in arrive with that file's own
+    /// change. Until then this is the value the scan will hand over, and
+    /// `CameraLogTests` holds it to the shape the request needs.
+    var photoContext: String? {
+        let trimmed = context.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
     private(set) var draft: MealResultDraft?
 
     /// When the shutter was pressed. Fixed there rather than read again at
@@ -490,12 +520,18 @@ final class CameraLogModel {
     /// `commit()` calls this too, but only after `store.log` has already put
     /// the compressed bytes in the entry, so a committed meal keeps its
     /// photograph; what ends here is only this object's own copy of it.
+    ///
+    /// The context goes with the frame. It was written about *that* plate, and
+    /// leaving it in the field would attach one meal's note to the next one's
+    /// photograph — silently, because the viewfinder is where the user lands
+    /// and the field is not what they are looking at.
     func discard() {
         retireRun()
         scan = nil
         isReanalysing = false
         photo = nil
         capturedPhotoData = nil
+        context = ""
         draft = nil
         stage = keys.hasKey(for: provider) ? .viewfinder : .noKey
     }

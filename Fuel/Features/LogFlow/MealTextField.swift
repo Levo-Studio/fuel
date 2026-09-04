@@ -19,6 +19,11 @@ struct MealTextField: View {
 
     @Binding var text: String
 
+    /// Which of the flow's two fields this is, so one focus value can address
+    /// both and `LogFlowChrome` can answer per field whether it may keep the
+    /// keyboard.
+    let field: LogFlowField
+
     /// The examples the empty field rotates through, in the order they are
     /// shown.
     let examples: [String]
@@ -31,13 +36,13 @@ struct MealTextField: View {
     /// over it, because that heading is what names the field on screen.
     let accessibilityLabel: String
 
-    /// Whether the field is holding the keyboard.
+    /// Which field is holding the keyboard, for the whole flow.
     ///
-    /// Bound rather than held here: the field outlives its own screen — the
+    /// Bound rather than held here: a field outlives its own screen — the
     /// scaffold stays in the hierarchy under the analysis and result overlays
     /// — so whoever knows the stage has to be able to let it go. See
-    /// `LogFlowChrome.canHoldTextFocus`.
-    @FocusState.Binding var isWriting: Bool
+    /// `LogFlowChrome.canHoldFocus`.
+    @FocusState.Binding var writing: LogFlowField?
 
     /// Which example the empty field is showing. View state, and it never
     /// reaches the model: an example is something to read, not something the
@@ -47,16 +52,18 @@ struct MealTextField: View {
 
     init(
         text: Binding<String>,
+        field: LogFlowField,
         examples: [String],
         line: @escaping (String) -> String,
         accessibilityLabel: String,
-        isWriting: FocusState<Bool>.Binding
+        writing: FocusState<LogFlowField?>.Binding
     ) {
         self._text = text
+        self.field = field
         self.examples = examples
         self.line = line
         self.accessibilityLabel = accessibilityLabel
-        self._isWriting = isWriting
+        self._writing = writing
         self._placeholder = State(initialValue: TextEntryPlaceholder(examples: examples))
     }
 
@@ -64,7 +71,7 @@ struct MealTextField: View {
         TextField("", text: $text, prompt: prompt, axis: .vertical)
             .fuelStyle(FuelTypography.textEntry)
             .foregroundStyle(FuelPalette.Camera.ink)
-            .focused($isWriting)
+            .focused($writing, equals: field)
             // The caret, not a drawn value: the export renders no cursor. The
             // camera surface stays dark in both themes, so the theme's accent
             // is not guaranteed to be legible on it and the surface's own ink

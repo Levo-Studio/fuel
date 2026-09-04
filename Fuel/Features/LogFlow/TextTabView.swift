@@ -17,13 +17,13 @@ struct TextTabView: View {
     /// buys, so the field goes with it and the tab says why.
     let isEstimateAvailable: Bool
 
-    /// Whether the field is holding the keyboard.
+    /// Which field in the flow is holding the keyboard.
     ///
     /// Bound rather than held here: the field outlives its own screen — the
     /// scaffold stays in the hierarchy under the analysis and result overlays
     /// — so whoever knows the stage has to be able to let it go. See
     /// `LogFlowChrome.canHoldTextFocus`.
-    @FocusState.Binding var isWriting: Bool
+    @FocusState.Binding var writing: LogFlowField?
 
     let onAnalyse: () -> Void
 
@@ -79,10 +79,11 @@ struct TextTabView: View {
     private var field: some View {
         MealTextField(
             text: $typedText,
+            field: .mealSentence,
             examples: TextLogCopy.placeholderExamples,
             line: TextLogCopy.placeholderLine,
             accessibilityLabel: TextLogCopy.title,
-            isWriting: $isWriting
+            writing: $writing
         )
     }
 
@@ -133,7 +134,7 @@ struct TextTabView: View {
 
 #Preview("Text entry") {
     @Previewable @State var typedText = ""
-    @Previewable @FocusState var isWriting: Bool
+    @Previewable @FocusState var writing: LogFlowField?
 
     ZStack {
         FuelPalette(theme: .dark, accent: .mono).camera
@@ -142,7 +143,7 @@ struct TextTabView: View {
         TextTabView(
             typedText: $typedText,
             isEstimateAvailable: true,
-            isWriting: $isWriting,
+            writing: $writing,
             onAnalyse: {}
         )
     }
@@ -150,7 +151,7 @@ struct TextTabView: View {
 
 #Preview("Text entry, written in") {
     @Previewable @State var typedText = "2 eggs with 200g cottage cheese and polenta"
-    @Previewable @FocusState var isWriting: Bool
+    @Previewable @FocusState var writing: LogFlowField?
 
     ZStack {
         FuelPalette(theme: .dark, accent: .mono).camera
@@ -159,7 +160,7 @@ struct TextTabView: View {
         TextTabView(
             typedText: $typedText,
             isEstimateAvailable: true,
-            isWriting: $isWriting,
+            writing: $writing,
             onAnalyse: {}
         )
     }
@@ -167,7 +168,7 @@ struct TextTabView: View {
 
 #Preview("Text entry without a key") {
     @Previewable @State var typedText = ""
-    @Previewable @FocusState var isWriting: Bool
+    @Previewable @FocusState var writing: LogFlowField?
 
     ZStack {
         FuelPalette(theme: .light, accent: .mono).camera
@@ -176,7 +177,7 @@ struct TextTabView: View {
         TextTabView(
             typedText: $typedText,
             isEstimateAvailable: false,
-            isWriting: $isWriting,
+            writing: $writing,
             onAnalyse: {}
         )
     }
