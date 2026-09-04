@@ -27,12 +27,17 @@ nonisolated enum RecentList: String, CaseIterable, Identifiable, Hashable, Senda
 /// A stored meal as the Recent list needs to read it.
 ///
 /// The list has a hand-off value of its own rather than reusing
-/// `NutritionEntry`, which deliberately carries neither the line items nor the
-/// favourite flag — the nutrition core has no use for either, and what it
-/// cannot see it cannot come to depend on. This list needs both: it repeats a
-/// meal whole, items included, and one of its two lists is the starred meals.
-/// Widening the core's value to serve a feature would give the core two things
-/// to ignore; a second value at the same boundary gives it none.
+/// `NutritionEntry`, which deliberately carries no line items — the nutrition
+/// core has no use for them, and what it cannot see it cannot come to depend
+/// on. This list does need them: it repeats a meal whole. Widening the core's
+/// value to serve a feature would give the core a field to ignore; a second
+/// value at the same boundary gives it none.
+///
+/// It carries no favourite flag either, although the tab has a list of starred
+/// meals. That list is a fetch of its own — `FuelStore.favouriteEntries(limit:)`
+/// filters on the stored `Bool`, which is something SwiftData can do and
+/// something an opaque item blob could never be — so by the time a row reaches
+/// this value, whether it is starred has already been answered.
 ///
 /// Pure and free of SwiftData, like `NutritionEntry` and for the same reason:
 /// `FuelStore` builds one of these at its boundary, and everything below is
@@ -43,7 +48,6 @@ nonisolated struct RecentEntry: Identifiable, Hashable, Sendable {
     let title: String
     let kilocalories: Int
     let macros: MacroTotals
-    let isFavourite: Bool
     let items: [RecognisedItem]
 
     init(
@@ -51,14 +55,12 @@ nonisolated struct RecentEntry: Identifiable, Hashable, Sendable {
         title: String,
         kilocalories: Int,
         macros: MacroTotals,
-        isFavourite: Bool = false,
         items: [RecognisedItem] = []
     ) {
         self.id = id
         self.title = title
         self.kilocalories = kilocalories
         self.macros = macros
-        self.isFavourite = isFavourite
         self.items = items
     }
 }
