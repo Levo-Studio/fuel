@@ -930,6 +930,29 @@ struct CameraLogTests {
         #expect(model.photoContext == "The sauce has cream")
     }
 
+    @Test("the typed line is what the scan hands to the client")
+    func theScanSendsTheTypedLine() async throws {
+        let client = ScriptedClient(answer: .success(Self.estimate))
+        let model = makeModel(store: try makeStore(), client: client)
+
+        model.context = "  Fried in butter, not oil\n"
+        await model.scanning(pixel())
+
+        #expect(client.lastPhotoContext == "Fried in butter, not oil")
+    }
+
+    /// The other half of "optional": a scan over an empty field hands the
+    /// client nothing, rather than an empty string it would have to interpret.
+    @Test("an empty field hands the client no note")
+    func anEmptyFieldSendsNoNote() async throws {
+        let client = ScriptedClient(answer: .success(Self.estimate))
+        let model = makeModel(store: try makeStore(), client: client)
+
+        await model.scanning(pixel())
+
+        #expect(client.lastPhotoContext == nil)
+    }
+
     /// The note was written about one plate. Carrying it back to the viewfinder
     /// would attach it to the next photograph without the user seeing it
     /// happen, because the field is not what they are looking at when they
