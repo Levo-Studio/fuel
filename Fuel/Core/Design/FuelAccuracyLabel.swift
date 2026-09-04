@@ -44,11 +44,17 @@ struct FuelAccuracyLabel: View {
     /// this type never has to represent "unknown".
     let percent: Int
 
+    /// The drawn style, named so a test can hold *this element* to it rather
+    /// than restating what `overlayCaption` happens to contain. A style test
+    /// that reads the token directly passes whatever this view is set in, which
+    /// is a test that cannot fail for the reason it exists.
+    static let style = FuelTypography.overlayCaption
+
     @Environment(\.fuelPalette) private var palette
 
     var body: some View {
         Text(FuelAccuracyCopy.figure(percent))
-            .fuelStyle(FuelTypography.overlayCaption)
+            .fuelStyle(Self.style)
             .foregroundStyle(palette.muted)
             .accessibilityLabel(Text(FuelAccuracyCopy.spoken(percent)))
     }
