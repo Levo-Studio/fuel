@@ -216,22 +216,15 @@ struct MealResultView<Lede: View>: View {
         } message: {
             Text(MealResultCopy.itemEditMessage)
         }
-        // The platform's own confirmation, for the same reason the item field
-        // is: the export draws no modal of any kind, so a drawn one would be a
-        // second undrawn surface where iOS already has the honest answer.
-        // `confirmationDialog` rather than `alert` because this is a
-        // destructive action being confirmed, which is the sheet's whole
-        // subject, and it puts the destructive verb where the platform's users
-        // look for it.
-        .confirmationDialog(
-            discardConfirmation.title,
+        // The same question the meal screen asks before a meal is deleted, in
+        // the same drawing: the export draws no modal of any kind, so how it
+        // comes up is the platform's and what it says is this app's.
+        .fuelDialog(
+            discardConfirmation,
             isPresented: $isConfirmingDiscard,
-            titleVisibility: .visible
-        ) {
-            Button(discardConfirmation.confirm, role: .destructive) { pendingDiscard?() }
-
-            Button(discardConfirmation.cancel, role: .cancel) { pendingDiscard = nil }
-        }
+            onConfirm: { pendingDiscard?() },
+            onCancel: { pendingDiscard = nil }
+        )
     }
 
     /// Puts the confirmation in front of something that throws the user's work
