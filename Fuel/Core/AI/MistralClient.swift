@@ -89,13 +89,19 @@ nonisolated struct MistralClient: AIClient {
 
     // MARK: - Estimating
 
-    func estimate(photo: MealPhoto) async throws -> MealEstimate {
+    func estimate(photo: MealPhoto, context: String? = nil) async throws -> MealEstimate {
         // Mistral takes an image as a data URL in an `image_url` part, not as
         // a base64 block with a separate media type. Same bytes, different
         // envelope — which is the whole reason `MealPhoto` hands out the
         // encoding rather than the request shape.
+        //
+        // The user's note rides inside the text part, so the note sits ahead
+        // of the image here and behind it at Anthropic. That is the envelope
+        // difference above and not a second rule about precedence: what keeps
+        // the photograph primary is `photoContextPreamble` saying so in words,
+        // and both providers get those words identically.
         let content: [[String: Any]] = [
-            ["type": "text", "text": EstimateContract.photoInstruction],
+            ["type": "text", "text": EstimateContract.photoInstruction(with: context)],
             [
                 "type": "image_url",
                 "image_url": "data:\(MealPhoto.mediaType);base64,\(photo.base64)"

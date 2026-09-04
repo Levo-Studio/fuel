@@ -272,6 +272,110 @@ struct PhotoEstimateTests {
         #expect(content[1]["type"] as? String == "text")
     }
 
+    /// Beside the image, in the request the scan was already making. The counts
+    /// are the assertion: still two content parts, still one round trip.
+    @Test("the typed note travels beside the image, in the same one request")
+    func contextTravelsWithThePhoto() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let transport = RecordingTransport(
+            status: 200,
+            body: Reply.anthropic(Reply.goodEstimate)
+        )
+        let client = AnthropicClient(transport: transport, keys: keys.source)
+        _ = try await client.estimate(photo: tinyPhoto(), context: "The sauce has cream")
+
+        #expect(transport.requests.count == 1)
+
+        let body = try #require(transport.requests.first?.httpBody)
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let messages = try #require(json["messages"] as? [[String: Any]])
+        let content = try #require(messages.first?["content"] as? [[String: Any]])
+
+        #expect(content.count == 2)
+        #expect(content[0]["type"] as? String == "image")
+
+        let text = try #require(content[1]["text"] as? String)
+        #expect(text.contains("Note: The sauce has cream"))
+        #expect(text.contains(EstimateContract.photoContextPreamble))
+    }
+
+    @Test("Mistral carries the note in the same part as the instruction")
+    func mistralCarriesTheContext() async throws {
+        let keys = try KeyFixture(provider: .mistral, secret: "0123456789abcdefghij")
+        defer { keys.tearDown(provider: .mistral) }
+
+        let transport = RecordingTransport(
+            status: 200,
+            body: Reply.mistral(Reply.goodEstimate)
+        )
+        let client = MistralClient(transport: transport, keys: keys.source)
+        _ = try await client.estimate(photo: tinyPhoto(), context: "Half of what you see")
+
+        #expect(transport.requests.count == 1)
+
+        let body = try #require(transport.requests.first?.httpBody)
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let messages = try #require(json["messages"] as? [[String: Any]])
+        let content = try #require(messages.last?["content"] as? [[String: Any]])
+
+        #expect(content.count == 2)
+        let textParts = content.filter { $0["type"] as? String == "text" }
+        #expect(textParts.count == 1)
+        let text = try #require(textParts.first?["text"] as? String)
+        #expect(text.contains("Note: Half of what you see"))
+        #expect(text.contains(EstimateContract.photoContextPreamble))
+    }
+
+    @Test("a scan with nothing typed under it mentions no note at all")
+    func noContextIsNoMentionOfOne() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let transport = RecordingTransport(
+            status: 200,
+            body: Reply.anthropic(Reply.goodEstimate)
+        )
+        let client = AnthropicClient(transport: transport, keys: keys.source)
+        _ = try await client.estimate(photo: tinyPhoto())
+
+        let body = try #require(transport.requests.first?.httpBody)
+        let parts = textParts(in: body)
+
+        #expect(parts == [EstimateContract.photoInstruction])
+    }
+
+    /// The bound runs before the body is built, so the failure this pins is not
+    /// "the note was cut short on the wire" but "the note was never on it".
+    @Test("an overlong note never reaches the provider")
+    func anOverlongContextNeverReachesTheProvider() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let transport = RecordingTransport(
+            status: 200,
+            body: Reply.anthropic(Reply.goodEstimate)
+        )
+        let client = AnthropicClient(transport: transport, keys: keys.source)
+
+        let note = "Zzznotafood " + String(repeating: "a", count: EstimateContract.maximumContextLength)
+        _ = try await client.estimate(photo: tinyPhoto(), context: note)
+
+        let body = try #require(transport.requests.first?.httpBody)
+        let wire = try #require(String(data: body, encoding: .utf8))
+
+        // Not a fragment of it either: a truncated note would still carry its
+        // opening words, and its opening words are what would mislead.
+        //
+        // Reduced to a `Bool` before the expectation rather than asserted on
+        // `wire` directly, so a failure here reports the answer instead of
+        // printing a base64 photograph into the test log.
+        let carriesTheNote = wire.contains("Zzznotafood")
+        #expect(!carriesTheNote)
+        #expect(textParts(in: body) == [EstimateContract.photoInstruction])
+    }
+
     @Test("a good Mistral reply becomes an estimate")
     func mistralPhoto() async throws {
         let keys = try KeyFixture(provider: .mistral, secret: "0123456789abcdefghij")

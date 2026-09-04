@@ -45,7 +45,7 @@ final class ScriptedClient: AIClient, @unchecked Sendable {
 
     func checkKey(_ key: APIKey) async -> KeyCheckResult { .passed }
 
-    func estimate(photo: MealPhoto) async throws -> MealEstimate {
+    func estimate(photo: MealPhoto, context: String?) async throws -> MealEstimate {
         try next()
     }
 
@@ -111,7 +111,7 @@ nonisolated struct UnusedEstimator: AIClient {
 
     func checkKey(_ key: APIKey) async -> KeyCheckResult { .failed(.cancelled) }
 
-    func estimate(photo: MealPhoto) async throws -> MealEstimate { throw AIError.cancelled }
+    func estimate(photo: MealPhoto, context: String?) async throws -> MealEstimate { throw AIError.cancelled }
 
     func estimate(text: String) async throws -> MealEstimate { throw AIError.cancelled }
 }
@@ -198,7 +198,7 @@ final class GatedClient: AIClient, @unchecked Sendable {
 
     func checkKey(_ key: APIKey) async -> KeyCheckResult { .passed }
 
-    func estimate(photo: MealPhoto) async throws -> MealEstimate {
+    func estimate(photo: MealPhoto, context: String?) async throws -> MealEstimate {
         try await next()
     }
 
