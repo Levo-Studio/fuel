@@ -156,7 +156,7 @@ final class MealChatModel {
     /// way in cannot be undone by the next word. See `MealChatEvent.sentence`.
     ///
     /// **It never becomes a transcript line.** What lands in `messages` is the
-    /// sentence from the finished turn, parsed out of the complete object; this
+    /// sentence from the finished turn, read out of the complete reply; this
     /// is thrown away when the turn ends, whichever way it ends. A stream that
     /// dies half-way through a sentence leaves nothing behind — see
     /// `fail(with:as:)`.
@@ -444,7 +444,7 @@ final class MealChatModel {
         guard isCurrent(run), let subject else { return }
 
         // Whatever happens below, nothing is still arriving. The sentence that
-        // lands in the transcript comes from the complete object rather than
+        // lands in the transcript comes from the complete reply rather than
         // from what was drawn on the way — the two agree, and the complete one
         // is the one that was parsed.
         arrivingReply = nil

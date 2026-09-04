@@ -260,8 +260,8 @@ nonisolated enum MealChatContract {
     /// dropping one overlong sentence costs the sentence and leaves the answer
     /// standing. Prose *is* the answer: there is no object behind it, and
     /// dropping it costs the user the request. Holding it to a bound written
-    /// for a caption beside a row would put "Nothing changed" over a paragraph
-    /// that answered the question perfectly well.
+    /// for a caption beside a row would put one of Fuel's own fixed sentences
+    /// over a paragraph that answered the question perfectly well.
     ///
     /// A thousand characters is a long paragraph and nothing like a page. It is
     /// generous on purpose — the cap exists to have *a* bound on a string the

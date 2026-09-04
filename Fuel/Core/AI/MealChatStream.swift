@@ -339,11 +339,12 @@ nonisolated struct MealChatStreamAssembler {
     /// The turn, complete.
     ///
     /// **The structured half is parsed exactly as it was before any of this
-    /// streamed**: one complete object through `MealChatContract.intent(from:)`
+    /// streamed**: the complete reply through `MealChatContract.intent(from:)`
     /// and one pass through `MealAdjuster`. Nothing the partial reader said is
-    /// carried into it. Streaming buys the sentence its progressive arrival and
-    /// buys the screen its early warning; it buys the weights nothing, and the
-    /// weights are the part that must not be guessed at.
+    /// carried into it — including the prose it drew, which is read again from
+    /// the whole buffer here. Streaming buys the sentence its progressive
+    /// arrival and buys the screen its early warning; it buys the weights
+    /// nothing, and the weights are the part that must not be guessed at.
     ///
     /// Throws `AIError.truncatedReply` where the provider said it ran into the
     /// ceiling before an object was finished — and not where it said so after
