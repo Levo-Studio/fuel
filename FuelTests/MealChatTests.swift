@@ -283,6 +283,50 @@ struct MealChatTests {
         #expect(client.lastMessage == "a tablespoon")
     }
 
+    /// **A line the model never answered is not an exchange.** It stays in the
+    /// transcript, because the user typed it and can see that they did, and it
+    /// stays out of the request: two user turns in a row is a request the
+    /// providers are not trained on and can refuse outright.
+    @Test("a message that was never answered does not travel as history")
+    func unansweredTurnsDoNotTravel() async throws {
+        let subject = StandInSubject(meal: Self.meal())
+        let client = ScriptedClient(
+            adjustments: [
+                .failure(.network),
+                .success(MealAdjustmentOutcome(reply: "Polenta is boiled maize meal.", meal: nil)),
+                .success(MealAdjustmentOutcome(reply: "Raised the rice.", meal: Self.raised())),
+            ]
+        )
+        let model = makeModel(subject: subject, client: client)
+
+        model.message = "it was quite oily"
+        model.send()
+        await settle(model)
+
+        // The failure is dismissed rather than retried, and something else is
+        // asked — which is the one move that leaves an orphan behind.
+        model.dismissFailure()
+        model.message = "what is in polenta?"
+        model.send()
+        await settle(model)
+
+        #expect(client.lastHistory == [])
+
+        model.message = "more rice"
+        model.send()
+        await settle(model)
+
+        // Only the exchange that happened, and the user's unanswered line is
+        // still drawn above it.
+        #expect(
+            client.lastHistory == [
+                MealChatTurn(speaker: .user, text: "what is in polenta?"),
+                MealChatTurn(speaker: .model, text: "Polenta is boiled maize meal."),
+            ]
+        )
+        #expect(model.messages.map(\.author) == [.you, .you, .fuel, .you, .fuel])
+    }
+
     /// The second message is about the meal the first one produced, so a
     /// snapshot taken when the sheet opened would raise the rice twice from
     /// 150 g.
