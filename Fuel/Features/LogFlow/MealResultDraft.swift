@@ -206,13 +206,12 @@ nonisolated struct MealResultDraft: Equatable, Sendable {
     /// standing line describes the meal before one row changed, which is a
     /// closer description of what is on the screen than a remark about the row
     /// on its own, and closer than nothing. The macros are the harder case and
-    /// the answer is
-    /// `FoodTableGrounding`'s again: the model is asked for macros once, for
-    /// the whole meal, and never per row, so the meal's macro figure has no
-    /// part in it attributable to the rows that changed and nothing that can
-    /// honestly be taken out. Splitting it by kilocalorie share would answer
-    /// that question with a number nobody produced. They stand until a reply
-    /// that is about the whole meal replaces them, which is the case below.
+    /// the answer is `FoodTableGrounding`'s again: the model is asked for
+    /// macros once, for the whole meal, and never per row, so the meal's macro
+    /// figure has no part in it attributable to the rows that changed and
+    /// nothing that can honestly be taken out. Splitting it by kilocalorie
+    /// share would answer that question with a number nobody produced. They
+    /// stand until a reply about the whole meal replaces them, below.
     ///
     /// **When every row was changed there is nothing left to protect**, the
     /// reply describes the entire meal, and this is the wholesale replacement
