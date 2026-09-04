@@ -854,7 +854,26 @@ extension View {
     /// footer's own bottom padding is the export's `bottom:34`, and a spacing
     /// here would be a second, invented one.
     ///
-    /// One modifier rather than the same three in two files, for the reason
+    /// **The band behind the footer is drawn nowhere in the export.** Neither
+    /// result frame has a gradient anywhere on it, and a still render has no
+    /// scrolled list to need one. It is there because the screen does: a
+    /// `safeAreaInset` clears the list where it comes to rest and nothing at all
+    /// while it is being dragged past, so the rows ran into the controls — what
+    /// the owner saw was `Add item` and a row's remove mark reading through and
+    /// around the trash mark and the pill. What stands behind them is
+    /// `FuelListFade`, the one fade the design does write down — see
+    /// `design/Fuel Design Notes.md`, "The list fade under the add button" — at
+    /// its own height and its own stop rather than a second gradient invented
+    /// for this screen. The two places it is used are the same situation: a
+    /// control floating over a list that has to keep passing under it.
+    ///
+    /// It is a background rather than a layer of its own, so it takes the
+    /// footer's width and its bottom edge and reaches up past it on the
+    /// strength of its own height. Nothing about the controls moves for it, and
+    /// `FuelListFade` answers no touch, so a row under the band is still a row
+    /// a finger can reach.
+    ///
+    /// One modifier rather than the same four in two files, for the reason
     /// `MealResultPrimaryButton` is shared — and because the inset and the
     /// stripping of the container inset are two halves of one arrangement.
     /// Applying the first without the second puts the footer back at 68.
@@ -863,6 +882,7 @@ extension View {
             content()
                 .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
                 .padding(.bottom, FuelMetrics.Space.s34)
+                .background(alignment: .bottom) { FuelListFade() }
         }
         .ignoresSafeArea(.container, edges: .bottom)
     }

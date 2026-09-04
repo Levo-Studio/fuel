@@ -105,16 +105,20 @@ nonisolated enum FuelMetrics {
         static let keyTestTopPadding = Space.s96
     }
 
-    /// The band that fades the day list out under the floating add button, so
-    /// the last row does not collide with it.
+    /// The band that fades a list out under whatever floats over it, so the
+    /// last row does not collide with it.
     ///
     /// Prototype-only: a static render has no scrolled list to fade, so
     /// grepping `Screens2c.dc.html` for it comes back empty. See
-    /// `design/Fuel Design Notes.md`, "The list fade under the add button".
+    /// `design/Fuel Design Notes.md`, "The list fade under the add button" —
+    /// written down for Today's add button, and reused under the result
+    /// screens' footer, which the design does not write down at all.
     enum ListFade {
 
-        /// Band height. Note this is taller than the button plus its inset —
-        /// the fade has to start above the button, not level with it.
+        /// Band height. Note this is taller than either thing it covers for —
+        /// Today's 58 button on its 32 inset, and the result footer's controls
+        /// on their 34 — because the fade has to start above the control, not
+        /// level with it.
         static let height: CGFloat = 120
 
         /// Where the background reaches full opacity, measured from the bottom.
