@@ -194,57 +194,10 @@ struct MealResultView<Lede: View>: View {
 
             VStack(alignment: .leading, spacing: .zero) {
                 header
-
-                ScrollView {
-                    VStack(alignment: .leading, spacing: .zero) {
-                        lede()
-                        labelRow
-                        caloriesRow
-                        macroRow
-                        itemList
-                    }
-                    .padding(.top, FuelMetrics.Space.s26)
-                    .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
-                }
-                .fuelScrolling()
-                // The list ends above the footer, as the export draws it —
-                // and it ends above wherever the footer currently is, which is
-                // the whole point of taking the inset from the footer rather
-                // than writing a number for it.
-                //
-                // It used to be a fixed `s96` under a footer laid over the
-                // list in a bottom-aligned `ZStack`. That number stood for the
-                // footer's height at rest, and it was two things at once: a
-                // measurement of a view nobody had measured, and a promise the
-                // layout could not keep the moment the keyboard came up. The
-                // keyboard shrinks the safe area, the footer rises with it,
-                // and a bottom padding on the *content* rises with the list
-                // instead — so the two pass each other and the pills end up
-                // over the breakdown, mid-list, which is what the owner saw.
-                //
-                // `safeAreaInset` inverts that: the footer is the thing being
-                // placed, and the list is inset by exactly what the footer
-                // occupies, keyboard or no keyboard. Nothing drawn moves —
-                // the footer keeps its `s28` sides and its `s34` above the
-                // safe-area boundary, and it still sits over the list while
-                // one is being dragged past it.
-                //
-                // `spacing: .zero` because the gap is already drawn: the
-                // footer's own bottom padding is the export's `bottom:34`, and
-                // a spacing here would be a second, invented one.
-                //
-                // Nothing is inset at all when `commit` is `nil` — the one
-                // caller in that position draws its own footer outside this
-                // view entirely, with its own `safeAreaInset` doing the same
-                // job for it. See `MealDetailView.footer`.
-                .safeAreaInset(edge: .bottom, spacing: .zero) {
-                    if let commit {
-                        footer(commit: commit)
-                    }
-                }
+                breakdown
             }
-            // The second half of the same fix, and the half without which the
-            // first does nothing.
+            // The other half of what `breakdown` describes, and the half
+            // without which the first does nothing.
             //
             // Keyboard avoidance reaches the footer through the safe area but
             // leaves the scroll view's own frame where it was, so the footer
@@ -301,6 +254,61 @@ struct MealResultView<Lede: View>: View {
     private func confirmDiscard(_ perform: @escaping () -> Void) {
         pendingDiscard = perform
         isConfirmingDiscard = true
+    }
+
+    // MARK: - The list and what stands under it
+
+    /// The scrolling half of the screen, with this screen's own footer under it
+    /// where there is one.
+    ///
+    /// The list ends above the footer, as the export draws it — and it ends
+    /// above wherever the footer currently is, which is the whole point of
+    /// taking the inset from the footer rather than writing a number for it.
+    ///
+    /// It used to be a fixed `s96` under a footer laid over the list in a
+    /// bottom-aligned `ZStack`. That number stood for the footer's height at
+    /// rest, and it was two things at once: a measurement of a view nobody had
+    /// measured, and a promise the layout could not keep the moment the
+    /// keyboard came up. The keyboard shrinks the safe area, the footer rises
+    /// with it, and a bottom padding on the *content* rises with the list
+    /// instead — so the two pass each other and the pills end up over the
+    /// breakdown, mid-list, which is what the owner saw.
+    ///
+    /// `mealResultFooter` inverts that: the footer is the thing being placed,
+    /// and the list is inset by exactly what the footer occupies, keyboard or
+    /// no keyboard. Nothing drawn moves — the footer keeps its `s28` sides and
+    /// its `s34` from the bottom edge of the screen, and it still sits over the
+    /// list while one is being dragged past it.
+    ///
+    /// **A screen with no footer of its own does not reach for it at all**, and
+    /// the branch is load bearing rather than tidy. `MealDetailView` stands its
+    /// own footer in this same place from outside this view, and the modifier
+    /// strips the container's bottom inset from everything under it — including
+    /// the inset that caller's footer contributes. Applied here with nothing to
+    /// draw, it would take the list's clearance of *that* footer away with it,
+    /// and the last row would come to rest under the trash mark.
+    @ViewBuilder
+    private var breakdown: some View {
+        if let commit {
+            list.mealResultFooter { footer(commit: commit) }
+        } else {
+            list
+        }
+    }
+
+    private var list: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: .zero) {
+                lede()
+                labelRow
+                caloriesRow
+                macroRow
+                itemList
+            }
+            .padding(.top, FuelMetrics.Space.s26)
+            .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
+        }
+        .fuelScrolling()
     }
 
     // MARK: - The item field
@@ -720,8 +728,6 @@ struct MealResultView<Lede: View>: View {
 
             MealResultPrimaryButton(action: primaryAction(commit: commit))
         }
-        .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
-        .padding(.bottom, FuelMetrics.Space.s34)
         .fuelAnimation(FuelMotion.standard, value: draft.hasItemEdits)
     }
 
@@ -813,6 +819,72 @@ struct MealResultView<Lede: View>: View {
     private func primaryAction(commit: MealResultAction) -> MealResultAction {
         guard draft.canReanalyse else { return commit }
         return MealResultAction(title: MealResultCopy.reanalyse, perform: onReanalyse)
+    }
+}
+
+// MARK: - Footer ground
+
+extension View {
+
+    /// Stands a result footer under this view, where
+    /// `Screens2c.dc.html` lines 341 and 381 draw one:
+    /// `left:28;right:28;bottom:34`.
+    ///
+    /// **The 34 is measured from the frame's own bottom edge, not from above
+    /// the safe area**, and that is the correction this modifier carries. The
+    /// export draws its screens at 390×844 — a whole iPhone screen, home
+    /// indicator included — and leaves exactly 34 empty under the footer, which
+    /// is exactly the bottom inset such a device has. That strip is the drawn
+    /// stand-in for the indicator, the way the mock's own status row stands in
+    /// for the real one at the top. Adding the drawn 34 *above* the safe area
+    /// spends it twice: the owner reported the controls floating with a gap
+    /// beneath them, and a hosted render measured that gap at 68 on an iPhone
+    /// 17 Pro — 34 of padding on 34 of inset. Stripping the container inset
+    /// from the whole arrangement brings it to the 34 that was drawn, and on a
+    /// device with a home indicator the two readings then coincide: the
+    /// controls come to rest on the safe-area boundary, clear of the indicator,
+    /// at the distance the export drew.
+    ///
+    /// **`.container`, not the whole safe area.** The keyboard is a region of
+    /// its own and is untouched here, because the result screen deliberately
+    /// does not dodge a keyboard — see the note above the call site in
+    /// `MealResultView` — and this must not become a second opinion on that.
+    ///
+    /// `spacing: .zero` because the gap over the footer is already drawn: the
+    /// footer's own bottom padding is the export's `bottom:34`, and a spacing
+    /// here would be a second, invented one.
+    ///
+    /// **The band behind the footer is drawn nowhere in the export.** Neither
+    /// result frame has a gradient anywhere on it, and a still render has no
+    /// scrolled list to need one. It is there because the screen does: a
+    /// `safeAreaInset` clears the list where it comes to rest and nothing at all
+    /// while it is being dragged past, so the rows ran into the controls — what
+    /// the owner saw was `Add item` and a row's remove mark reading through and
+    /// around the trash mark and the pill. What stands behind them is
+    /// `FuelListFade`, the one fade the design does write down — see
+    /// `design/Fuel Design Notes.md`, "The list fade under the add button" — at
+    /// its own height and its own stop rather than a second gradient invented
+    /// for this screen. The two places it is used are the same situation: a
+    /// control floating over a list that has to keep passing under it.
+    ///
+    /// It is a background rather than a layer of its own, so it takes the
+    /// footer's width and its bottom edge and reaches up past it on the
+    /// strength of its own height. Nothing about the controls moves for it, and
+    /// `FuelListFade` answers no touch, so a row under the band is still a row
+    /// a finger can reach.
+    ///
+    /// One modifier rather than the same four in two files, for the reason
+    /// `MealResultPrimaryButton` is shared — and because the inset and the
+    /// stripping of the container inset are two halves of one arrangement.
+    /// Applying the first without the second puts the footer back at 68.
+    func mealResultFooter(@ViewBuilder _ content: () -> some View) -> some View {
+        safeAreaInset(edge: .bottom, spacing: .zero) {
+            content()
+                .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
+                .padding(.bottom, FuelMetrics.Space.s34)
+                .background(alignment: .bottom) { FuelListFade() }
+        }
+        .ignoresSafeArea(.container, edges: .bottom)
     }
 }
 
