@@ -45,7 +45,7 @@ final class LogFlowModel {
     /// make.
     func reload() {
         guard let entries = try? store.recentEntries(limit: RecentMeals.entriesRead) else { return }
-        recentMeals = RecentMeals.list(from: entries.map(\.nutritionValue))
+        recentMeals = RecentMeals.list(from: entries.map(\.recentValue))
     }
 
     // MARK: - Logging
@@ -56,6 +56,18 @@ final class LogFlowModel {
     /// re-derives the whole day through `MealLabeler`, which is the one place
     /// the course-of-the-day rule lives; a second derivation at this call site
     /// would be a second rule to keep in step with the first.
+    ///
+    /// The breakdown comes with it. A repeat is the same plate as the meal it
+    /// repeats, and that meal's items were settled the first time round — by
+    /// the model, and where a food resolved against the table, by
+    /// `FoodTableGrounding`. Handing them straight to the store costs no
+    /// request, spends none of the user's credit, and gives back the figures
+    /// they already accepted rather than a second opinion on them.
+    ///
+    /// The photo and the typed sentence do **not** come with it, and that is
+    /// not the same omission: those are the record of one particular capture,
+    /// and this is a new meal at a new time that was never photographed or
+    /// typed. `source` says `.recent` for exactly that reason.
     ///
     /// The `Bool` says whether the write happened, so the flow stays open on a
     /// failure instead of returning to Today as though something had been
@@ -68,7 +80,8 @@ final class LogFlowModel {
                 kilocalories: meal.kilocalories,
                 macros: meal.macros,
                 loggedAt: now(),
-                source: .recent
+                source: .recent,
+                items: meal.items
             )
             return true
         } catch {

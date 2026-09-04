@@ -271,4 +271,24 @@ extension FoodEntry {
             isLabelUserSet: isLabelUserSet
         )
     }
+
+    /// The hand-off value the Recent list reads.
+    ///
+    /// A second value at the same boundary rather than a widening of the first.
+    /// The Recent list repeats a meal whole — its line items included, so the
+    /// figures the user accepted come back rather than being estimated a second
+    /// time — and offers the starred meals as a list of their own, so it needs
+    /// exactly the two fields `nutritionValue` leaves behind. Adding them there
+    /// would hand the nutrition core two things it has no use for; see
+    /// `RecentEntry`.
+    var recentValue: RecentEntry {
+        RecentEntry(
+            id: entryID,
+            title: title,
+            kilocalories: kilocalories,
+            macros: macros,
+            isFavourite: isFavourite,
+            items: items
+        )
+    }
 }

@@ -76,7 +76,7 @@ struct LogFlowTests {
     @Test("the list is capped")
     func capped() {
         let entries = (0..<(RecentMeals.maximumRows + 5)).map { index in
-            entry(at: at(0, index), title: "Meal \(index)")
+            RecentEntry(title: "Meal \(index)", kilocalories: 0, macros: .zero)
         }
 
         #expect(RecentMeals.list(from: entries).count == RecentMeals.maximumRows)
@@ -102,6 +102,63 @@ struct LogFlowTests {
         #expect(logged.kilocalories == 420)
         #expect(logged.macros == macros)
         #expect(logged.source == .recent)
+    }
+
+    @Test("a repeated meal brings the whole breakdown back, item for item")
+    func repeatingCarriesTheItems() throws {
+        let store = try makeStore()
+        // The three items of screen 14, translated, with the middle one left
+        // without macros on purpose: CIQUAL has no fat figure for cooked
+        // polenta, so a grounded item can legitimately arrive with `nil` here
+        // and that absence is the marking. It has to survive the repeat exactly
+        // as the two complete ones do.
+        let items = [
+            RecognisedItem(
+                name: "Salmon fillet, fried",
+                kilocalories: 240,
+                macros: MacroTotals(protein: 34, carbs: 0, fat: 11),
+                note: .photo(confidence: .confident, approximateGrams: 150)
+            ),
+            RecognisedItem(
+                name: "Polenta",
+                kilocalories: 150,
+                note: .photo(confidence: .confident, approximateGrams: 180)
+            ),
+            RecognisedItem(
+                name: "Leaf spinach",
+                kilocalories: 70,
+                macros: MacroTotals(protein: 3, carbs: 2, fat: 1),
+                note: .photo(confidence: .unsure, approximateGrams: 90)
+            )
+        ]
+        try store.log(
+            title: "Salmon with polenta",
+            kilocalories: 460,
+            macros: MacroTotals(protein: 37, carbs: 26, fat: 23),
+            loggedAt: at(19, 20, day: 0),
+            source: .photo,
+            items: items
+        )
+
+        let model = LogFlowModel(store: store, selectedTab: .recent, now: { at(19, 30, day: 1) })
+        model.reload()
+        let meal = try #require(model.recentMeals.first)
+        #expect(meal.items == items)
+
+        #expect(model.log(meal))
+
+        // Newest first, so the repeat is the first row.
+        let repeated = try #require(try store.recentEntries(limit: 1).first)
+        #expect(repeated.loggedAt == at(19, 30, day: 1))
+        #expect(repeated.source == .recent)
+        #expect(repeated.items.count == 3)
+        // Whole-value equality, which pins each item's name, its own
+        // kilocalories, its note and its identity as well as its macros.
+        #expect(repeated.items == items)
+        // Spelled out separately because it is the one that is easy to lose to
+        // a re-estimate: the middle item stays without macros rather than
+        // gaining a zero nothing measured.
+        #expect(repeated.items.map(\.macros) == items.map(\.macros))
     }
 
     @Test("the label comes from the time of day, not from the meal it repeats")

@@ -40,9 +40,16 @@ final class FoodEntry {
     /// Drawn as the ☆ / ★ control on the result screen.
     var isFavourite: Bool
 
-    /// The breakdown shown under `Recognised` / `Broken down`. Empty for an
-    /// entry logged straight from the Recent list, which repeats a meal rather
-    /// than analysing one.
+    /// The breakdown shown under `Recognised` / `Broken down`.
+    ///
+    /// An entry logged straight from the Recent list carries the breakdown of
+    /// the meal it repeats, item for item and figure for figure. Nothing is
+    /// re-estimated on that path: the items were settled when the meal was
+    /// first logged, and a repeat is the same plate.
+    ///
+    /// Empty only where nothing ever supplied one — an entry written before
+    /// this property existed, or one whose source meal had no breakdown of its
+    /// own.
     var items: [RecognisedItem]
 
     /// The compressed photo behind a camera-mode entry — the same bytes the
