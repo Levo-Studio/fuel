@@ -62,8 +62,8 @@ struct ItemConfidenceTests {
 
 // MARK: - The meal's figure
 
-/// The derivation drawn beside a meal's kilocalories. Pure arithmetic over
-/// plain values: no store, no container, no simulator.
+/// The derivation behind a meal's score. Pure arithmetic over plain values:
+/// no store, no container, no simulator.
 @Suite("Estimate confidence")
 struct EstimateConfidenceTests {
 
