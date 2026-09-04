@@ -67,8 +67,8 @@ nonisolated enum MealDetailCopy {
     /// false twice — nothing is discarded, and the meal is in the store and
     /// stays there whichever button is pressed. What is actually at stake is
     /// the breakdown edits the user has just made and has not had priced.
-    static var discardEditsConfirmation: MealResultConfirmation {
-        MealResultConfirmation(
+    static var discardEditsConfirmation: FuelDialogCopy {
+        FuelDialogCopy(
             title: String(localized: "detail.discardEdits.title"),
             confirm: String(localized: "detail.discardEdits.confirm"),
             cancel: String(localized: "detail.discardEdits.cancel")

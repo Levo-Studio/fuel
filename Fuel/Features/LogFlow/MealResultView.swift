@@ -19,32 +19,6 @@ struct MealResultAction {
     let perform: () -> Void
 }
 
-// MARK: - Footer confirmation
-
-/// The words on the dialog that stands in front of throwing the user's work
-/// away.
-///
-/// A parameter for the same reason `MealResultAction`'s title is one: the
-/// mechanism is identical on every errand and the sentence is not. After an
-/// estimate, what is at stake is the estimate — nothing has been written down
-/// yet, and `Discard` is literally what happens to it. On a meal that is
-/// already in the store, nothing is discarded and the meal survives either way;
-/// what is at stake is the breakdown edits the user has just made.
-///
-/// One value rather than two, because one dialog stands in front of both
-/// controls that can reach it — the trash mark and `‹ Back` — and on any screen
-/// that draws both, both risk the same thing.
-nonisolated struct MealResultConfirmation {
-
-    let title: String
-
-    /// The destructive verb.
-    let confirm: String
-
-    /// The way out, which changes nothing.
-    let cancel: String
-}
-
 // MARK: - Meal result
 
 /// Screens 14 and 15: what the model came back with, before any of it is
@@ -114,9 +88,20 @@ struct MealResultView<Lede: View>: View {
     /// nothing to discard, and draws no leading control at all.
     let onDiscard: (() -> Void)?
 
-    /// What the confirmation in front of both of those says. Handed in the way
-    /// `flowLabel` is: the screen draws it, the caller knows what is at stake.
-    let discardConfirmation: MealResultConfirmation
+    /// What the question in front of both of those says.
+    ///
+    /// Handed in for the same reason `MealResultAction`'s title is: the
+    /// mechanism is identical on every errand and the sentence is not. After an
+    /// estimate, what is at stake is the estimate — nothing has been written
+    /// down yet, and `Discard` is literally what happens to it. On a meal that
+    /// is already in the store, nothing is discarded and the meal survives
+    /// either way; what is at stake is the breakdown edits the user has just
+    /// made.
+    ///
+    /// One value rather than two, because one dialog stands in front of both
+    /// controls that can reach it — the trash mark and `‹ Back` — and on any
+    /// screen that draws both, both risk the same thing.
+    let discardConfirmation: FuelDialogCopy
 
     /// The filled footer button as this caller means it.
     ///
@@ -167,7 +152,7 @@ struct MealResultView<Lede: View>: View {
         onAddItem: @escaping (String) -> Void,
         onReanalyse: @escaping () -> Void,
         onDiscard: (() -> Void)?,
-        discardConfirmation: MealResultConfirmation,
+        discardConfirmation: FuelDialogCopy,
         commit: MealResultAction?,
         @ViewBuilder lede: @escaping () -> Lede
     ) {

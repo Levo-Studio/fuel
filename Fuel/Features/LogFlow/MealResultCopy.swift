@@ -145,8 +145,8 @@ nonisolated enum MealResultCopy {
 
     /// What the confirmation says on the two screens where the estimate has
     /// not been written down yet, so discarding it is literally what happens.
-    static var discardConfirmation: MealResultConfirmation {
-        MealResultConfirmation(
+    static var discardConfirmation: FuelDialogCopy {
+        FuelDialogCopy(
             title: String(localized: "result.discard.title"),
             confirm: String(localized: "result.discard.confirm"),
             cancel: String(localized: "result.discard.cancel")
