@@ -670,9 +670,17 @@ private nonisolated struct EstimatePayload: Decodable {
                 // drawn on every meal however it was logged. Only the
                 // identification step is answered here; the grounding step is
                 // `FoodTableGrounding`'s to fill in.
-                confidence: ItemConfidence(
-                    estimatePercent: EstimateContract.confidencePercent(confidencePercent?.value)
-                ),
+                //
+                // **A model that answered nothing readable leaves this `nil`
+                // rather than an `ItemConfidence` with nothing in it.** The two
+                // read the same through `percent`, and they are not the same
+                // stored row: an empty value writes `"confidence":{}` into
+                // every item blob for good, and it makes `confidence != nil` —
+                // the obvious way to ask "did any step answer" — true of an
+                // item no step answered for.
+                confidence: EstimateContract
+                    .confidencePercent(confidencePercent?.value)
+                    .map { ItemConfidence(estimatePercent: $0) },
                 note: note
             )
         }

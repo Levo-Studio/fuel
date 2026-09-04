@@ -145,7 +145,10 @@ struct ConfidenceInReplyTests {
         let estimate = try EstimateContract.estimate(from: json, mode: .photo)
 
         #expect(estimate.items[0].note == .photo(confidence: .confident, approximateGrams: 150))
-        #expect(estimate.items[0].confidence?.estimatePercent == nil)
+        // Absent, not present-and-empty: an `ItemConfidence` with nothing in it
+        // would be written into the stored blob and would make
+        // `confidence != nil` true of a row no step answered for.
+        #expect(estimate.items[0].confidence == nil)
         #expect(estimate.confidencePercent == nil)
     }
 
@@ -166,6 +169,7 @@ struct ConfidenceInReplyTests {
 
         #expect(estimate.kilocalories == 460)
         #expect(estimate.items.count == 2)
+        #expect(estimate.items.allSatisfy { $0.confidence == nil })
         #expect(estimate.confidencePercent == nil)
     }
 
@@ -184,6 +188,8 @@ struct ConfidenceInReplyTests {
 
         let estimate = try EstimateContract.estimate(from: json, mode: .photo)
 
+        #expect(estimate.items[0].confidence?.estimatePercent == 80)
+        #expect(estimate.items[1].confidence == nil)
         #expect(estimate.confidencePercent == 80)
     }
 
