@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 import UIKit
 
@@ -848,5 +849,358 @@ struct ShellTests {
     func mistralUsesTheSameMapping() async {
         #expect(await outcome(from: .answering(401), provider: .mistral) == .invalidKey)
         #expect(await outcome(from: .answering(200, body: "{}"), provider: .mistral) == .passed)
+    }
+}
+
+// MARK: - The pushed screen's back gesture
+
+/// A stack shaped like `RootShell.todayStack` — the bar hidden on both ends,
+/// one screen pushed over another — with the real meal screen at the top of it.
+///
+/// The root stands in for Today as a scroll view and nothing else: what these
+/// tests ask about it is only that the tie above does not reach down here, and
+/// a real `TodayView` would need a presentation, a navigation and a checklist
+/// to answer a question none of them are part of.
+private struct PushedMealProbe: View {
+
+    let model: MealDetailModel
+
+    /// Whether a sheet is up over the pushed screen, which is the shape the
+    /// conversation arrives in.
+    let presentsSheet: Bool
+
+    @State private var path: [Int] = []
+
+    init(model: MealDetailModel, presentsSheet: Bool) {
+        self.model = model
+        self.presentsSheet = presentsSheet
+    }
+
+    var body: some View {
+        NavigationStack(path: $path) {
+            ScrollView {
+                Color.clear.frame(height: 2000)
+            }
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(for: Int.self) { _ in
+                MealDetailView(model: model, onClose: {})
+                    .toolbar(.hidden, for: .navigationBar)
+                    .sheet(isPresented: .constant(presentsSheet)) {
+                        ScrollView {
+                            Color.clear.frame(height: 2000)
+                        }
+                    }
+            }
+            .onAppear { path = [1] }
+        }
+        .environment(\.fuelPalette, FuelPalette(theme: .dark, accent: .mono))
+    }
+}
+
+/// What lets the system's own interactive pop win a drag that starts at the
+/// leading edge of the meal screen: `FuelInteractivePop`, applied by
+/// `MealDetailView`.
+///
+/// **A suite of its own inside this file, and serialized.** Each test here
+/// stands a real window on the test host's scene, which two of them doing it at
+/// the same moment would fight over; the rest of `ShellTests` is model work and
+/// parallelises happily. It stays in this file rather than moving to one of its
+/// own because it is navigation, which is what this file is about.
+///
+/// **What these cannot reach, and it is worth being plain about.** They pin the
+/// requirement — that the breakdown's scroll view waits for the navigation
+/// controller's back gesture, that the tie stops at the screen it was applied
+/// to. They do not pin whether a real finger now wins the race, because touch
+/// delivery is not something a unit test can synthesise: there is no UI-test
+/// target, and a gesture driven by hand through UIKit's own action is not the
+/// event a thumb sends. That last step is checked on a build, not here.
+@Suite("Shell · the pushed meal screen's back gesture", .serialized)
+@MainActor
+struct MealDetailBackGestureTests {
+
+    // MARK: - Fixtures
+
+    private func makeModel() throws -> MealDetailModel {
+        let store = try FuelStore(inMemory: true)
+        let entry = try store.log(
+            title: "Salmon with polenta",
+            kilocalories: 460,
+            macros: MacroTotals(protein: 34, carbs: 28, fat: 23),
+            loggedAt: Date(),
+            source: .photo,
+            advice: nil,
+            items: [
+                RecognisedItem(
+                    name: "Salmon fillet, fried",
+                    kilocalories: 240,
+                    note: .photo(confidence: .confident, approximateGrams: 150)
+                ),
+                RecognisedItem(
+                    name: "Polenta",
+                    kilocalories: 220,
+                    note: .photo(confidence: .confident, approximateGrams: 180)
+                ),
+            ]
+        )
+        let built = MealDetailModel(
+            entryID: entry.entryID,
+            store: store,
+            client: UnusedEstimator(),
+            keys: StoredKey(),
+            provider: .claude,
+            pace: {}
+        )
+        // Unwrapped by hand rather than through `#require`, for the reason
+        // `MealDetailTests` gives at its own fixture: the macro puts the
+        // expression in a closure it wants `Sendable`, and a main-actor model
+        // is not one.
+        guard let model = built else { throw MissingFixture.noStoredMeal }
+        return model
+    }
+
+    private enum MissingFixture: Error {
+        case noStoredMeal
+        case noNavigationController
+        case noScrollView
+    }
+
+    /// Stands the stack on a window on the test host's own scene, the way
+    /// `MealResultFooterTests` does, and waits for the push to settle.
+    ///
+    /// A real window rather than `sizeThatFits`: the subject is a
+    /// `UINavigationController` SwiftUI builds underneath, and it does not exist
+    /// until the stack is actually on screen.
+    private func host(_ view: some View) throws -> UINavigationController {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = UIHostingController(rootView: view)
+        window.makeKeyAndVisible()
+        // Long enough for the push and for the sheet, which is a presentation
+        // of its own and does not arrive in the same turn as the screen under
+        // it.
+        RunLoop.current.run(until: Date().addingTimeInterval(1.5))
+        window.layoutIfNeeded()
+
+        guard let navigation = navigationController(in: window.rootViewController) else {
+            throw MissingFixture.noNavigationController
+        }
+        // The window is held by the controller chain the caller keeps, so
+        // nothing here has to hold it to keep the screen alive.
+        return navigation
+    }
+
+    private func navigationController(in controller: UIViewController?) -> UINavigationController? {
+        guard let controller else { return nil }
+        if let found = controller as? UINavigationController { return found }
+        for child in controller.children {
+            if let found = navigationController(in: child) { return found }
+        }
+        return navigationController(in: controller.presentedViewController)
+    }
+
+    /// How a failure requirement is read back, and why it is read this way.
+    ///
+    /// **UIKit publishes no accessor for it.** `require(toFail:)` writes and
+    /// nothing reads: `shouldRequireFailure(of:)` and
+    /// `shouldBeRequiredToFail(by:)` look like the readers and are not — they
+    /// are the hooks a *subclass* overrides to state a class-wide rule, and both
+    /// answer `false` whether or not the requirement was made. That was
+    /// measured on this screen before this was written, not assumed. A
+    /// recogniser's own description is the one place UIKit reports the set it is
+    /// holding, so that is what is read.
+    ///
+    /// **Only the `must-fail` set, and the distinction is the whole assertion.**
+    /// UIKit prints the inverse relation beside it as `must-fail-for`, in the
+    /// same format and naming the same objects, so a match against the whole
+    /// description would pass on either — it would say the two recognisers are
+    /// mentioned together and call that direction. The slice below is cut at
+    /// `must-fail = {`, which `must-fail-for = {` does not contain, so what is
+    /// asserted is that this recogniser waits for the other and not the reverse.
+    ///
+    /// The needle inside that slice is the other recogniser's description up to
+    /// its first `;` — its class and its address — so a match is to *that
+    /// object* rather than to a name someone could reword. If UIKit ever stops
+    /// reporting requirements at all, this goes red, which is the right outcome
+    /// for a test whose only window onto the state is that report.
+    private func waits(_ recogniser: UIGestureRecognizer, for other: UIGestureRecognizer) -> Bool {
+        let text = String(describing: recogniser)
+        guard let opening = text.range(of: "must-fail = {") else { return false }
+        let remainder = text[opening.upperBound...]
+        guard let closing = remainder.range(of: "}") else { return false }
+
+        let identity = String(String(describing: other).prefix { $0 != ";" })
+        return remainder[..<closing.lowerBound].contains(identity)
+    }
+
+    private func scrollView(in controller: UIViewController) throws -> UIScrollView {
+        guard
+            let content = controller.viewIfLoaded,
+            let scroll = FuelInteractivePop.scrollViews(in: content).first
+        else {
+            throw MissingFixture.noScrollView
+        }
+        return scroll
+    }
+
+    // MARK: - The requirement
+
+    /// The fix, stated as the thing that was missing.
+    ///
+    /// Before it, the breakdown's scroll view and the navigation controller's
+    /// edge pan had no relationship at all — each reported it could prevent the
+    /// other, neither required the other to fail — so a drag at the leading edge
+    /// went to whichever recognised first, and a scroll view claims a touch as
+    /// soon as it moves.
+    @Test("The breakdown waits for the back gesture")
+    func breakdownWaitsForTheBackGesture() throws {
+        let navigation = try host(PushedMealProbe(model: try makeModel(), presentsSheet: false))
+        let edge = try #require(navigation.interactivePopGestureRecognizer)
+        let pushed = try #require(navigation.viewControllers.last)
+
+        #expect(navigation.viewControllers.count == 2)
+        let breakdown = try scrollView(in: pushed).panGestureRecognizer
+        #expect(waits(breakdown, for: edge))
+        // The direction, asserted rather than assumed. UIKit records the same
+        // pair on both recognisers — the requirement on one, its inverse on the
+        // other — so a reading that only noticed the two were mentioned together
+        // would pass here whichever way round it was, and would keep passing if
+        // the tie were made backwards.
+        #expect(waits(edge, for: breakdown) == false)
+    }
+
+    /// The other half of the same rule, and the one that keeps Today's day swipe
+    /// out of this.
+    ///
+    /// `FuelDaySwipe` deliberately does not reserve the left edge — Today is the
+    /// root, there is nothing to pop, and excluding the edge would kill the
+    /// gesture exactly where reaching for the previous day is most natural. A
+    /// tie that searched from the window rather than from one screen would put a
+    /// back gesture's failure requirement in front of that swipe.
+    ///
+    /// **Built out of plain UIKit rather than pushed through SwiftUI**, because
+    /// the screen underneath has to still be there to be asked about: SwiftUI
+    /// takes the root's views down once something is pushed over it, so the
+    /// scroll view this is about does not exist by the time the question can be
+    /// put. Two controllers assembled by hand keep both ends alive, and the
+    /// subject — which subtree `tie(from:)` searches — is the same either way.
+    @Test("The tie stops at the screen it was applied to")
+    func theScreenUnderneathIsLeftAlone() throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let window = UIWindow(windowScene: scene)
+
+        let root = UIViewController()
+        let underneath = UIScrollView()
+        root.view.addSubview(underneath)
+
+        let pushed = UIViewController()
+        let above = UIScrollView()
+        pushed.view.addSubview(above)
+        // What the carrier view is in the real screen: something inside the
+        // pushed controller for the search to start from.
+        let anchor = UIView()
+        pushed.view.addSubview(anchor)
+
+        let navigation = UINavigationController(rootViewController: root)
+        window.rootViewController = navigation
+        window.makeKeyAndVisible()
+        navigation.pushViewController(pushed, animated: false)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        window.layoutIfNeeded()
+
+        FuelInteractivePop.tie(from: anchor)
+
+        let edge = try #require(navigation.interactivePopGestureRecognizer)
+        #expect(waits(above.panGestureRecognizer, for: edge))
+        #expect(waits(underneath.panGestureRecognizer, for: edge) == false)
+    }
+
+    /// A sheet over the meal screen — the shape the conversation arrives in — is
+    /// a presentation of its own, so what scrolls inside it is not part of the
+    /// screen the tie reaches.
+    ///
+    /// A plain sheet stands in for that one deliberately: the claim being tested
+    /// is about view-controller containment and holds for any sheet, and pinning
+    /// it on a stand-in keeps this test from breaking every time the
+    /// conversation's own contents change.
+    @Test("A sheet over the meal screen is out of the tie's reach")
+    func aSheetIsOutOfReach() throws {
+        let navigation = try host(PushedMealProbe(model: try makeModel(), presentsSheet: true))
+        let edge = try #require(navigation.interactivePopGestureRecognizer)
+        let pushed = try #require(navigation.viewControllers.last)
+        let sheet = try #require(pushed.presentedViewController)
+
+        let inSheet = try scrollView(in: sheet)
+        let onScreen = FuelInteractivePop.scrollViews(in: try #require(pushed.viewIfLoaded))
+        #expect(onScreen.contains(inSheet) == false)
+        #expect(waits(inSheet.panGestureRecognizer, for: edge) == false)
+        // The screen underneath still got its own tie, so the sheet being up is
+        // not the reason the assertion above passes.
+        #expect(waits(try scrollView(in: pushed).panGestureRecognizer, for: edge))
+    }
+
+    // MARK: - Keeping it tied
+
+    /// The requirement is made against the scroll view that exists when it is
+    /// stated, and SwiftUI may build a new one under a screen that never left
+    /// the stack. This is the half of that which can be pinned: stating it again
+    /// reaches a list that arrived after the first time.
+    ///
+    /// It matters because the failure it guards against is silent — a rebuilt
+    /// list would leave the screen looking exactly as it does now, with the
+    /// gesture quietly back to being swallowed.
+    @Test("Stating the requirement again reaches a list that was rebuilt")
+    func aRebuiltListIsTiedAgain() throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let window = UIWindow(windowScene: scene)
+
+        let root = UIViewController()
+        let pushed = UIViewController()
+        let first = UIScrollView()
+        pushed.view.addSubview(first)
+        let anchor = UIView()
+        pushed.view.addSubview(anchor)
+
+        let navigation = UINavigationController(rootViewController: root)
+        window.rootViewController = navigation
+        window.makeKeyAndVisible()
+        navigation.pushViewController(pushed, animated: false)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+
+        FuelInteractivePop.tie(from: anchor)
+        let edge = try #require(navigation.interactivePopGestureRecognizer)
+        #expect(waits(first.panGestureRecognizer, for: edge))
+
+        // What a rebuild leaves behind: the same screen, a different list.
+        first.removeFromSuperview()
+        let rebuilt = UIScrollView()
+        pushed.view.addSubview(rebuilt)
+        #expect(waits(rebuilt.panGestureRecognizer, for: edge) == false)
+
+        FuelInteractivePop.tie(from: anchor)
+        #expect(waits(rebuilt.panGestureRecognizer, for: edge))
+    }
+
+    /// The other half: what makes the restatement above actually happen on a
+    /// screen nobody is calling into by hand.
+    ///
+    /// A touch is the trigger, and this asserts the watch that hears it is on
+    /// the real meal screen. **What it does not assert is UIKit delivering a
+    /// touch to it** — that is the same boundary the whole of this suite stops
+    /// at, and it is checked on a build rather than here.
+    @Test("The meal screen carries the watch that keeps it tied")
+    func theScreenKeepsItselfTied() throws {
+        let navigation = try host(PushedMealProbe(model: try makeModel(), presentsSheet: false))
+        let pushed = try #require(navigation.viewControllers.last)
+        let content = try #require(pushed.viewIfLoaded)
+
+        let watches = (content.gestureRecognizers ?? []).filter { $0 is FuelInteractivePopWatch }
+        #expect(watches.count == 1)
+
+        // It has to be inert, or it would be the second recogniser this screen
+        // is argued into not carrying.
+        let watch = try #require(watches.first)
+        #expect(watch.cancelsTouchesInView == false)
+        #expect(watch.delaysTouchesBegan == false)
+        #expect(watch.delaysTouchesEnded == false)
     }
 }
