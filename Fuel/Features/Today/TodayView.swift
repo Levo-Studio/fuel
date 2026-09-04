@@ -98,6 +98,18 @@ struct TodayView: View {
                 .frame(maxHeight: .infinity, alignment: .bottom)
                 .ignoresSafeArea(.container, edges: .bottom)
 
+            // The same reading of the frame's edge at the other end, and the
+            // same reason for it: the status row is inside the frame, so a band
+            // hung on the safe area would leave exactly the strip the clock is
+            // drawn in uncovered. The reader is the one thing that knows how
+            // deep that strip is, and it has to keep its own safe area to be
+            // able to say — so it is the band inside it that ignores it.
+            GeometryReader { proxy in
+                FuelListTopFade(statusBar: proxy.safeAreaInsets.top)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .ignoresSafeArea(.container, edges: .top)
+            }
+
             TodayAddButton(action: onAddEntry)
                 .padding(.trailing, FuelMetrics.Control.addButtonTrailingInset)
                 .padding(.bottom, FuelMetrics.Control.addButtonBottomInset)

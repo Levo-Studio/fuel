@@ -44,3 +44,68 @@ struct FuelListFade: View {
         .allowsHitTesting(false)
     }
 }
+
+// MARK: - Top fade
+
+/// The band at the other end of the same list: it takes the day out from under
+/// the status row, so a total scrolled up to the top edge is not drawn through
+/// the clock.
+///
+/// **Undrawn, like the band below it, and reported the same way.** The export
+/// has no scrolled state at either end. What the owner saw was the big total
+/// travelling up under the status row and reading straight through the time,
+/// at full contrast, with neither legible.
+///
+/// **The same gradient inverted, and deliberately not the same two values.**
+/// Both of `FuelListFade`'s numbers were measured against a band standing on
+/// the bottom edge with nothing at rest underneath it, and neither survives the
+/// move to a top edge that a header is already sitting against:
+///
+/// - **Not 120 tall.** Today's header stands `Space.s26` below the safe area
+///   and does not move when the list scrolls. A 120pt band would still be at
+///   roughly half opacity where the eyebrow begins, so the date, the title and
+///   all three header controls would sit behind a wash while nothing had been
+///   scrolled at all.
+/// - **Not stopped at 46%.** The strip this exists to keep clear is the one the
+///   system draws its clock, its indicators and its island into, and that strip
+///   is the top safe area — a figure the app is told rather than one it may
+///   choose. So the band is opaque across exactly that and fades out over the
+///   header's own drop below it. Both of its edges are facts of the layout, and
+///   the whole reserved strip is covered on every device rather than whichever
+///   fraction of it a proportion carried over from the other end would happen
+///   to reach.
+///
+/// In front of the list and behind nothing, and not hit-testable for the reason
+/// its sibling is not: it covers rows that are still rows a finger can reach.
+struct FuelListTopFade: View {
+
+    /// The strip the system reserves at the top of the screen.
+    ///
+    /// Passed in rather than read here: a view that has been told to ignore the
+    /// safe area is the one place that can no longer ask what it was.
+    let statusBar: CGFloat
+
+    @Environment(\.fuelPalette) private var palette
+
+    /// Down to the first line of the header, which is where the band has to be
+    /// gone: the reserved strip, plus the drop the header stands at.
+    private var height: CGFloat { statusBar + FuelMetrics.Space.s26 }
+
+    /// Where it stops being opaque, as a fraction of that height — the bottom
+    /// edge of the reserved strip.
+    private var opaqueStop: CGFloat { height > .zero ? statusBar / height : .zero }
+
+    var body: some View {
+        LinearGradient(
+            stops: [
+                Gradient.Stop(color: palette.background, location: .zero),
+                Gradient.Stop(color: palette.background, location: opaqueStop),
+                Gradient.Stop(color: palette.background.opacity(.zero), location: 1),
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .frame(height: height)
+        .allowsHitTesting(false)
+    }
+}

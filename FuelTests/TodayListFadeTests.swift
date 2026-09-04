@@ -6,9 +6,10 @@ import UIKit
 
 // MARK: - Where the day list stops being visible
 
-/// The band that takes Today's list out at the bottom of the screen, and what
-/// it is for: content scrolled past the end of the screen stops being drawn
-/// before it reaches the add button standing over it.
+/// The two bands that take Today's list out at the edges of the screen, and the
+/// one thing both of them are for: content that has scrolled past the ends of
+/// the screen stops being drawn before it reaches anything that is standing
+/// still there.
 ///
 /// **Rendered rather than asserted, for the reason `MealResultFooterTests` is.**
 /// Every value behind the bottom band was right and the screen was still wrong:
@@ -24,7 +25,7 @@ import UIKit
 /// background whether or not anything is covering it, so a run of blanks would
 /// pass a test about a band that had been deleted. A height reads as background
 /// here only if nothing managed to show there at any of the positions.
-@Suite("Today · the list fades into the bottom edge", .serialized)
+@Suite("Today · the list fades at both edges", .serialized)
 @MainActor
 struct TodayListFadeTests {
 
@@ -39,8 +40,8 @@ struct TodayListFadeTests {
         for: Date(timeIntervalSince1970: 1_756_771_200)
     )
 
-    /// A day far longer than the screen, so there is list above and below the
-    /// band at every position sampled.
+    /// A day far longer than the screen, so there is list above and below both
+    /// bands at every position sampled.
     private static var day: [NutritionEntry] {
         let labels: [MealLabel] = [.breakfast, .lunch, .snack, .dinner]
         return (0..<16).map { index in
@@ -55,7 +56,7 @@ struct TodayListFadeTests {
         }
     }
 
-    /// Goal mode, which is the screen the owner reported.
+    /// Goal mode, which is the screen the owner reported both times.
     private func screen() -> some View {
         TodayView(
             presentation: TodayPresentation(entries: Self.day, mode: .goal(.default), date: Self.date),
@@ -99,7 +100,7 @@ struct TodayListFadeTests {
     ///
     /// The positions stop a whole clearance short of the end — the padding under
     /// the last row plus the scroll view's own bottom inset — so real rows still
-    /// cross the band rather than the empty space that holds them off.
+    /// cross both bands rather than the empty space that holds them off.
     ///
     /// Only the leading half of each row is read. The add button is drawn in the
     /// accent on top of the bottom band, and it is meant to be: it stands over
@@ -209,6 +210,58 @@ struct TodayListFadeTests {
         expectDarkensTowardTheEdge(
             slices(of: profile, across: FuelMetrics.ListFade.height, from: .bottom),
             .bottom
+        )
+    }
+
+    // MARK: - The top
+
+    /// The other end, and the strip that matters there: the one the system draws
+    /// its clock, its indicators and its island into, which is the top safe area.
+    ///
+    /// The owner reported the day's total travelling up into it and being drawn
+    /// straight through the time. `FuelListTopFade` is opaque across exactly that
+    /// strip, which is why the claim here is stated against the window's own
+    /// inset rather than against a fraction of a band.
+    @Test("the list fades out into the top edge and never back in")
+    func topBand() throws {
+        let hosted = try hosted()
+        let reserved = hosted.window.safeAreaInsets.top
+        let profile = try fadeProfile(of: hosted)
+
+        #expect(
+            peak(of: profile, within: reserved, of: .top) <= DrawnPixels.tolerance,
+            "the list shows \(peak(of: profile, within: reserved, of: .top)) levels through the \(reserved) points the system reserves"
+        )
+        expectDarkensTowardTheEdge(
+            slices(of: profile, across: reserved + FuelMetrics.Space.s26, from: .top),
+            .top
+        )
+    }
+
+    /// The condition on the top band: it is there for content passing under the
+    /// header, not for the header.
+    ///
+    /// The header does not move when the list scrolls — it is the first thing in
+    /// the list — so where it comes to rest is where it stays, and a band that
+    /// reached it would wash out the date, the title and all three controls for
+    /// as long as the screen was up. Stated as the geometry rather than as a
+    /// colour: at rest nothing at all is drawn above the band's bottom edge, so
+    /// there is nothing there for it to dim.
+    @Test("the top band is gone before the header it comes to rest above")
+    func headerAtRest() throws {
+        let hosted = try hosted()
+        let drawing = try #require(hosted.drawing)
+        let background = DrawnPixels.Channels(Self.palette.background)
+        let band = hosted.window.safeAreaInsets.top + FuelMetrics.Space.s26
+
+        let first = (0..<Int(drawing.size.height)).first { y in
+            drawing.peakDeviation(fromColour: background, y: y, x: 0..<Int(drawing.size.width))
+                > DrawnPixels.tolerance
+        }
+
+        #expect(
+            CGFloat(try #require(first)) >= band,
+            "the first thing drawn stands at \(first ?? 0) with the band reaching \(band)"
         )
     }
 
