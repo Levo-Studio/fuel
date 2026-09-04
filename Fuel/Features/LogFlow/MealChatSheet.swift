@@ -535,9 +535,10 @@ private struct ArrivingTurn: View {
 
 // MARK: - Preview data
 
-/// An exchange that has already happened, so the canvas shows the three things
-/// a turn can be: the user's own words, a reply that moved something, and a
-/// reply that moved nothing.
+/// An exchange that has already happened, so the canvas shows the four things
+/// a turn can be: the user's own words, a reply that moved something, a reply
+/// that asked to move something and moved nothing, and an answer to a question,
+/// which moves nothing and is not corrected for it.
 private enum MealChatPreviewData {
 
     static func model() -> MealChatModel {
@@ -555,10 +556,25 @@ private enum MealChatPreviewData {
                     changes: [
                         MealChatMessage.Change(name: "Rice", grams: 225),
                         MealChatMessage.Change(name: "Olive oil", grams: 14),
-                    ]
+                    ],
+                    askedForAChange: true
                 ),
-                MealChatMessage(author: .you, text: "It was a bit spicy too"),
-                MealChatMessage(author: .fuel, text: "Spice does not change the amounts on its own."),
+                MealChatMessage(author: .you, text: "There was a spoon of harissa on it as well"),
+                // A reply that set out to move something and moved nothing: the
+                // table cannot price harissa, so the row was dropped and the
+                // sentence is contradicted underneath.
+                MealChatMessage(
+                    author: .fuel,
+                    text: "Added a spoon of harissa.",
+                    askedForAChange: true
+                ),
+                MealChatMessage(author: .you, text: "How long will this keep me full?"),
+                // And a question, which moves nothing because it was never
+                // about the amounts, and gets no note under it saying so.
+                MealChatMessage(
+                    author: .fuel,
+                    text: "A good while — there is fat and protein here as well as starch."
+                ),
             ]
         )
     }

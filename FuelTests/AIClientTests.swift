@@ -2297,6 +2297,42 @@ struct MealAdjustmentClientTests {
         #expect(adjusted.items[0].grams == 200)
     }
 
+    /// **The failure this feature must never have.** "What could I add" names a
+    /// food the person has not eaten, and a suggestion that reached `additions`
+    /// would be logged as though they had. A reply that answers it in words and
+    /// leaves both lists empty moves no gram, adds no row, and never announces
+    /// an adjustment — the whole path behind the prompt, pinned on the shape
+    /// that carries the risk.
+    ///
+    /// Nothing separates a suggested food from an eaten one once it is in that
+    /// key: both are a name and a weight. The prompt is what keeps them apart,
+    /// and `MealChatContractTests.promptRefusesSuggestions` is the canary over
+    /// the sentence that does it.
+    @Test("a suggestion asked for in words comes back as words and adds no row")
+    func suggestionAddsNothing() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let answer = """
+            {"changes":[],"additions":[],"reply":"A little fat or protein alongside would sit with you \
+            longer — nuts, or yoghurt."}
+            """
+        let client = AnthropicClient(
+            transport: RecordingTransport(streaming: Reply.anthropicStream(answer, chunks: 12)),
+            keys: keys.source
+        )
+
+        let said = try await events(
+            of: client.adjust(Self.meal(), history: [], message: "what could I add to make this more filling?")
+        )
+
+        #expect(!said.contains(.adjusting))
+        guard case .finished(let turn) = try #require(said.last) else { return }
+        #expect(turn.meal == nil)
+        #expect(!turn.changedTheMeal)
+        #expect(turn.reply == "A little fat or protein alongside would sit with you longer — nuts, or yoghurt.")
+    }
+
     /// Mistral's envelope, the same answer, and the `[DONE]` sentinel that is
     /// not JSON.
     @Test("the other provider's stream reaches the same turn", arguments: [1, 5])
@@ -2354,7 +2390,11 @@ struct MealAdjustmentClientTests {
         let said = try await events(of: client.adjust(Self.meal(), history: [], message: "what is in polenta?"))
 
         #expect(!said.contains(.adjusting))
-        #expect(said.last == .finished(MealAdjustmentOutcome(reply: "Polenta is boiled maize meal.", meal: nil)))
+        #expect(
+            said.last == .finished(
+                MealAdjustmentOutcome(reply: "Polenta is boiled maize meal.", askedForAChange: false, meal: nil)
+            )
+        )
     }
 
     /// The sentence grows rather than repeating itself, and every value is the
@@ -2537,7 +2577,7 @@ struct MealAdjustmentClientTests {
 
         // No analysis states for a question: the model committed to nothing.
         #expect(!said.contains(.adjusting))
-        #expect(said.last == .finished(MealAdjustmentOutcome(reply: answer, meal: nil)))
+        #expect(said.last == .finished(MealAdjustmentOutcome(reply: answer, askedForAChange: false, meal: nil)))
         // And it was drawn on the way rather than appearing whole at the end:
         // prose has no `reply` key to read, so the words themselves are read.
         let sentences = said.compactMap { event -> String? in

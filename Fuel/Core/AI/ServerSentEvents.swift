@@ -100,8 +100,9 @@ nonisolated struct ServerSentEventLineSplitter {
     /// `MealChatStreamAssembler` a reply with a hole in it, and a hole is not
     /// reliably fatal: lose the delta carrying `"changes":[{"item":1,"grams":300}],`
     /// and what is left is `{"additions":[],"reply":"Raised the rice to 300 g."}`,
-    /// which parses cleanly and tells the user nothing moved while the sentence
-    /// says it did. A quietly wrong answer is the one outcome this layer refuses
+    /// which parses cleanly as a turn that asked for nothing — so the sentence
+    /// saying the rice was raised is drawn with nothing under it to say the meal
+    /// never moved. A quietly wrong answer is the one outcome this layer refuses
     /// everywhere else — `ServerSentEventDecoder` will not dispatch half an
     /// event for the same reason. Failing costs the user the retry state, which
     /// is a screen the design draws, and `AIError.malformedResponse` is the

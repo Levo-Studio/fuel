@@ -25,7 +25,13 @@ nonisolated enum MealChatCopy {
     }
 
     /// The line under the title, which is the only place the rule of the whole
-    /// feature is stated to the user: amounts move, and the figures follow.
+    /// feature is stated to the user: a question is answered, amounts move, and
+    /// the figures follow from the table rather than from anything said here.
+    ///
+    /// **It used to name only the amounts**, and a line that tells someone what
+    /// they may say is a line that decides what they will say. A person who
+    /// wanted to know whether their lunch was any good read this, saw a sheet
+    /// for correcting portions, and did not ask.
     static var hint: String {
         String(localized: "chat.hint")
     }
@@ -58,18 +64,31 @@ nonisolated enum MealChatCopy {
         String(localized: "chat.adjusted")
     }
 
-    /// What a reply reads as when nothing moved and the model said nothing
-    /// either — the emptiest answer this screen can get, and one it still has
-    /// to state rather than leave blank.
+    /// What a reply reads as when the model asked for a change, nothing moved,
+    /// and it said nothing either — the emptiest answer an adjustment can get,
+    /// and one this screen still has to state rather than leave blank.
     static var unchanged: String {
         String(localized: "chat.unchanged")
     }
 
-    /// The note under a reply that changed nothing.
+    /// The same emptiness after a question, which is a different thing to read.
     ///
-    /// **The load-bearing string of this feature.** A sentence with no change
-    /// under it and nothing saying so reads as a change that happened, and a
-    /// screen that spends the user's credit must not let them infer that.
+    /// Nothing was being adjusted, so there is nothing for the meal to be
+    /// unchanged against; what happened is that the model answered with no
+    /// usable words, and that is what this says.
+    static var noAnswer: String {
+        String(localized: "chat.noAnswer")
+    }
+
+    /// The note under a reply that asked to change something and changed
+    /// nothing.
+    ///
+    /// **The load-bearing string of this feature.** A sentence claiming a
+    /// change, with no change under it and nothing saying so, reads as a change
+    /// that happened, and a screen that spends the user's credit must not let
+    /// them infer that. It follows a turn that asked for one and no other —
+    /// under an answer to a question it would be Fuel correcting the user for
+    /// asking. See `MealChatMessage.movedNothing`.
     static var nothingChanged: String {
         String(localized: "chat.nothingChanged")
     }

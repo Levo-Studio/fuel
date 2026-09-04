@@ -272,7 +272,9 @@ struct MealChatStreamAssemblerTests {
 
         let finished = try assembler.finish(over: Self.meal())
 
-        #expect(finished == .finished(MealAdjustmentOutcome(reply: "Boiled maize meal.", meal: nil)))
+        #expect(
+            finished == .finished(MealAdjustmentOutcome(reply: "Boiled maize meal.", askedForAChange: false, meal: nil))
+        )
     }
 
     /// A reply cut off at the request's own ceiling is reported as that rather
@@ -298,7 +300,47 @@ struct MealChatStreamAssemblerTests {
 
         let finished = try assembler.finish(over: Self.meal())
 
-        #expect(finished == .finished(MealAdjustmentOutcome(reply: "Polenta is boiled maize meal.", meal: nil)))
+        #expect(
+            finished == .finished(
+                MealAdjustmentOutcome(reply: "Polenta is boiled maize meal.", askedForAChange: false, meal: nil)
+            )
+        )
+    }
+
+    /// **The turn the note under a reply exists for, assembled from a real
+    /// reply.** The model asked for a change to an item this meal does not
+    /// have, so `MealAdjuster` dropped it and nothing moved — and the sentence
+    /// says it raised the rice. What comes out carries the claim, carries no
+    /// meal, and carries the fact that a change was asked for, which is the
+    /// only thing that lets the screen contradict it.
+    @Test("a change that nothing could apply still lands as a turn that asked for one")
+    func claimedChangeThatMovedNothing() throws {
+        var assembler = MealChatStreamAssembler()
+        _ = assembler.append(#"{"changes":[{"item":9,"grams":300}],"reply":"Raised the rice to 300 g."}"#)
+
+        let finished = try assembler.finish(over: Self.meal())
+
+        #expect(
+            finished == .finished(
+                MealAdjustmentOutcome(reply: "Raised the rice to 300 g.", askedForAChange: true, meal: nil)
+            )
+        )
+    }
+
+    /// **The trap, at the one boundary that could still spring it.** "What
+    /// could I add" is a question, and the food in the answer is food the
+    /// person has not eaten. A reply that names it in words and leaves both
+    /// lists empty reaches the meal with nothing in its hands: no row, no
+    /// weight, and no claim to contradict either.
+    @Test("a suggestion answered in words adds no row to the meal")
+    func suggestionAddsNoRow() throws {
+        var assembler = MealChatStreamAssembler()
+        let answer = "A handful of nuts or some yoghurt would make it sit with you longer."
+        _ = assembler.append(#"{"changes":[],"additions":[],"reply":"\#(answer)"}"#)
+
+        let finished = try assembler.finish(over: Self.meal())
+
+        #expect(finished == .finished(MealAdjustmentOutcome(reply: answer, askedForAChange: false, meal: nil)))
     }
 
     @Test("a reply with nothing readable in it at all is a malformed one")

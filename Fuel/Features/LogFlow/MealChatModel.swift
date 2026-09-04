@@ -55,21 +55,43 @@ nonisolated struct MealChatMessage: Identifiable, Equatable, Sendable {
     /// nothing — see `movedNothing`.
     let changes: [Change]
 
-    init(id: UUID = UUID(), author: Author, text: String, changes: [Change] = []) {
+    /// Whether the reply this turn carries asked for anything to move. Always
+    /// `false` on a turn the user wrote, whatever they were asking for: this is
+    /// what the model committed to, not what the message wanted.
+    let askedForAChange: Bool
+
+    init(
+        id: UUID = UUID(),
+        author: Author,
+        text: String,
+        changes: [Change] = [],
+        askedForAChange: Bool = false
+    ) {
         self.id = id
         self.author = author
         self.text = text
         self.changes = changes
+        self.askedForAChange = askedForAChange
     }
 
-    /// Whether this is a reply that left the meal exactly as it was.
+    /// Whether this is a reply that set out to move the meal and left it
+    /// exactly as it was.
     ///
-    /// **Drawn, rather than left for the user to work out.** A sentence with
-    /// no change under it and nothing saying so reads as a change that
-    /// happened — which is the one thing a screen that spends the user's
-    /// credit must not do.
+    /// **Drawn, rather than left for the user to work out.** A sentence
+    /// claiming a change, with no change under it and nothing saying so, reads
+    /// as a change that happened — which is the one thing a screen that spends
+    /// the user's credit must not do.
+    ///
+    /// **A question is not one of these, and that is the whole of the
+    /// distinction.** "How filling is this" is answered by a sentence with
+    /// nothing under it because there was never anything to move, and a note
+    /// saying the meal is unchanged is then Fuel correcting the user for a
+    /// question they were entitled to ask. The two are the same shape by the
+    /// time they are drawn — a reply, no rows — so the answer comes from the
+    /// model's own `changes` and `additions` rather than from anything readable
+    /// here. See `MealAdjustmentIntent.askedForAChange`.
     var movedNothing: Bool {
-        author == .fuel && changes.isEmpty
+        author == .fuel && askedForAChange && changes.isEmpty
     }
 
     /// One row, after the turn moved it.
@@ -470,8 +492,10 @@ final class MealChatModel {
     /// `MealDetailModel.writeBack`.
     ///
     /// An answer that moved nothing is not a failure and is not treated as
-    /// one: the model's sentence goes up with `movedNothing` set, and the
-    /// sheet says so under it.
+    /// one. Which of the two kinds it is decides what the sheet says under it:
+    /// a turn that asked for a change and got none goes up with `movedNothing`
+    /// set and is contradicted in words, and a question goes up as the answer
+    /// it is, with nothing beneath it.
     private func record(_ outcome: MealAdjustmentOutcome, over before: AdjustableMeal, as run: Int) {
         guard isCurrent(run), let subject else { return }
 
@@ -492,11 +516,17 @@ final class MealChatModel {
             changes = Self.changes(from: before.items, to: adjusted.items)
         }
 
+        let said = outcome.reply ?? Self.sentence(
+            forSomethingMoved: !changes.isEmpty,
+            afterAskingForAChange: outcome.askedForAChange
+        )
+
         messages.append(
             MealChatMessage(
                 author: .fuel,
-                text: outcome.reply ?? Self.sentence(forSomethingMoved: !changes.isEmpty),
-                changes: changes
+                text: said,
+                changes: changes,
+                askedForAChange: outcome.askedForAChange
             )
         )
         pendingMessage = nil
@@ -524,11 +554,17 @@ final class MealChatModel {
 
     /// What a reply reads as when the model wrote no usable sentence.
     ///
-    /// Two fixed strings rather than one, because the two states are not the
-    /// same thing to a reader and the difference is exactly the one this
-    /// feature has to be honest about.
-    private static func sentence(forSomethingMoved moved: Bool) -> String {
-        moved ? MealChatCopy.adjusted : MealChatCopy.unchanged
+    /// Three fixed strings rather than one, because the three states are not
+    /// the same thing to a reader and the differences are exactly the ones this
+    /// feature has to be honest about: amounts that moved, amounts that were
+    /// asked for and did not move, and a question that came back with no words
+    /// in it at all. Telling that last one "nothing to adjust from that" is the
+    /// screen answering a question nobody asked.
+    private static func sentence(forSomethingMoved moved: Bool, afterAskingForAChange asked: Bool) -> String {
+        if moved {
+            return MealChatCopy.adjusted
+        }
+        return asked ? MealChatCopy.unchanged : MealChatCopy.noAnswer
     }
 
     private func isCurrent(_ run: Int) -> Bool {

@@ -81,6 +81,12 @@ struct MealChatTests {
         )
     }
 
+    /// The turn a model produces for that, in the shape a scripted client hands
+    /// one back: a change it asked for, and the meal that came of it.
+    private static func raisedTheRice(saying reply: String? = "Raised the rice.") -> MealAdjustmentOutcome {
+        MealAdjustmentOutcome(reply: reply, askedForAChange: true, meal: raised())
+    }
+
     private func makeModel(
         subject: any MealChatSubject,
         client: any AIClient,
@@ -106,7 +112,7 @@ struct MealChatTests {
     @Test("with no key nothing is sent and the user's line survives")
     func keylessSendsNothing() async {
         let subject = StandInSubject(meal: Self.meal())
-        let client = ScriptedClient(adjustments: [.success(MealAdjustmentOutcome(reply: "Done.", meal: Self.raised()))])
+        let client = ScriptedClient(adjustments: [.success(Self.raisedTheRice(saying: "Done."))])
         let model = makeModel(subject: subject, client: client, keys: NoKeys())
 
         model.message = "a second, smaller portion"
@@ -126,7 +132,7 @@ struct MealChatTests {
     )
     func emptyMessageSendsNothing(written: String) async {
         let subject = StandInSubject(meal: Self.meal())
-        let client = ScriptedClient(adjustments: [.success(MealAdjustmentOutcome(reply: "Done.", meal: Self.raised()))])
+        let client = ScriptedClient(adjustments: [.success(Self.raisedTheRice(saying: "Done."))])
         let model = makeModel(subject: subject, client: client)
 
         model.message = written
@@ -154,7 +160,7 @@ struct MealChatTests {
     func successfulTurn() async throws {
         let subject = StandInSubject(meal: Self.meal())
         let client = ScriptedClient(
-            adjustments: [.success(MealAdjustmentOutcome(reply: "Raised the rice to 300 g.", meal: Self.raised()))]
+            adjustments: [.success(Self.raisedTheRice(saying: "Raised the rice to 300 g."))]
         )
         let model = makeModel(subject: subject, client: client)
 
@@ -183,7 +189,7 @@ struct MealChatTests {
     func silentButUseful() async throws {
         let subject = StandInSubject(meal: Self.meal())
         let client = ScriptedClient(
-            adjustments: [.success(MealAdjustmentOutcome(reply: nil, meal: Self.raised()))]
+            adjustments: [.success(Self.raisedTheRice(saying: nil))]
         )
         let model = makeModel(subject: subject, client: client)
 
@@ -199,12 +205,15 @@ struct MealChatTests {
 
     /// The ambiguity rule, from the interface's side: a message the model
     /// could not put a number on must not leave a sentence on screen over
-    /// figures that did not move.
-    @Test("an answer that moves nothing says so and writes nothing")
+    /// figures that did not move. A model that asked back committed to no
+    /// change, so its own question is the whole of what is drawn.
+    @Test("an answer that moves nothing writes nothing")
     func unmappableMessage() async throws {
         let subject = StandInSubject(meal: Self.meal())
         let client = ScriptedClient(
-            adjustments: [.success(MealAdjustmentOutcome(reply: "Roughly how much oil?", meal: nil))]
+            adjustments: [
+                .success(MealAdjustmentOutcome(reply: "Roughly how much oil?", askedForAChange: false, meal: nil))
+            ]
         )
         let model = makeModel(subject: subject, client: client)
 
@@ -215,16 +224,46 @@ struct MealChatTests {
         #expect(subject.applied.isEmpty)
         #expect(subject.adjustableMeal == Self.meal())
         #expect(model.messages[1].text == "Roughly how much oil?")
-        #expect(model.messages[1].movedNothing)
         #expect(model.messages[1].changes.isEmpty)
         // Not a failure: the request worked and the model answered.
+        #expect(model.stage == .conversation)
+    }
+
+    /// **The note's whole job, in the one turn that earns it.** The model asked
+    /// for a change, said in its sentence that it had made one, and nothing
+    /// moved — a row the table could not price, an item number the list does
+    /// not have. The sentence is drawn as it was written and contradicted
+    /// underneath, because it is the only thing on screen that would otherwise
+    /// be believed.
+    @Test("a change that moved nothing is still contradicted under its own sentence")
+    func claimedChangeThatMovedNothing() async throws {
+        let subject = StandInSubject(meal: Self.meal())
+        let client = ScriptedClient(
+            adjustments: [
+                .success(
+                    MealAdjustmentOutcome(reply: "Added a spoon of harissa.", askedForAChange: true, meal: nil)
+                )
+            ]
+        )
+        let model = makeModel(subject: subject, client: client)
+
+        model.message = "there was a spoon of harissa on it"
+        model.send()
+        await settle(model)
+
+        #expect(subject.applied.isEmpty)
+        #expect(subject.adjustableMeal == Self.meal())
+        #expect(model.messages[1].text == "Added a spoon of harissa.")
+        #expect(model.messages[1].movedNothing)
         #expect(model.stage == .conversation)
     }
 
     @Test("an answer with neither a sentence nor a change still reads as something")
     func silentAndUseless() async throws {
         let subject = StandInSubject(meal: Self.meal())
-        let client = ScriptedClient(adjustments: [.success(MealAdjustmentOutcome(reply: nil, meal: nil))])
+        let client = ScriptedClient(
+            adjustments: [.success(MealAdjustmentOutcome(reply: nil, askedForAChange: true, meal: nil))]
+        )
         let model = makeModel(subject: subject, client: client)
 
         model.message = "hmm"
@@ -235,6 +274,25 @@ struct MealChatTests {
         #expect(model.messages[1].movedNothing)
     }
 
+    /// The same emptiness after a question is a different sentence, because
+    /// "nothing to adjust from that" answers a question nobody asked. Nothing
+    /// was being adjusted; the model simply came back with no words.
+    @Test("a question that came back wordless does not read as a failed adjustment")
+    func silentAnswerToAQuestion() async throws {
+        let subject = StandInSubject(meal: Self.meal())
+        let client = ScriptedClient(
+            adjustments: [.success(MealAdjustmentOutcome(reply: nil, askedForAChange: false, meal: nil))]
+        )
+        let model = makeModel(subject: subject, client: client)
+
+        model.message = "how healthy is this meal?"
+        model.send()
+        await settle(model)
+
+        #expect(model.messages[1].text == MealChatCopy.noAnswer)
+        #expect(!model.messages[1].movedNothing)
+    }
+
     /// A store that refuses is not a change that happened. Nothing may go into
     /// the transcript claiming otherwise.
     @Test("a refused write lands on the retry state and claims nothing")
@@ -242,7 +300,7 @@ struct MealChatTests {
         let subject = StandInSubject(meal: Self.meal())
         subject.accepts = false
         let client = ScriptedClient(
-            adjustments: [.success(MealAdjustmentOutcome(reply: "Raised the rice.", meal: Self.raised()))]
+            adjustments: [.success(Self.raisedTheRice())]
         )
         let model = makeModel(subject: subject, client: client)
 
@@ -255,6 +313,44 @@ struct MealChatTests {
         #expect(subject.applied.isEmpty)
     }
 
+    // MARK: - A question is an answer
+
+    /// **The owner's report.** "How healthy is this meal" is a question about
+    /// the food, the model answers it, and the screen used to print a line
+    /// underneath telling the user that naming an amount is what lets a meal be
+    /// adjusted — Fuel correcting them for asking something it had just
+    /// answered. The answer now stands on its own.
+    @Test(
+        "a question is answered with nothing underneath it about amounts",
+        arguments: [
+            "how healthy is this meal?",
+            "how long will it keep me full?",
+            "what could I add to make it more satisfying?",
+        ]
+    )
+    func aQuestionIsNotCorrected(asked: String) async throws {
+        let subject = StandInSubject(meal: Self.meal())
+        let answer = "Plenty of starch, and light on protein for its size."
+        let client = ScriptedClient(
+            adjustments: [.success(MealAdjustmentOutcome(reply: answer, askedForAChange: false, meal: nil))]
+        )
+        let model = makeModel(subject: subject, client: client)
+
+        model.message = asked
+        model.send()
+        await settle(model)
+
+        #expect(model.messages[1].text == answer)
+        #expect(!model.messages[1].movedNothing)
+        #expect(model.messages[1].changes.isEmpty)
+        // The meal is exactly as it was, and nothing was written to it — the
+        // last of those matters most for the third question, whose answer names
+        // food the user has not eaten.
+        #expect(subject.applied.isEmpty)
+        #expect(subject.adjustableMeal == Self.meal())
+        #expect(model.stage == .conversation)
+    }
+
     // MARK: - The conversation
 
     @Test("the second message carries the first exchange and not its own line")
@@ -262,8 +358,8 @@ struct MealChatTests {
         let subject = StandInSubject(meal: Self.meal())
         let client = ScriptedClient(
             adjustments: [
-                .success(MealAdjustmentOutcome(reply: "Roughly how much oil?", meal: nil)),
-                .success(MealAdjustmentOutcome(reply: "Added a tablespoon.", meal: Self.raised())),
+                .success(MealAdjustmentOutcome(reply: "Roughly how much oil?", askedForAChange: false, meal: nil)),
+                .success(Self.raisedTheRice(saying: "Added a tablespoon.")),
             ]
         )
         let model = makeModel(subject: subject, client: client)
@@ -295,8 +391,10 @@ struct MealChatTests {
         let client = ScriptedClient(
             adjustments: [
                 .failure(.network),
-                .success(MealAdjustmentOutcome(reply: "Polenta is boiled maize meal.", meal: nil)),
-                .success(MealAdjustmentOutcome(reply: "Raised the rice.", meal: Self.raised())),
+                .success(
+                    MealAdjustmentOutcome(reply: "Polenta is boiled maize meal.", askedForAChange: false, meal: nil)
+                ),
+                .success(Self.raisedTheRice()),
             ]
         )
         let model = makeModel(subject: subject, client: client)
@@ -337,8 +435,8 @@ struct MealChatTests {
         let subject = StandInSubject(meal: Self.meal())
         let client = ScriptedClient(
             adjustments: [
-                .success(MealAdjustmentOutcome(reply: "Raised it.", meal: Self.raised())),
-                .success(MealAdjustmentOutcome(reply: "Again.", meal: nil)),
+                .success(Self.raisedTheRice(saying: "Raised it.")),
+                .success(MealAdjustmentOutcome(reply: "Again.", askedForAChange: true, meal: nil)),
             ]
         )
         let model = makeModel(subject: subject, client: client)
@@ -363,7 +461,7 @@ struct MealChatTests {
         let client = ScriptedClient(
             adjustments: [
                 .failure(.network),
-                .success(MealAdjustmentOutcome(reply: "Raised the rice.", meal: Self.raised())),
+                .success(Self.raisedTheRice()),
             ]
         )
         let model = makeModel(subject: subject, client: client)
@@ -421,7 +519,7 @@ struct MealChatTests {
     func cancelRetiresTheRun() async throws {
         let subject = StandInSubject(meal: Self.meal())
         let client = GatedClient(
-            adjustments: [.success(MealAdjustmentOutcome(reply: "Raised the rice.", meal: Self.raised()))]
+            adjustments: [.success(Self.raisedTheRice())]
         )
         let model = makeModel(subject: subject, client: client)
 
@@ -456,7 +554,11 @@ struct MealChatTests {
     func aQuestionShowsNoSteps() async throws {
         let subject = StandInSubject(meal: Self.meal())
         let client = GatedClient(
-            adjustments: [.success(MealAdjustmentOutcome(reply: "Polenta is boiled maize meal.", meal: nil))]
+            adjustments: [
+                .success(
+                    MealAdjustmentOutcome(reply: "Polenta is boiled maize meal.", askedForAChange: false, meal: nil)
+                )
+            ]
         )
         let model = makeModel(subject: subject, client: client)
 
@@ -474,7 +576,9 @@ struct MealChatTests {
         #expect(model.stage == .conversation)
         #expect(model.messages.map(\.author) == [.you, .fuel])
         #expect(model.messages[1].text == "Polenta is boiled maize meal.")
-        #expect(model.messages[1].movedNothing)
+        // An answer, not a failed adjustment: nothing under it says the meal
+        // is unchanged, because nothing was being changed.
+        #expect(!model.messages[1].movedNothing)
         #expect(model.arrivingReply == nil)
         #expect(subject.applied.isEmpty)
     }
@@ -486,7 +590,7 @@ struct MealChatTests {
     func anAdjustmentShowsTheSteps() async throws {
         let subject = StandInSubject(meal: Self.meal())
         let client = GatedClient(
-            adjustments: [.success(MealAdjustmentOutcome(reply: "Raised the rice.", meal: Self.raised()))]
+            adjustments: [.success(Self.raisedTheRice())]
         )
         let model = makeModel(subject: subject, client: client)
 
@@ -510,7 +614,11 @@ struct MealChatTests {
     func oneMessageAtATime() async throws {
         let subject = StandInSubject(meal: Self.meal())
         let client = GatedClient(
-            adjustments: [.success(MealAdjustmentOutcome(reply: "Polenta is boiled maize meal.", meal: nil))]
+            adjustments: [
+                .success(
+                    MealAdjustmentOutcome(reply: "Polenta is boiled maize meal.", askedForAChange: false, meal: nil)
+                )
+            ]
         )
         let model = makeModel(subject: subject, client: client)
 
@@ -588,7 +696,7 @@ struct MealChatTests {
         )
 
         let client = ScriptedClient(
-            adjustments: [.success(MealAdjustmentOutcome(reply: "Raised the rice.", meal: Self.raised()))]
+            adjustments: [.success(Self.raisedTheRice())]
         )
         let detail = MealDetailModel(
             entryID: entry.entryID,
@@ -630,7 +738,7 @@ struct MealChatTests {
         )
 
         let client = ScriptedClient(
-            adjustments: [.success(MealAdjustmentOutcome(reply: "Raised the rice.", meal: Self.raised()))]
+            adjustments: [.success(Self.raisedTheRice())]
         )
         let detail = MealDetailModel(
             entryID: entry.entryID,
@@ -664,7 +772,7 @@ struct MealChatTests {
         )
 
         let client = GatedClient(
-            adjustments: [.success(MealAdjustmentOutcome(reply: "Raised the rice.", meal: Self.raised()))]
+            adjustments: [.success(Self.raisedTheRice())]
         )
         let detail = MealDetailModel(
             entryID: entry.entryID,
@@ -894,7 +1002,9 @@ struct MealChatComposerTests {
             subject: subject,
             model: MealChatModel(
                 subject: subject,
-                client: ScriptedClient(adjustments: [.success(MealAdjustmentOutcome(reply: "Done.", meal: nil))]),
+                client: ScriptedClient(
+                    adjustments: [.success(MealAdjustmentOutcome(reply: "Done.", askedForAChange: true, meal: nil))]
+                ),
                 keys: StoredKey(),
                 provider: .claude,
                 pace: {}

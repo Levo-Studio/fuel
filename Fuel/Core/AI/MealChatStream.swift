@@ -16,6 +16,11 @@ nonisolated struct MealChatStreamProgress: Sendable, Equatable {
     /// declared intent would be a field a model can get wrong in either
     /// direction; an open `changes` array with an object in it is the model
     /// already writing the change.
+    ///
+    /// The finished turn asks the same question of the same two arrays and
+    /// keeps the answer as `MealAdjustmentIntent.askedForAChange`, so the
+    /// analysis states cannot run over a turn that then lands as a question,
+    /// nor a question be met at the end by a note about amounts.
     var movesSomething: Bool
 
     init(sentence: String? = nil, movesSomething: Bool = false) {
@@ -402,6 +407,7 @@ nonisolated struct MealChatStreamAssembler {
         return .finished(
             MealAdjustmentOutcome(
                 reply: intent.reply,
+                askedForAChange: intent.askedForAChange,
                 meal: MealAdjuster.applyAgainstBundledTable(intent, to: meal)
             )
         )

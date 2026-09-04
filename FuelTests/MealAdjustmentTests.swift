@@ -74,6 +74,59 @@ struct MealChatContractTests {
         #expect(intent.additions.isEmpty)
     }
 
+    /// **The two turns that arrive looking identical.** Both lists empty is a
+    /// model that was never moving anything; a list with something in it is a
+    /// model that was. Every later decision about what the screen may say under
+    /// the sentence rests on this one flag, so it is read here, off the reply's
+    /// own data, and nowhere else.
+    @Test("a reply that asks for nothing says so, and one that asks says so too")
+    func readsWhetherAChangeWasAskedFor() throws {
+        let question = try MealChatContract.intent(from: #"{"changes":[],"additions":[],"reply":"Boiled maize."}"#)
+        #expect(!question.askedForAChange)
+
+        let adjustment = try MealChatContract.intent(from: #"{"changes":[{"item":1,"grams":300}]}"#)
+        #expect(adjustment.askedForAChange)
+
+        let addition = try MealChatContract.intent(from: #"{"additions":[{"name":"Olive oil","grams":10}]}"#)
+        #expect(addition.askedForAChange)
+    }
+
+    /// **A row the parse threw away is still a model that set out to move
+    /// something**, and the flag is read from the rows as they arrived for
+    /// exactly this case. A reply whose sentence claims the rice was raised,
+    /// with a change object too broken to use, must not reach the screen
+    /// looking like a question — nothing else on the turn would then contradict
+    /// the claim.
+    ///
+    /// It is the same direction `MealChatStreamReader.hasAnElement` counts in,
+    /// so the warning the stream gives and the turn that lands cannot disagree
+    /// about what kind of turn it was.
+    @Test(
+        "a change row too broken to use still counts as a turn that asked for one",
+        arguments: [
+            #"{"changes":[{"item":1}],"reply":"Raised the rice to 300 g."}"#,
+            #"{"changes":[{"item":1,"grams":0}],"reply":"Raised the rice to 300 g."}"#,
+            #"{"additions":[{"grams":10}],"reply":"Added the olive oil."}"#,
+        ]
+    )
+    func droppedRowsStillAskedForAChange(raw: String) throws {
+        let intent = try MealChatContract.intent(from: raw)
+
+        #expect(intent.changes.isEmpty)
+        #expect(intent.additions.isEmpty)
+        #expect(intent.askedForAChange)
+    }
+
+    /// Prose asks for nothing, which is what a sentence with no object behind
+    /// it plainly is — including one that talks as though it had changed
+    /// something, because there is no branch here that takes a change out of a
+    /// sentence.
+    @Test("an answer written as prose asked for no change")
+    func proseAsksForNothing() throws {
+        #expect(!(try MealChatContract.intent(from: "Polenta is boiled maize meal.").askedForAChange))
+        #expect(!(try MealChatContract.intent(from: "I raised the rice to 300 g for you.").askedForAChange))
+    }
+
     @Test("both lists missing entirely read as empty rather than throwing")
     func missingLists() throws {
         let intent = try MealChatContract.intent(from: #"{"reply":"Not sure."}"#)
@@ -255,6 +308,26 @@ struct MealChatContractTests {
         for key in ["\"kilocalories\"", "\"calories\"", "\"protein", "\"carb", "\"fat", "\"energy\""] {
             #expect(!prompt.contains(key))
         }
+    }
+
+    /// **A canary over the one rule here that nothing structural enforces.**
+    ///
+    /// Every other promise this contract makes is kept by the device whatever
+    /// the model writes: a figure has no key to arrive in and no property to
+    /// land in, a weight is priced against CIQUAL rather than believed, an
+    /// unreadable row is dropped. This one cannot be. "The carrots were done in
+    /// olive oil" and "what could I add to make this more filling" produce the
+    /// same `additions` entry — a food name and a weight — and there is nothing
+    /// in the object, the payload or the wire that says which of the two it
+    /// came from, so a suggestion written into that key would be logged as food
+    /// the user never ate.
+    ///
+    /// The sentence in the prompt is therefore the whole of the protection, and
+    /// this exists so that a reword which quietly drops it fails here instead
+    /// of in somebody's day.
+    @Test("the prompt says a food it suggested is not a food that was eaten")
+    func promptRefusesSuggestions() {
+        #expect(MealChatContract.systemPrompt.contains("Only food they ate goes in \"additions\""))
     }
 
     @Test("a meal with no breakdown says so rather than sending an empty list")
