@@ -229,7 +229,31 @@ nonisolated struct MistralClient: AIClient {
             throw AIError.transportFailure(error)
         }
 
+        // The Anthropic client's own note says why a stream that delivered
+        // nothing is asked again without streaming, and what the second request
+        // costs.
+        guard !assembler.receivedNothing else {
+            yield(try await unstreamed(body: body, over: meal))
+            return
+        }
+
         yield(try assembler.finish(over: meal))
+    }
+
+    /// The same question, asked once more as a single document. The Anthropic
+    /// client's `unstreamed(body:over:)` carries the reasoning for both.
+    private func unstreamed(body: Data, over meal: AdjustableMeal) async throws -> MealChatEvent {
+        guard var object = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else {
+            throw AIError.malformedResponse
+        }
+        object.removeValue(forKey: "stream")
+
+        let reply = try await send(body: object)
+        return try MealChatStreamAssembler.turn(
+            from: reply.text,
+            over: meal,
+            ranOutOfTokens: Self.ranOutOfTokens(reply.body)
+        )
     }
 
     // MARK: - The one request path

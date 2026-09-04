@@ -334,6 +334,24 @@ nonisolated struct MealChatStreamAssembler {
         ranOutOfTokens = true
     }
 
+    /// Whether the stream ended without one character of an answer in it.
+    ///
+    /// **A different question from "was the answer readable", and the reason
+    /// the clients can tell a wire problem from a model problem.** A model that
+    /// wrote prose, a code fence or half an object has answered badly, and
+    /// asking it again costs the user a second request for the same reply. A
+    /// stream that delivered nothing at all has not been answered badly — it
+    /// has not been read — and that is a failure at Fuel's end of the wire,
+    /// which is worth one more request without the streaming that broke it.
+    ///
+    /// This was reachable for every message on both providers until the line
+    /// framing was fixed; see `ServerSentEventLineSplitter`. It should now be
+    /// unreachable, and the fallback behind it exists because the suite could
+    /// not see that one either.
+    var receivedNothing: Bool {
+        raw.isEmpty
+    }
+
     // MARK: - Finishing it
 
     /// The turn, complete.
@@ -360,11 +378,26 @@ nonisolated struct MealChatStreamAssembler {
     /// closed and a sentence that never ended — are the same thing to the user,
     /// and both are the retry state.
     func finish(over meal: AdjustableMeal) throws -> MealChatEvent {
-        guard !ranOutOfTokens || MealChatContract.carriesAnObject(raw) else {
+        try Self.turn(from: raw, over: meal, ranOutOfTokens: ranOutOfTokens)
+    }
+
+    /// The same reading of a complete reply, however it was collected.
+    ///
+    /// **Static, and shared with the unstreamed fallback**, so a turn that came
+    /// back in one document is read by exactly the code a streamed one is. The
+    /// fallback exists to save an answer, not to introduce a second parse with
+    /// its own idea of what a reply is — the whole point of it is that the
+    /// weights are decided in one place whichever way the words arrived.
+    static func turn(
+        from reply: String,
+        over meal: AdjustableMeal,
+        ranOutOfTokens: Bool
+    ) throws -> MealChatEvent {
+        guard !ranOutOfTokens || MealChatContract.carriesAnObject(reply) else {
             throw AIError.truncatedReply
         }
 
-        let intent = try MealChatContract.intent(from: raw)
+        let intent = try MealChatContract.intent(from: reply)
 
         return .finished(
             MealAdjustmentOutcome(

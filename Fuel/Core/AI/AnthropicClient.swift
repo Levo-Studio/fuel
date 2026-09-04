@@ -223,7 +223,47 @@ nonisolated struct AnthropicClient: AIClient {
             throw AIError.transportFailure(error)
         }
 
+        // **A stream that delivered nothing is asked again without streaming.**
+        // See `MealChatStreamAssembler.receivedNothing` for why this is a
+        // different case from a reply Fuel could not read, and
+        // `unstreamed(body:over:)` for what the second request costs.
+        guard !assembler.receivedNothing else {
+            yield(try await unstreamed(body: body, over: meal))
+            return
+        }
+
         yield(try assembler.finish(over: meal))
+    }
+
+    /// The same question, asked once more as a single document.
+    ///
+    /// **The safety net under the streaming path, and the reason the chat no
+    /// longer depends on the wire format being read perfectly.** Streaming buys
+    /// the sentence its word-by-word arrival and nothing else; the answer
+    /// itself is the same object either way, read by the same
+    /// `MealChatStreamAssembler.turn(from:over:ranOutOfTokens:)`. Losing the
+    /// arrival is a far smaller thing than losing the answer, which is what a
+    /// stream Fuel cannot frame costs the user today.
+    ///
+    /// **It costs a second request, and that is the honest price.** The
+    /// alternative is the retry state, where the user taps `Try again` and pays
+    /// for a second request anyway — the same reasoning
+    /// `sendRetryingALostConnection` gives for its one extra attempt, and it is
+    /// bounded the same way: this path does not stream, so it cannot reach
+    /// itself. It is only entered when the stream produced no character at all,
+    /// which no answered request does.
+    private func unstreamed(body: Data, over meal: AdjustableMeal) async throws -> MealChatEvent {
+        guard var object = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else {
+            throw AIError.malformedResponse
+        }
+        object.removeValue(forKey: "stream")
+
+        let reply = try await send(body: object)
+        return try MealChatStreamAssembler.turn(
+            from: reply.text,
+            over: meal,
+            ranOutOfTokens: Self.ranOutOfTokens(reply.body)
+        )
     }
 
     // MARK: - The one request path

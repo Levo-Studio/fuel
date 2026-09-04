@@ -78,6 +78,14 @@ private final class RecordingTransport: StreamingHTTPTransport, @unchecked Senda
         transcript = (status, framed, nil)
     }
 
+    /// Answers `stream` with a transcript and `send` with a collected response,
+    /// for the one path that uses both: a stream that delivered nothing and the
+    /// unstreamed request that rescues it.
+    convenience init(streaming lines: [String], thenAnswering body: String, status: Int = 200) {
+        self.init([.success(HTTPResponse(statusCode: status, body: Data(body.utf8)))])
+        transcript = (status, lines, nil)
+    }
+
     /// Answers every request with the same recorded response.
     convenience init(status: Int, body: String) {
         self.init([.success(HTTPResponse(statusCode: status, body: Data(body.utf8)))])
@@ -2618,5 +2626,97 @@ struct MealAdjustmentClientTests {
         let turn = try await outcome(of: client.adjust(Self.meal(), history: [], message: "a second portion"))
 
         #expect(turn.reply == "Raised the rice to 300 g.")
+    }
+
+    // MARK: - When the stream says nothing at all
+
+    /// **The net under the streaming path.** Whatever the wire turns out to do
+    /// next, a conversation that produced no character at all is asked once
+    /// more without streaming rather than shown as an answer Fuel could not
+    /// read. The transcript here is nothing but keep-alives, which is a stream
+    /// that framed perfectly and delivered no answer.
+    @Test("a stream that delivers nothing is asked again without streaming")
+    func fallsBackToOneRequest() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let transport = RecordingTransport(
+            streaming: [": keep-alive", "", ": keep-alive", ""],
+            thenAnswering: Reply.anthropic(Self.raisesTheRice)
+        )
+        let client = AnthropicClient(transport: transport, keys: keys.source)
+
+        let turn = try await outcome(of: client.adjust(Self.meal(), history: [], message: "a second portion"))
+
+        #expect(turn.reply == "Raised the rice to 300 g.")
+        #expect(try #require(turn.meal).items[0].grams == 300)
+
+        // Exactly two: the stream that said nothing, and the one request that
+        // rescued it. The second carries no `stream` key, so it cannot reach
+        // this path again.
+        #expect(transport.requests.count == 2)
+        let second = try #require(transport.requests.last?.httpBody)
+        let json = try #require(try JSONSerialization.jsonObject(with: second) as? [String: Any])
+        #expect(json["stream"] == nil)
+        #expect(json["system"] as? String == MealChatContract.systemPrompt)
+    }
+
+    @Test("the other provider falls back the same way")
+    func mistralFallsBack() async throws {
+        let keys = try KeyFixture(provider: .mistral, secret: "0123456789abcdefghij")
+        defer { keys.tearDown(provider: .mistral) }
+
+        let transport = RecordingTransport(
+            streaming: [": keep-alive", ""],
+            thenAnswering: Reply.mistral(Self.raisesTheRice)
+        )
+        let client = MistralClient(transport: transport, keys: keys.source)
+
+        let turn = try await outcome(of: client.adjust(Self.meal(), history: [], message: "a second portion"))
+
+        #expect(turn.reply == "Raised the rice to 300 g.")
+        #expect(transport.requests.count == 2)
+        let second = try #require(transport.requests.last?.httpBody)
+        let json = try #require(try JSONSerialization.jsonObject(with: second) as? [String: Any])
+        #expect(json["stream"] == nil)
+    }
+
+    /// **A reply the model wrote badly is not asked again.** The fallback is
+    /// for a stream that delivered nothing, and repeating a request whose answer
+    /// arrived and was unreadable would spend the user's credit on the same
+    /// answer twice.
+    @Test("an unreadable answer is not asked again")
+    func anUnreadableAnswerIsNotRepeated() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let transport = RecordingTransport(
+            streaming: Reply.anthropicStream("{\"changes\":[{\"item\":1,\"gra"),
+            thenAnswering: Reply.anthropic(Self.raisesTheRice)
+        )
+        let client = AnthropicClient(transport: transport, keys: keys.source)
+
+        await #expect(throws: AIError.malformedResponse) {
+            _ = try await outcome(of: client.adjust(Self.meal(), history: [], message: "more"))
+        }
+        #expect(transport.requests.count == 1)
+    }
+
+    /// The fallback answers with the same reading as a streamed turn, so a
+    /// ceiling reached on the unstreamed request is still the ceiling.
+    @Test("a fallback that ran into the ceiling is still the ceiling")
+    func fallbackRespectsTheCeiling() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let transport = RecordingTransport(
+            streaming: [": keep-alive", ""],
+            thenAnswering: Reply.anthropicOutOfTokens("{\"changes\":[{\"item\":1,\"gra")
+        )
+        let client = AnthropicClient(transport: transport, keys: keys.source)
+
+        await #expect(throws: AIError.truncatedReply) {
+            _ = try await outcome(of: client.adjust(Self.meal(), history: [], message: "more"))
+        }
     }
 }
