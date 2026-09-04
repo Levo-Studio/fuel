@@ -353,6 +353,42 @@ struct FuelMotionTests {
         #expect(FuelMotion.resolve(FuelMotion.emphasised, reduceMotion: true) == nil)
     }
 
+    /// The one difference between the two, and the reason `dayChange` is not
+    /// simply `emphasised`: a sheet leaves the screen underneath standing, and
+    /// a day change replaces everything under the header at once.
+    @Test("a day change is emphasised's shape, and fades where emphasised is dropped")
+    func dayChangeIsEmphasisedThatFades() {
+        #expect(FuelMotion.dayChange.duration == FuelMotion.emphasised.duration)
+        #expect(FuelMotion.dayChange.controlPoint1 == FuelMotion.emphasised.controlPoint1)
+        #expect(FuelMotion.dayChange.controlPoint2 == FuelMotion.emphasised.controlPoint2)
+        #expect(FuelMotion.resolve(FuelMotion.dayChange, reduceMotion: true) != nil)
+    }
+
+    /// What moves is the half of the decision a `Curve` cannot carry, and the
+    /// direction is why it lives here: an arrow, a swipe and a jump that all
+    /// land on the same day have to travel the same way.
+    @Test("a day change travels in the direction it was made")
+    func dayTravelFollowsTheDirection() {
+        #expect(
+            FuelMotion.resolveDayTravel(isBackward: true, reduceMotion: false)
+                == .sideways(isBackward: true)
+        )
+        #expect(
+            FuelMotion.resolveDayTravel(isBackward: false, reduceMotion: false)
+                == .sideways(isBackward: false)
+        )
+    }
+
+    /// Reduce Motion drops the travel and keeps the change followable, which is
+    /// the whole difference between `dayChange` and `emphasised`. Both
+    /// directions collapse onto one answer, because a fade has no direction to
+    /// have.
+    @Test("reduced motion drops a day change's travel and leaves the fade")
+    func dayTravelIsDroppedNotSoftened() {
+        #expect(FuelMotion.resolveDayTravel(isBackward: true, reduceMotion: true) == .fade)
+        #expect(FuelMotion.resolveDayTravel(isBackward: false, reduceMotion: true) == .fade)
+    }
+
     @Test("a paced sequence advances normally, and not at all under reduced motion")
     func pacingStopsRatherThanSoftens() {
         // The distinction from `resolve` is the point. A cross-fade would keep

@@ -98,6 +98,30 @@ nonisolated enum FuelMotion {
         reducedBehaviour: .crossFade
     )
 
+    /// Today changing to the day beside it — by a swipe, by an arrow in the
+    /// header, or by a jump from the date picker.
+    ///
+    /// **The same duration and the same bézier as `emphasised`**, taken from it
+    /// rather than restated, because a day arriving *is* the thing that curve
+    /// describes: a screenful of content coming in from one side while the
+    /// previous one leaves at the other. Nothing about the travel differs, so
+    /// nothing about the timing does.
+    ///
+    /// What differs is the one thing a curve carries beyond its shape. Reduce
+    /// Motion drops `emphasised` entirely, which is right for a sheet: the
+    /// screen underneath is still there and the change is legible without it.
+    /// A day change replaces everything under the header at once, and a cut
+    /// with no cue at all is the case Apple's guidance names — a state that
+    /// swaps instantly is harder to follow than one that fades. So this one
+    /// cross-fades where `emphasised` is dropped, and `resolveDayTransition`
+    /// below is what the fade is applied to.
+    static let dayChange = Curve(
+        duration: emphasised.duration,
+        controlPoint1: emphasised.controlPoint1,
+        controlPoint2: emphasised.controlPoint2,
+        reducedBehaviour: .crossFade
+    )
+
     /// The duration a cross-fade gets when a curve is reduced. One value for
     /// all of them: under Reduce Motion the differences between the curves stop
     /// meaning anything, and a fade that varies in length by origin is just
@@ -106,7 +130,7 @@ nonisolated enum FuelMotion {
 
     /// Every curve above, so a test can hold the whole set to one rule rather
     /// than to four restated ones.
-    static let allCurves: [Curve] = [standard, emphasised, value, progress]
+    static let allCurves: [Curve] = [standard, emphasised, value, progress, dayChange]
 
     // MARK: - Press feedback
 
@@ -213,6 +237,56 @@ nonisolated enum FuelMotion {
         return curve.animation.repeatForever(autoreverses: false)
     }
 
+    /// How a day change moves, kept as data for the reason `Curve` is: so the
+    /// decision can be made by a pure function and tested, and only then turned
+    /// into something SwiftUI can apply.
+    ///
+    /// `resolve` cannot answer this, for the reason `resolveRepeating` cannot
+    /// answer its own question. A `Curve` says how long and how eased; this
+    /// says *what moves*, which is the other half of the same decision. Leaving
+    /// it at the call site would put a direction — and the Reduce Motion branch
+    /// that replaces it — in a feature file.
+    enum DayTravel: Equatable, Sendable {
+
+        /// The day arrives from one edge while the one it replaces leaves at
+        /// the other. `isBackward` is a move to an *earlier* day.
+        case sideways(isBackward: Bool)
+
+        /// Reduce Motion: the travel is dropped and the two days cross-fade in
+        /// place, which is `dayChange`'s `.crossFade` applied to the thing that
+        /// would otherwise move.
+        case fade
+
+        /// Backwards, the day arrives from the leading edge — the direction a
+        /// page turns back — and forwards is that reversed.
+        ///
+        /// Combined with a fade rather than a bare slide: the day list has no
+        /// opaque card behind it, so two of them sliding across each other
+        /// would overlap mid-travel and read as one screen of doubled text.
+        fileprivate var transition: AnyTransition {
+            switch self {
+            case .fade:
+                return .opacity
+            case .sideways(let isBackward):
+                return .asymmetric(
+                    insertion: .move(edge: isBackward ? .leading : .trailing).combined(with: .opacity),
+                    removal: .move(edge: isBackward ? .trailing : .leading).combined(with: .opacity)
+                )
+            }
+        }
+    }
+
+    /// Which way a day change travels, and whether it travels at all.
+    ///
+    /// **The direction is the whole point of it existing.** Three controls
+    /// change the day: a horizontal drag, an arrow in the header, and a jump
+    /// from the picker. They are three gestures and one movement, and they read
+    /// as one only if a move to an earlier day travels the same way whichever
+    /// of them made it.
+    static func resolveDayTravel(isBackward: Bool, reduceMotion: Bool) -> DayTravel {
+        reduceMotion ? .fade : .sideways(isBackward: isBackward)
+    }
+
     /// Whether a sequence that advances on its own should advance at all, and
     /// how long it holds each state when it does.
     ///
@@ -265,6 +339,23 @@ private struct FuelAnimationModifier<Value: Equatable>: ViewModifier {
 
     func body(content: Content) -> some View {
         content.animation(FuelMotion.resolve(curve, reduceMotion: reduceMotion), value: value)
+    }
+}
+
+// MARK: - Travelling between days
+
+/// Applies the day transition, with the accessibility flag read here rather
+/// than at the call site — the same reason `FuelAnimationModifier` exists.
+private struct FuelDayTransitionModifier: ViewModifier {
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    let isBackward: Bool
+
+    func body(content: Content) -> some View {
+        content.transition(
+            FuelMotion.resolveDayTravel(isBackward: isBackward, reduceMotion: reduceMotion).transition
+        )
     }
 }
 
@@ -328,6 +419,15 @@ extension View {
         advance: @escaping () -> Void
     ) -> some View {
         modifier(FuelPacingModifier(hold: hold, isActive: isActive, advance: advance))
+    }
+
+    /// Travels to the day beside this one, in the direction the move was made.
+    ///
+    /// The only transition entry point a feature file uses. `.transition` with
+    /// a hand-written edge is a design-layer bypass and a Reduce Motion bug in
+    /// one line — the same two things `fuelAnimation` prevents.
+    func fuelDayTransition(isBackward: Bool) -> some View {
+        modifier(FuelDayTransitionModifier(isBackward: isBackward))
     }
 
     /// Animates a change with one of the curves above, already reduced if the
