@@ -88,7 +88,7 @@ nonisolated enum FuelMetrics {
         /// stand-in for the indicator, and adding it above the safe area spent
         /// it twice: the pills came to rest 68 from the bottom of a hosted
         /// render. They now take the drawn distance from the frame's own bottom
-        /// edge — see `MealResultFooter`. The onboarding footers still add
+        /// edge — see `mealResultFooter`. The onboarding footers still add
         /// theirs above the safe area; nobody has measured those against a
         /// device, and which reading they should take is the owner's call
         /// rather than something to change on the way past.
