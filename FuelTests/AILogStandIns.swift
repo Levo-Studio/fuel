@@ -35,6 +35,11 @@ final class ScriptedClient: AIClient, @unchecked Sendable {
     /// edited list. Never printed anywhere.
     private(set) var lastText: String?
 
+    /// The note that came with the last photo, so a test can check that what
+    /// the user typed under the viewfinder is what the scan handed over — and
+    /// that an empty field hands over nothing. Never printed anywhere either.
+    private(set) var lastPhotoContext: String?
+
     convenience init(answer: Result<MealEstimate, AIError>) {
         self.init(answers: [answer])
     }
@@ -45,8 +50,9 @@ final class ScriptedClient: AIClient, @unchecked Sendable {
 
     func checkKey(_ key: APIKey) async -> KeyCheckResult { .passed }
 
-    func estimate(photo: MealPhoto) async throws -> MealEstimate {
-        try next()
+    func estimate(photo: MealPhoto, context: String?) async throws -> MealEstimate {
+        lastPhotoContext = context
+        return try next()
     }
 
     func estimate(text: String) async throws -> MealEstimate {
@@ -111,7 +117,7 @@ nonisolated struct UnusedEstimator: AIClient {
 
     func checkKey(_ key: APIKey) async -> KeyCheckResult { .failed(.cancelled) }
 
-    func estimate(photo: MealPhoto) async throws -> MealEstimate { throw AIError.cancelled }
+    func estimate(photo: MealPhoto, context: String?) async throws -> MealEstimate { throw AIError.cancelled }
 
     func estimate(text: String) async throws -> MealEstimate { throw AIError.cancelled }
 }
@@ -198,7 +204,7 @@ final class GatedClient: AIClient, @unchecked Sendable {
 
     func checkKey(_ key: APIKey) async -> KeyCheckResult { .passed }
 
-    func estimate(photo: MealPhoto) async throws -> MealEstimate {
+    func estimate(photo: MealPhoto, context: String?) async throws -> MealEstimate {
         try await next()
     }
 

@@ -48,12 +48,26 @@ nonisolated protocol AIClient: Sendable {
     /// exception. Everything that can go wrong maps onto `KeyCheckResult`.
     func checkKey(_ key: APIKey) async -> KeyCheckResult
 
-    /// Estimates a meal from a photo.
+    /// Estimates a meal from a photo, and from what the user typed under the
+    /// viewfinder about it.
     ///
     /// The photo is already compressed by `MealPhotoCompressor` — the size
     /// check happens there, before any request is built, so an oversized photo
     /// costs nothing.
-    func estimate(photo: MealPhoto) async throws -> MealEstimate
+    ///
+    /// `context` is detail the photograph cannot carry: the oil something was
+    /// fried in, what is in a sauce, a portion smaller than it looks. It
+    /// travels **beside the image in the same request** — it does not replace
+    /// the photo, it is not a second call, and there is still no second
+    /// request shape. `EstimateContract.photoInstruction(with:)` is where it
+    /// is bounded and framed, and it is bounded there rather than here so that
+    /// an overlong note is refused before a body exists to carry it.
+    ///
+    /// No default value: a protocol requirement cannot carry one. The two
+    /// clients declare `context: String? = nil` on their implementations, so a
+    /// concrete caller with nothing to add — every request-shape test in the
+    /// suite — goes on saying nothing.
+    func estimate(photo: MealPhoto, context: String?) async throws -> MealEstimate
 
     /// Estimates a meal from the sentence the user typed.
     func estimate(text: String) async throws -> MealEstimate

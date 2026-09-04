@@ -65,7 +65,7 @@ private nonisolated struct FailingEstimator: AIClient {
 
     func checkKey(_ key: APIKey) async -> KeyCheckResult { .failed(.network) }
 
-    func estimate(photo: MealPhoto) async throws -> MealEstimate { throw AIError.network }
+    func estimate(photo: MealPhoto, context: String?) async throws -> MealEstimate { throw AIError.network }
 
     func estimate(text: String) async throws -> MealEstimate { throw AIError.network }
 }

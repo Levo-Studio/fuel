@@ -73,7 +73,7 @@ private struct PreviewEstimator: AIClient {
 
     func checkKey(_ key: APIKey) async -> KeyCheckResult { .passed }
 
-    func estimate(photo: MealPhoto) async throws -> MealEstimate { Self.estimate }
+    func estimate(photo: MealPhoto, context: String?) async throws -> MealEstimate { Self.estimate }
 
     func estimate(text: String) async throws -> MealEstimate { Self.estimate }
 

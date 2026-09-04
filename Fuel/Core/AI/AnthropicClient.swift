@@ -83,12 +83,17 @@ nonisolated struct AnthropicClient: AIClient {
 
     // MARK: - Estimating
 
-    func estimate(photo: MealPhoto) async throws -> MealEstimate {
+    func estimate(photo: MealPhoto, context: String? = nil) async throws -> MealEstimate {
         // The image block comes before the text block. Anthropic's own
         // guidance is that images placed ahead of the question perform better,
         // and the ordering is load-bearing enough to be worth a comment: a
         // future edit that appends the image after the prompt would look
         // harmless and would quietly cost accuracy.
+        //
+        // The user's note rides inside that same text block rather than
+        // arriving as a third one, so a scan carries two parts whether or not
+        // anything was typed, and the note cannot be mistaken for a turn of
+        // its own.
         let content: [[String: Any]] = [
             [
                 "type": "image",
@@ -98,7 +103,7 @@ nonisolated struct AnthropicClient: AIClient {
                     "data": photo.base64
                 ]
             ],
-            ["type": "text", "text": EstimateContract.photoInstruction]
+            ["type": "text", "text": EstimateContract.photoInstruction(with: context)]
         ]
 
         let estimate = try await complete(content: content, mode: .photo)

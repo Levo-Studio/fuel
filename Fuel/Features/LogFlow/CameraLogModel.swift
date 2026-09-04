@@ -76,11 +76,15 @@ final class CameraLogModel {
     /// Trimmed, because a field holding only a space is a field the user typed
     /// nothing into, and sending it would spend tokens saying so.
     ///
-    /// **Nothing sends this yet.** `AIClient.estimate(photo:)` takes a frame
-    /// and nothing else, and `Fuel/Core/AI/` is not this change's to widen —
-    /// the parameter and the prompt it lands in arrive with that file's own
-    /// change. Until then this is the value the scan will hand over, and
-    /// `CameraLogTests` holds it to the shape the request needs.
+    /// This is what `run(_:as:)` hands to `AIClient.estimate(photo:context:)`,
+    /// where it travels beside the image in the one request the scan already
+    /// makes.
+    ///
+    /// Trimmed here and bounded again in `EstimateContract.boundedContext` —
+    /// not a duplicate, because the two answer different questions. This one
+    /// asks whether the user typed anything; that one asks whether what they
+    /// typed belongs in a prompt, which is a property of the request and holds
+    /// for every caller rather than only for this field.
     var photoContext: String? {
         let trimmed = context.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
@@ -310,7 +314,9 @@ final class CameraLogModel {
             let compressed = try MealPhotoCompressor.compress(image)
             capturedPhotoData = compressed.jpegData
 
-            let estimate = try await stepping(as: run) { try await self.client.estimate(photo: compressed) }
+            let estimate = try await stepping(as: run) {
+                try await self.client.estimate(photo: compressed, context: self.photoContext)
+            }
 
             try Task.checkCancellation()
             present(estimate, as: run)
