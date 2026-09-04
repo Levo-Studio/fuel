@@ -156,7 +156,7 @@ final class MealChatModel {
     /// way in cannot be undone by the next word. See `MealChatEvent.sentence`.
     ///
     /// **It never becomes a transcript line.** What lands in `messages` is the
-    /// sentence from the finished turn, parsed out of the complete object; this
+    /// sentence from the finished turn, read out of the complete reply; this
     /// is thrown away when the turn ends, whichever way it ends. A stream that
     /// dies half-way through a sentence leaves nothing behind — see
     /// `fail(with:as:)`.
@@ -418,13 +418,44 @@ final class MealChatModel {
     /// The turn that is being sent is not in here: `send()` appends the user's
     /// line to the transcript for the sheet to draw, and
     /// `MealChatContract.turn(for:message:)` carries it in the request as the
-    /// current question. So the last line is dropped, and what is left is
-    /// whole exchanges — the alternation a provider expects, because a turn is
-    /// only ever answered into the transcript once its reply has arrived.
+    /// current question. So the last line is dropped.
+    ///
+    /// **Only turns that were answered travel, and that is not the same thing
+    /// as everything before the last one.** A message whose reply never
+    /// arrived stays in the transcript — the user said it, and a screen that
+    /// quietly deleted what they typed would be worse than one that shows a
+    /// failure — but it is not an exchange. It is a line the model never saw.
+    /// Sending it would put two user turns in a row into a request whose
+    /// providers are trained on them alternating, which is a request that comes
+    /// back refused or answered as though the first line were part of the
+    /// second.
+    ///
+    /// It is reachable in one move: a turn fails, the user dismisses the
+    /// failure rather than retrying, and types something else. Every message
+    /// after that carried the orphan, and this file's own comment claimed it
+    /// could not happen because "a turn is only ever answered into the
+    /// transcript once its reply has arrived" — true of replies, and silent
+    /// about the turns that never got one.
     private var history: [MealChatTurn] {
-        messages
-            .dropLast()
-            .map { MealChatTurn(speaker: $0.author == .you ? .user : .model, text: $0.text) }
+        var exchanges: [MealChatTurn] = []
+        var asked: MealChatMessage?
+
+        for message in messages.dropLast() {
+            switch message.author {
+            case .you:
+                // Held until it is known to have been answered. A second one
+                // arriving before any reply means the first never was.
+                asked = message
+
+            case .fuel:
+                guard let question = asked else { break }
+                exchanges.append(MealChatTurn(speaker: .user, text: question.text))
+                exchanges.append(MealChatTurn(speaker: .model, text: message.text))
+                asked = nil
+            }
+        }
+
+        return exchanges
     }
 
     // MARK: - The answer
@@ -444,7 +475,7 @@ final class MealChatModel {
         guard isCurrent(run), let subject else { return }
 
         // Whatever happens below, nothing is still arriving. The sentence that
-        // lands in the transcript comes from the complete object rather than
+        // lands in the transcript comes from the complete reply rather than
         // from what was drawn on the way — the two agree, and the complete one
         // is the one that was parsed.
         arrivingReply = nil
