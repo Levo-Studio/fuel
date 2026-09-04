@@ -57,6 +57,26 @@ nonisolated struct MealEstimate: Sendable, Equatable {
         self.advice = advice
         self.items = items
     }
+
+    // MARK: - How sure the model is
+
+    /// How sure the model is of this estimate, as a whole percent, or `nil`
+    /// where no row of it carries an answer.
+    ///
+    /// A view onto `items` rather than a field of its own, because the model is
+    /// asked per row and never once for the meal — the same shape the export
+    /// already draws, which puts a confidence under each recognised item and
+    /// none over the total. Deriving the meal's figure from the rows is what
+    /// makes it survive a re-analysis: the rows that change bring their own
+    /// answers with them and the average follows, where a single meal-wide
+    /// figure would go stale the moment one line was corrected.
+    ///
+    /// `EstimateConfidence.percent(of:)` holds the rule. This is only the one
+    /// place that hands it a meal's rows, so the two log models and
+    /// `MealResultDraft` cannot each derive it slightly differently.
+    var confidencePercent: Int? {
+        EstimateConfidence.percent(of: items.map(\.confidence))
+    }
 }
 
 // MARK: - Log mode

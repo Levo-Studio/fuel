@@ -284,6 +284,14 @@ nonisolated enum MealAdjuster {
     /// before, and that is correct rather than surprising: grounding declines
     /// a typed meal it cannot attach a weight to, and the whole point of
     /// storing weights is that such a meal now has one.
+    ///
+    /// **The row keeps the confidence it arrived with**, for the reason
+    /// `RecognisedItem.setWeight(_:)` gives about the word beside it: the
+    /// model's certainty is about what it was looking at, and a change of
+    /// amount does not answer that either way. So a meal whose quantity the
+    /// user corrected in the chat carries the same accuracy figure afterwards
+    /// — the figure moves when the model's certainty is asked again, which is
+    /// what a re-analysis does, and not when a number is edited on the device.
     private static func repricing(
         _ item: RecognisedItem,
         to grams: Int,
@@ -353,6 +361,10 @@ nonisolated enum MealAdjuster {
             kilocalories: portion.kilocalories,
             grams: addition.grams,
             macros: portion.incompleteMacros ? nil : portion.macros,
+            // No confidence, because none was asked for: `MealChatContract`
+            // asks the model what to change, not how sure it is. The row joins
+            // the meal without a figure and is left out of the average rather
+            // than borrowing one from the rows that were estimated.
             note: .text(amount: .estimated)
         )
     }
