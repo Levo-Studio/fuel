@@ -2135,6 +2135,89 @@ struct MealAdjustmentClientTests {
         #expect(adjusted.items[0].kilocalories == PortionCalculator.portion(of: row.per100g, grams: 300).kilocalories)
     }
 
+    /// **The owner's first example, in the shape the prompt now asks for it.**
+    /// "A second portion that was smaller" holds no number at all; what it
+    /// holds is a proportion of a weight that is already recorded, which is an
+    /// amount the model is asked to work out and state rather than ask back
+    /// about. What arrives is that weight, and the table prices it.
+    @Test("a proportion with no figure in it comes back as a weight")
+    func relativeAmount() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let answer = """
+            {"changes":[{"item":1,"grams":225}],"additions":[],\
+            "reply":"Took the second portion as about half of the first, so 225 g of rice."}
+            """
+        let client = AnthropicClient(
+            transport: RecordingTransport(streaming: Reply.anthropicStream(answer, chunks: 8)),
+            keys: keys.source
+        )
+
+        let turn = try await outcome(
+            of: client.adjust(Self.meal(), history: [], message: "I had a second portion that was smaller")
+        )
+
+        let adjusted = try #require(turn.meal)
+        #expect(adjusted.items[0].grams == 225)
+
+        let table = try FoodTable.bundled()
+        let row = try #require(FoodTableGrounding.bestMatch(for: "Rice", preferring: .prepared, in: table))
+        #expect(adjusted.items[0].kilocalories == PortionCalculator.portion(of: row.per100g, grams: 225).kilocalories)
+        // The assumption is said out loud, because the user is the only one who
+        // can tell it that half was the wrong reading.
+        #expect(turn.reply == "Took the second portion as about half of the first, so 225 g of rice.")
+    }
+
+    /// **The owner's second example.** A message that says how a dish was made
+    /// names the food it was made with, and `additions` is the shape that has
+    /// always existed for it: the oil joins the list priced from CIQUAL, and
+    /// the meal grows by exactly what the table says that weight of it is.
+    @Test("an ingredient the message only implies joins the meal from the table")
+    func impliedIngredient() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let meal = AdjustableMeal(
+            title: "Roast carrots",
+            kilocalories: 90,
+            macros: MacroTotals(protein: 1, carbs: 14, fat: 1),
+            items: [
+                RecognisedItem(
+                    name: "Carrots",
+                    kilocalories: 90,
+                    grams: 200,
+                    note: .photo(confidence: .confident, approximateGrams: 200)
+                )
+            ]
+        )
+
+        let answer = """
+            {"changes":[],"additions":[{"name":"Olive oil","grams":10}],\
+            "reply":"Added a tablespoon of olive oil for the roasting."}
+            """
+        let client = AnthropicClient(
+            transport: RecordingTransport(streaming: Reply.anthropicStream(answer, chunks: 8)),
+            keys: keys.source
+        )
+
+        let turn = try await outcome(
+            of: client.adjust(meal, history: [], message: "the carrots were made with olive oil")
+        )
+
+        let adjusted = try #require(turn.meal)
+        #expect(adjusted.items.count == 2)
+        #expect(adjusted.items[1].name == "Olive oil")
+
+        let table = try FoodTable.bundled()
+        let row = try #require(FoodTableGrounding.bestMatch(for: "Olive oil", preferring: .prepared, in: table))
+        let oil = PortionCalculator.portion(of: row.per100g, grams: 10)
+        #expect(adjusted.items[1].kilocalories == oil.kilocalories)
+        #expect(adjusted.kilocalories == meal.kilocalories + oil.kilocalories)
+        // The carrots were not mentioned as an amount and do not move.
+        #expect(adjusted.items[0].grams == 200)
+    }
+
     /// Mistral's envelope, the same answer, and the `[DONE]` sentinel that is
     /// not JSON.
     @Test("the other provider's stream reaches the same turn", arguments: [1, 5])

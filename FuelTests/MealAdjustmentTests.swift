@@ -238,6 +238,25 @@ struct MealChatContractTests {
         #expect(!turn.contains("protein"))
     }
 
+    /// **The rule that does not bend, checked at the other end of it.** The
+    /// decoder has no property a figure could land in and the intent has no
+    /// field one could travel in; this says the shape the model is shown does
+    /// not offer it a key to write one into either. It survives the prompt
+    /// being reworded, which it has been, and would not survive a nutritional
+    /// field being added back to the shape.
+    @Test("the shape the prompt asks for has no field a figure could go in")
+    func promptAsksForNoFigures() {
+        let prompt = MealChatContract.systemPrompt
+
+        #expect(prompt.contains("\"changes\""))
+        #expect(prompt.contains("\"additions\""))
+        #expect(prompt.contains("\"reply\""))
+
+        for key in ["\"kilocalories\"", "\"calories\"", "\"protein", "\"carb", "\"fat", "\"energy\""] {
+            #expect(!prompt.contains(key))
+        }
+    }
+
     @Test("a meal with no breakdown says so rather than sending an empty list")
     func turnWithoutItems() {
         let meal = AdjustableMeal(title: "Leftovers", kilocalories: 300, macros: .zero, items: [])
