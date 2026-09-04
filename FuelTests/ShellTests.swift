@@ -68,6 +68,15 @@ private nonisolated struct FailingEstimator: AIClient {
     func estimate(photo: MealPhoto, context: String?) async throws -> MealEstimate { throw AIError.network }
 
     func estimate(text: String) async throws -> MealEstimate { throw AIError.network }
+
+    /// The shell never opens a conversation, so this only exists to conform.
+    func adjust(
+        _ meal: AdjustableMeal,
+        history: [MealChatTurn],
+        message: String
+    ) async throws -> MealAdjustmentOutcome {
+        throw AIError.network
+    }
 }
 
 /// Remembers which provider each log flow was built for.

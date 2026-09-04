@@ -28,6 +28,7 @@ final class ScriptedClient: AIClient, @unchecked Sendable {
     let provider: AIProvider = .claude
 
     private let answers: [Result<MealEstimate, AIError>]
+    private let adjustments: [Result<MealAdjustmentOutcome, AIError>]
     private(set) var requests = 0
 
     /// The last sentence it was asked about, so a test can check that a retry
@@ -40,12 +41,27 @@ final class ScriptedClient: AIClient, @unchecked Sendable {
     /// that an empty field hands over nothing. Never printed anywhere either.
     private(set) var lastPhotoContext: String?
 
+    // MARK: - Adjustments
+
+    /// Counted apart from `requests`, because a screen that talks about a meal
+    /// and a screen that re-analyses one both spend the user's credit and a
+    /// test has to be able to say which of the two happened.
+    private(set) var adjustRequests = 0
+
+    private(set) var lastAdjustedMeal: AdjustableMeal?
+    private(set) var lastHistory: [MealChatTurn] = []
+    private(set) var lastMessage: String?
+
     convenience init(answer: Result<MealEstimate, AIError>) {
         self.init(answers: [answer])
     }
 
-    init(answers: [Result<MealEstimate, AIError>]) {
+    init(
+        answers: [Result<MealEstimate, AIError>] = [.failure(.cancelled)],
+        adjustments: [Result<MealAdjustmentOutcome, AIError>] = [.failure(.cancelled)]
+    ) {
         self.answers = answers
+        self.adjustments = adjustments
     }
 
     func checkKey(_ key: APIKey) async -> KeyCheckResult { .passed }
@@ -58,6 +74,25 @@ final class ScriptedClient: AIClient, @unchecked Sendable {
     func estimate(text: String) async throws -> MealEstimate {
         lastText = text
         return try next()
+    }
+
+    /// The scripted answer, with the request recorded rather than applied.
+    ///
+    /// **The outcome is handed over whole**, so a model test says what came
+    /// back without also re-testing `MealAdjuster` — what a reply does to a
+    /// meal is that type's subject, and it has a suite of its own against the
+    /// real table.
+    func adjust(
+        _ meal: AdjustableMeal,
+        history: [MealChatTurn],
+        message: String
+    ) async throws -> MealAdjustmentOutcome {
+        lastAdjustedMeal = meal
+        lastHistory = history
+        lastMessage = message
+        let answer = adjustments[min(adjustRequests, adjustments.count - 1)]
+        adjustRequests += 1
+        return try answer.get()
     }
 
     private func next() throws -> MealEstimate {
@@ -120,6 +155,14 @@ nonisolated struct UnusedEstimator: AIClient {
     func estimate(photo: MealPhoto, context: String?) async throws -> MealEstimate { throw AIError.cancelled }
 
     func estimate(text: String) async throws -> MealEstimate { throw AIError.cancelled }
+
+    func adjust(
+        _ meal: AdjustableMeal,
+        history: [MealChatTurn],
+        message: String
+    ) async throws -> MealAdjustmentOutcome {
+        throw AIError.cancelled
+    }
 }
 
 /// A camera that opens nothing and counts the one thing a shell can be asked
@@ -175,11 +218,16 @@ final class GatedClient: AIClient, @unchecked Sendable {
 
     private let lock = NSLock()
     private let answers: [Result<MealEstimate, AIError>]
+    private let adjustments: [Result<MealAdjustmentOutcome, AIError>]
     private var started = 0
     private var waiting: [Int: CheckedContinuation<Void, Never>] = [:]
 
-    init(answers: [Result<MealEstimate, AIError>]) {
+    init(
+        answers: [Result<MealEstimate, AIError>] = [.failure(.cancelled)],
+        adjustments: [Result<MealAdjustmentOutcome, AIError>] = [.failure(.cancelled)]
+    ) {
         self.answers = answers
+        self.adjustments = adjustments
     }
 
     /// How many requests have been made and are waiting to be let go or have
@@ -212,7 +260,24 @@ final class GatedClient: AIClient, @unchecked Sendable {
         try await next()
     }
 
+    /// A conversation held open the same way, and counted in the same
+    /// sequence: a screen that can re-analyse and talk at once has two kinds
+    /// of request in flight, and `release(_:)` has to be able to name either.
+    func adjust(
+        _ meal: AdjustableMeal,
+        history: [MealChatTurn],
+        message: String
+    ) async throws -> MealAdjustmentOutcome {
+        let index = await waitForTurn()
+        return try adjustments[min(index, adjustments.count - 1)].get()
+    }
+
     private func next() async throws -> MealEstimate {
+        let index = await waitForTurn()
+        return try answers[min(index, answers.count - 1)].get()
+    }
+
+    private func waitForTurn() async -> Int {
         let index: Int = lock.withLock {
             defer { started += 1 }
             return started
@@ -222,6 +287,6 @@ final class GatedClient: AIClient, @unchecked Sendable {
             lock.withLock { waiting[index] = continuation }
         }
 
-        return try answers[min(index, answers.count - 1)].get()
+        return index
     }
 }

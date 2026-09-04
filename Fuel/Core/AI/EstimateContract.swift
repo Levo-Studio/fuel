@@ -168,6 +168,17 @@ nonisolated enum EstimateContract {
         have one.
         """
 
+    /// The opening of the bracket `rawWeightConvention` asks a model to end a
+    /// raw-weighed item's name with: `Rice (raw 300 g)`.
+    ///
+    /// **A wire shape, not a piece of interface copy**, which is why it is a
+    /// constant here beside the paragraph that asks for it rather than a key
+    /// in the string catalog. Three things read or write it —
+    /// `rawWeightConvention` teaches it, `FoodTableGrounding` strips it before
+    /// a lookup, and `MealAdjuster` restates it when a quantity moves — and
+    /// they have to agree on the same six characters.
+    static let rawAnnotationOpening = " (raw "
+
     /// The user-turn instruction for typed text, with the user's own words
     /// appended.
     ///
@@ -447,7 +458,12 @@ nonisolated enum EstimateContract {
     /// Brace counting rather than a regular expression, and string-aware so a
     /// `}` inside a meal name — `"title": "Rice }"` — does not end the object
     /// early. Escapes are skipped so a `\"` inside a string does not close it.
-    private static func firstJSONObject(in reply: String) -> String? {
+    ///
+    /// Visible past this file because `MealChatContract` has the same problem
+    /// with the same providers — a model that opens with "Here is the
+    /// adjustment:" has still answered — and a second brace counter would be a
+    /// second place the string handling above could be got wrong.
+    static func firstJSONObject(in reply: String) -> String? {
         var depth = 0
         var start: String.Index?
         var insideString = false
@@ -547,6 +563,14 @@ private nonisolated struct EstimatePayload: Decodable {
         /// `RecognisedItem` reads an entry written by another build.
         /// Overstating what the model was sure of is the worse failure, and
         /// `unsure` claims nothing the model did not say.
+        ///
+        /// **`grams` is kept for both modes now, and only the photo mode still
+        /// insists on it.** The field was always asked for and always answered
+        /// for a typed meal as well; it was simply thrown away there, because
+        /// the only thing reading it was the second line of a photo row. It is
+        /// a stored quantity from here on — see `RecognisedItem.grams` — so a
+        /// typed row that named an amount arrives with that amount attached
+        /// rather than with it dissolved into prose.
         func recognisedItem(mode: AILogMode) -> RecognisedItem? {
             guard
                 let trimmed = EstimateContract.boundedName(name),
@@ -555,15 +579,17 @@ private nonisolated struct EstimatePayload: Decodable {
                 return nil
             }
 
+            let weight = grams?.value.map { max(0, $0) }
+
             let note: RecognisedItem.Note
             switch mode {
             case .photo:
-                guard let grams = grams?.value else {
+                guard let weight else {
                     return nil
                 }
                 note = .photo(
                     confidence: confidence == "confident" ? .confident : .unsure,
-                    approximateGrams: max(0, grams)
+                    approximateGrams: weight
                 )
             case .text:
                 note = .text(amount: Self.amountOrigin(from: amount))
@@ -572,6 +598,10 @@ private nonisolated struct EstimatePayload: Decodable {
             return RecognisedItem(
                 name: trimmed,
                 kilocalories: max(0, kilocalories),
+                // Zero is not an amount, and a row that came back with one has
+                // said nothing about its weight. `weightInGrams` states the
+                // same rule from the reading side.
+                grams: (weight ?? 0) > 0 ? weight : nil,
                 note: note
             )
         }
@@ -656,7 +686,11 @@ private nonisolated struct LenientString: Decodable {
 /// which is the question being asked; `isFinite` only rules out NaN and the
 /// infinities. Nothing above this type can defend the trap, because a trap is
 /// not catchable.
-private nonisolated struct LenientInt: Decodable {
+///
+/// Visible past this file because `MealChatContract` reads numbers off the
+/// same providers under the same rules. A second copy of it there would be a
+/// second place the `Int(exactly:)` above could be lost.
+nonisolated struct LenientInt: Decodable {
 
     let value: Int?
 

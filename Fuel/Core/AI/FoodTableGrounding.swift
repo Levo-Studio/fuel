@@ -104,17 +104,31 @@ nonisolated enum FoodTableGrounding {
         var soleItemMacros: MacroTotals?
 
         let items = estimate.items.map { item -> RecognisedItem in
-            guard
-                let weight = weight(for: item, mode: mode, soleTextWeight: textWeight),
-                let match = bestMatch(for: item.name, preferring: weight.preparation, in: table)
-            else {
+            guard let weight = weight(for: item, mode: mode, soleTextWeight: textWeight) else {
                 return item
+            }
+
+            // **The weight is written down before anything is looked up**, and
+            // whether or not the lookup then finds a row. This function has
+            // just worked out the one number that says how much of this food
+            // there was — for a typed meal by reading the user's own sentence,
+            // which nothing downstream can do again — and until now it spent
+            // that number on one multiplication and dropped it. Recovering it
+            // here is what lets a quantity be changed later without re-deriving
+            // it from a sentence the entry no longer holds.
+            var priced = item
+            if let whole = Int(exactly: weight.grams.rounded()) {
+                priced.setWeight(whole)
+            }
+
+            guard let match = bestMatch(for: item.name, preferring: weight.preparation, in: table) else {
+                return priced
             }
 
             let portion = PortionCalculator.portion(of: match.per100g, grams: weight.grams)
             kilocalorieDelta += portion.kilocalories - item.kilocalories
 
-            var grounded = item
+            var grounded = priced
             grounded.kilocalories = portion.kilocalories
 
             // A row missing one of its own macros — CIQUAL has no fat figure
@@ -186,15 +200,19 @@ nonisolated enum FoodTableGrounding {
     ///
     /// **Photo and text disagree about where the weight comes from, and agree
     /// about what "no marker" means.** A photo item already carries its own
-    /// `approximateGrams` — the model's guess at how much is on the plate —
-    /// and that guess is the only amount a photo can ever produce, marker or
-    /// no marker; there is no sentence to have typed a raw weight into. It is
-    /// always looked up against the *prepared* row, because a photographed
-    /// meal is food as it will be eaten, which is the same thing a bare typed
-    /// weight means: `RawWeightNotation`'s own doc comment states it as "a
-    /// weight without it is the amount as eaten." Text uses the marker where
-    /// `soleTextWeight` found one and the prepared row otherwise, which is the
-    /// identical default stated the other way round.
+    /// weight — the model's guess at how much is on the plate — and that guess
+    /// is the only amount a photo can ever produce, marker or no marker; there
+    /// is no sentence to have typed a raw weight into. It is always looked up
+    /// against the *prepared* row, because a photographed meal is food as it
+    /// will be eaten, which is the same thing a bare typed weight means:
+    /// `RawWeightNotation`'s own doc comment states it as "a weight without it
+    /// is the amount as eaten." Text uses the marker where `soleTextWeight`
+    /// found one and the prepared row otherwise, which is the identical default
+    /// stated the other way round.
+    ///
+    /// `weightInGrams` rather than the note directly, so a row whose quantity
+    /// has been changed since it was scanned is priced at the amount that now
+    /// stands rather than at the one the photograph suggested.
     private static func weight(
         for item: RecognisedItem,
         mode: AILogMode,
@@ -202,10 +220,10 @@ nonisolated enum FoodTableGrounding {
     ) -> GroundingWeight? {
         switch mode {
         case .photo:
-            guard case .photo(_, let approximateGrams) = item.note, approximateGrams > 0 else {
+            guard let grams = item.weightInGrams, grams > 0 else {
                 return nil
             }
-            return GroundingWeight(grams: Double(approximateGrams), preparation: .prepared)
+            return GroundingWeight(grams: Double(grams), preparation: .prepared)
 
         case .text:
             guard let soleTextWeight else {
@@ -236,7 +254,14 @@ nonisolated enum FoodTableGrounding {
     /// citation. A query that fails this simply falls through to the model's
     /// own estimate, which is the safe side of this particular mistake — see
     /// this file's own asymmetry, one paragraph up from here.
-    private static func bestMatch(
+    ///
+    /// **The one place in the app that decides whether a food name resolves to
+    /// a row unattended**, and visible past this file for exactly that reason:
+    /// `MealAdjuster` asks the same question when a quantity moves, and a
+    /// second matcher would be a second coverage rule to keep as strict as
+    /// this one. It is also what makes a re-priced row keep its provenance —
+    /// same name, same table, same preparation, same row.
+    static func bestMatch(
         for name: String,
         preferring preparation: FoodPreparation,
         in table: FoodTable
@@ -271,7 +296,9 @@ nonisolated enum FoodTableGrounding {
     /// proves the marker was read would be exactly what stops the lookup from
     /// finding anything.
     private static func strippingRawAnnotation(_ name: String) -> String {
-        guard let range = name.range(of: " (raw ", options: .caseInsensitive) else {
+        guard
+            let range = name.range(of: EstimateContract.rawAnnotationOpening, options: .caseInsensitive)
+        else {
             return name
         }
         return String(name[..<range.lowerBound])

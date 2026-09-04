@@ -1,0 +1,349 @@
+import Foundation
+
+// MARK: - Contract
+
+/// The second JSON shape both providers are asked for: not "what is this
+/// meal" but "how much of it was there, given what the user has just said".
+///
+/// **A sibling of `EstimateContract`, not a variant of it.** The two ask
+/// different questions and neither answer fits the other's shape — an estimate
+/// prices a meal from nothing, and this moves the amounts of a meal that is
+/// already priced. What they share is everything underneath: the same clients,
+/// the same transport, the same key source, the same status mapping, the same
+/// lenient number reading and the same rule that the parser assumes nothing
+/// the prompt asked for was honoured.
+///
+/// **The model is never asked for a figure, and there is no field it could put
+/// one in.** The reply carries names and weights. Every kilocalorie and every
+/// gram of protein, carbohydrate and fat that reaches the screen after an
+/// adjustment is worked out on the device, by `MealAdjuster`, from a CIQUAL
+/// row and a weight. That is the whole architecture of this app said once
+/// more: the model names food and says how much, and the table prices it. A
+/// chat that answered `"kilocalories": 620` and was believed would quietly
+/// undo it, so the shape below has no key for one and the decoder has no
+/// property for one.
+nonisolated enum MealChatContract {
+
+    // MARK: - Instructions
+
+    /// The system prompt both clients send.
+    ///
+    /// English only, like everything else here. The user's message may be in
+    /// any language; the field names are not.
+    ///
+    /// The paragraphs after the shape are each answering something a model
+    /// does by default and must not do here — see the individual notes on
+    /// `MealAdjuster`, which is the half of the rule the device enforces
+    /// whatever the model writes. **Nothing in this prompt is relied on.**
+    static let systemPrompt = """
+        You adjust the recorded amounts of a meal someone has already logged.
+
+        You are given the meal as it now stands: its items, numbered, each \
+        with the weight recorded for it. The person tells you how the meal \
+        differed from what is recorded. Work out which items that changes and \
+        what each of them now weighs.
+
+        Reply with one JSON object and nothing else. No prose before it, no \
+        prose after it, no code fence.
+
+        {
+          "reply": string, one or two short sentences saying what you changed \
+        — or, if you could not tell, what you would need to know,
+          "changes": [
+            { "item": integer, the item's number, "grams": integer, what that \
+        item now weighs }
+          ],
+          "additions": [
+            { "name": string, an ordinary food name, "grams": integer }
+          ]
+        }
+
+        Amounts are the only thing you decide. Never answer with calories, \
+        energy, protein, carbohydrate or fat, in any field or in any words: \
+        they are worked out here from a food composition table and the weights \
+        you give, and nothing you write about them is read.
+
+        Leave every item the message is not about out of "changes" entirely. \
+        An item you do not mention keeps the figures it already has.
+
+        A second helping is one larger amount of the same item, not a second \
+        item. Raise that item's weight; do not repeat the row.
+
+        Use "additions" only for food that the message names or clearly \
+        implies and that is not already in the list — the oil a dish was \
+        fried in, a sauce, a drink. Give it an ordinary food name, with no \
+        amount in the name, and a weight in grams.
+
+        Never write a weight of zero or below. If the person says they did \
+        not eat something at all, say so in "reply" and leave the list alone; \
+        taking a row out is theirs to do.
+
+        If the message names no amount and implies none you can put a number \
+        on, answer with both lists empty and use "reply" to say what you \
+        would need to know.
+        """
+
+    /// The meal, and the user's message, as one user turn.
+    ///
+    /// **The current state of the meal rides with the current question, not
+    /// with the first one.** A conversation changes the thing it is about —
+    /// that is what it is for — so a meal block sent once at the top of the
+    /// exchange would describe a plate that no longer exists by the third
+    /// message. The turns before this one carry only what was said; this one
+    /// carries what the meal is now.
+    ///
+    /// **The message is placed last and labelled, so a user who types
+    /// something that reads like an instruction is described rather than
+    /// obeyed** — the same precaution and the same ordering as
+    /// `EstimateContract.textInstruction(for:)`. Everything Fuel has to say is
+    /// said before the user's own words begin.
+    ///
+    /// The item names are model-written text or the user's own corrections,
+    /// and go over as they are: they are what the rows say, and a model asked
+    /// about the second item has to be able to read the second item.
+    ///
+    /// **The photograph does not go.** It has already been read, it is not
+    /// what is being asked about, and re-sending it would charge the user
+    /// image tokens on every message to answer a question about arithmetic.
+    /// Neither does the kilocalorie figure beside each row: handing a model
+    /// its own last answer invites it to agree with itself, which is the
+    /// reason `MealResultDraft.itemSentence` withholds the same numbers.
+    static func turn(for meal: AdjustableMeal, message: String) -> String {
+        var lines = ["The meal as it now stands: \(meal.title)"]
+
+        if meal.items.isEmpty {
+            lines.append(noItemsLine)
+        } else {
+            for (index, item) in meal.items.enumerated() {
+                lines.append("\(index + 1). \(item.name) — \(amountLine(for: item))")
+            }
+        }
+
+        lines.append("")
+        lines.append("Message: \(message)")
+        return lines.joined(separator: "\n")
+    }
+
+    /// What a row says about its own weight, including when it has nothing to
+    /// say.
+    ///
+    /// A row with no weight is common and is not an error: a meal typed as a
+    /// sentence with no amounts in it, a meal repeated from the Recent list,
+    /// a row logged before Fuel stored weights at all. Saying so plainly lets
+    /// the model put a first number on it; inventing a weight to fill the line
+    /// would be Fuel guessing at the thing it is asking about.
+    private static func amountLine(for item: RecognisedItem) -> String {
+        guard let grams = item.weightInGrams, grams > 0 else {
+            return "amount not recorded"
+        }
+        return "\(grams) g"
+    }
+
+    private static let noItemsLine = "This meal has no itemised breakdown."
+
+    // MARK: - Bounds
+
+    /// The request ceiling, shared with `EstimateContract` rather than chosen
+    /// again.
+    ///
+    /// The reasoning there applies unchanged and is worth reading before
+    /// touching this: both providers bill generated tokens rather than the
+    /// ceiling, so a ceiling a well-formed reply never reaches is free, and
+    /// the one outcome that costs twice is a reply cut off mid-object. This
+    /// contract's replies are much smaller than an estimate's — a sentence and
+    /// a handful of two-field objects — so the shared number is generous here,
+    /// which is the direction to be generous in.
+    static let maxTokens = EstimateContract.maxTokens
+
+    /// The longest a message the user can send.
+    ///
+    /// **Not a design value and not in the export**, which draws no chat at
+    /// all. It is here because every character typed into this field is a
+    /// token the user pays for on this request and on every later one in the
+    /// same conversation, and a field with no bound is a paste of arbitrary
+    /// size on a bring-your-own-key product. 500 characters is far past
+    /// anything anyone says about a plate of food.
+    ///
+    /// The field refuses input past this rather than trimming what was typed:
+    /// silently sending less than the user wrote, and then answering the part
+    /// that fit, is the worse failure of the two.
+    static let maximumMessageLength = 500
+
+    /// The longest the model's own sentence may be by the time it leaves this
+    /// file.
+    ///
+    /// **Dropped rather than truncated**, and for the same reason a sentence
+    /// is different from a name: a name cut short is still a name, and a
+    /// sentence cut short stops mid-word with nothing under it to make sense
+    /// of it. A model that ignored "one or two short sentences" has not
+    /// answered this field, and the honest drawing of an unanswered field is
+    /// no line at all. Nothing else is lost — the changes are parsed
+    /// independently of it.
+    static let maximumReplyLength = 240
+
+    /// How many past exchanges travel with a request.
+    ///
+    /// **A conversation re-sends everything said so far on every turn**, so
+    /// an uncapped history costs the user a bill that grows with the square of
+    /// how much they have typed. Eight exchanges is more than any conversation
+    /// about how much rice was on a plate needs, and a ninth that had to
+    /// remember the first would be a conversation that has already gone wrong.
+    ///
+    /// The oldest turns are dropped rather than the newest: what was said last
+    /// is what the current message is a follow-up to.
+    static let maximumHistoryExchanges = 8
+
+    /// Reads the model's sentence, or `nil` where there is nothing to draw.
+    ///
+    /// Whitespace is collapsed as well as trimmed, so a model that answered in
+    /// two paragraphs cannot decide the height of a block on the screen.
+    ///
+    /// **It is model-authored text and nothing else ever reaches it.** It is
+    /// read from the `reply` key of the adjustment object and from no other
+    /// source: no status, no error body, no provider message. Every failure
+    /// path in this file throws before an adjustment exists.
+    static func boundedReply(_ raw: String?) -> String? {
+        guard let raw else {
+            return nil
+        }
+        let collapsed = raw.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        guard !collapsed.isEmpty, collapsed.count <= maximumReplyLength else {
+            return nil
+        }
+        return collapsed
+    }
+
+    // MARK: - Parsing
+
+    /// Reads the model's reply into the changes it is asking for.
+    ///
+    /// Defensive in the same two directions `EstimateContract.estimate(from:
+    /// mode:)` is: prose or a code fence around the object is tolerated, and
+    /// nothing inside it is repaired blindly.
+    ///
+    /// **Nothing here is fatal except an object that cannot be found at all.**
+    /// An estimate throws on a missing total because a zeroed meal would look
+    /// like a real one in the day's ring; this has no such field. A reply with
+    /// no `reply` and no changes is a legitimate answer — the model could not
+    /// map the message onto an amount — and it is `MealAdjuster`, not this,
+    /// that decides an empty answer changes nothing.
+    ///
+    /// Throws `AIError.malformedResponse`. Never crashes, including on a
+    /// number too large to be an `Int`.
+    static func intent(from reply: String) throws -> MealAdjustmentIntent {
+        guard
+            let object = EstimateContract.firstJSONObject(in: reply),
+            let payload = try? JSONDecoder().decode(AdjustmentPayload.self, from: Data(object.utf8))
+        else {
+            throw AIError.malformedResponse
+        }
+
+        return MealAdjustmentIntent(
+            reply: boundedReply(payload.reply),
+            // A row that cannot be read is dropped rather than taking the
+            // whole answer with it — the same rule an estimate's breakdown
+            // follows, and for the same reason: the other rows are still a
+            // usable answer to what was asked.
+            changes: payload.changes.compactMap(\.change),
+            additions: payload.additions.compactMap(\.addition)
+        )
+    }
+}
+
+// MARK: - Payload
+
+/// The wire shape, decoded leniently.
+///
+/// Every field is optional and every number goes through `LenientInt`, so a
+/// reply missing a key still decodes far enough to be read. A strict
+/// `Decodable` would throw inside the decoder, where there is no room to
+/// decide what is fatal.
+private nonisolated struct AdjustmentPayload: Decodable {
+
+    var reply: String?
+    var changes: [ChangePayload]
+    var additions: [AdditionPayload]
+
+    private enum CodingKeys: String, CodingKey {
+        case reply
+        case changes
+        case additions
+    }
+
+    /// Written out rather than synthesised because the synthesised
+    /// `decodeIfPresent(String.self, …)` throws on a type mismatch, and an
+    /// answer whose `reply` came back as a number would cost the user the
+    /// changes underneath it.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        reply = try? container.decode(String.self, forKey: .reply)
+        changes = (try? container.decode([ChangePayload].self, forKey: .changes)) ?? []
+        additions = (try? container.decode([AdditionPayload].self, forKey: .additions)) ?? []
+    }
+
+    // MARK: - A changed row
+
+    nonisolated struct ChangePayload: Decodable {
+
+        var item: LenientInt?
+        var grams: LenientInt?
+
+        /// The change this row asks for, or `nil` where it asks for nothing
+        /// usable.
+        ///
+        /// Both fields are required, and the number is required to be a real
+        /// amount. Zero and below is refused here as well as in the prompt:
+        /// it is not a smaller portion, it is the absence of one, and a meal
+        /// with a row silently emptied to nothing is a meal the user did not
+        /// edit.
+        ///
+        /// The index is left exactly as the model wrote it, one-based. It is
+        /// checked against the actual list by `MealAdjuster`, which is the
+        /// only thing that knows how long that list is.
+        var change: MealAdjustmentIntent.Change? {
+            guard let item = item?.value, let grams = grams?.value, grams > 0 else {
+                return nil
+            }
+            return MealAdjustmentIntent.Change(itemNumber: item, grams: grams)
+        }
+    }
+
+    // MARK: - An added row
+
+    nonisolated struct AdditionPayload: Decodable {
+
+        var name: String?
+        var grams: LenientInt?
+
+        private enum CodingKeys: String, CodingKey {
+            case name
+            case grams
+        }
+
+        /// Written out for the reason `AdjustmentPayload`'s is: a name that
+        /// arrived as something other than a string must cost this row and not
+        /// the whole list.
+        init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            name = try? container.decode(String.self, forKey: .name)
+            grams = try? container.decode(LenientInt.self, forKey: .grams)
+        }
+
+        /// The row this asks to add, or `nil` where there is not enough of one.
+        ///
+        /// The name goes through `EstimateContract.boundedName` rather than a
+        /// second bound of its own: it becomes a `RecognisedItem.name` like
+        /// any other, is written to SwiftData like any other, and is drawn in
+        /// the same row as the ones a scan produced. One rule for one string.
+        var addition: MealAdjustmentIntent.Addition? {
+            guard
+                let name = EstimateContract.boundedName(name),
+                let grams = grams?.value,
+                grams > 0
+            else {
+                return nil
+            }
+            return MealAdjustmentIntent.Addition(name: name, grams: grams)
+        }
+    }
+}

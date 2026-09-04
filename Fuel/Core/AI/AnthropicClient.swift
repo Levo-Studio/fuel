@@ -119,6 +119,43 @@ nonisolated struct AnthropicClient: AIClient {
         return FoodTableGrounding.groundAgainstBundledTable(estimate, mode: .text, originalText: text)
     }
 
+    // MARK: - Adjusting
+
+    func adjust(
+        _ meal: AdjustableMeal,
+        history: [MealChatTurn],
+        message: String
+    ) async throws -> MealAdjustmentOutcome {
+        // The turns so far, then the meal as it now stands with the new
+        // message attached to it. See `MealChatContract.turn(for:message:)`
+        // for why the meal rides with the current question rather than with
+        // the first one.
+        var messages: [[String: Any]] = history
+            .suffix(MealChatContract.maximumHistoryExchanges * 2)
+            .map { ["role": $0.speaker == .user ? "user" : "assistant", "content": $0.text] }
+        messages.append(["role": "user", "content": MealChatContract.turn(for: meal, message: message)])
+
+        let body: [String: Any] = [
+            "model": Self.model,
+            "max_tokens": MealChatContract.maxTokens,
+            "system": MealChatContract.systemPrompt,
+            "messages": messages
+        ]
+
+        let reply = try await send(body: body)
+        let intent: MealAdjustmentIntent
+        do {
+            intent = try MealChatContract.intent(from: reply.text)
+        } catch {
+            throw Self.ranOutOfTokens(reply.body) ? AIError.truncatedReply : error
+        }
+
+        return MealAdjustmentOutcome(
+            reply: intent.reply,
+            meal: MealAdjuster.applyAgainstBundledTable(intent, to: meal)
+        )
+    }
+
     // MARK: - The one request path
 
     private func complete(content: [[String: Any]], mode: AILogMode) async throws -> MealEstimate {
@@ -129,6 +166,30 @@ nonisolated struct AnthropicClient: AIClient {
             "messages": [["role": "user", "content": content]]
         ]
 
+        let reply = try await send(body: body)
+
+        do {
+            return try EstimateContract.estimate(from: reply.text, mode: mode)
+        } catch {
+            // Asked only once the reply has already failed to parse. A model
+            // that finished its object and was cut off writing the newline
+            // after it has still answered, and the user has paid for it.
+            throw Self.ranOutOfTokens(reply.body) ? AIError.truncatedReply : error
+        }
+    }
+
+    /// The assistant's text, and the envelope it came in.
+    ///
+    /// **One place a request is signed and sent**, shared by the estimate path
+    /// and the adjustment path rather than written twice: the key handling,
+    /// the transport failure and the status mapping are properties of talking
+    /// to Anthropic and not of what was asked. A second copy would be a second
+    /// place the key could end up somewhere other than `x-api-key`.
+    ///
+    /// The body travels back with the text because `ranOutOfTokens` reads
+    /// `stop_reason` off the envelope, and only the caller knows whether its
+    /// own parse failing is the kind of failure that question answers.
+    private func send(body: [String: Any]) async throws -> (text: String, body: Data) {
         // Read the key here, at the moment the request is built, and let it go
         // out of scope with this function.
         let key = try keys.key()
@@ -148,14 +209,7 @@ nonisolated struct AnthropicClient: AIClient {
             throw AIError.from(status: response.statusCode, body: response.body, provider: provider)
         }
 
-        do {
-            return try EstimateContract.estimate(from: Self.replyText(in: response.body), mode: mode)
-        } catch {
-            // Asked only once the reply has already failed to parse. A model
-            // that finished its object and was cut off writing the newline
-            // after it has still answered, and the user has paid for it.
-            throw Self.ranOutOfTokens(response.body) ? AIError.truncatedReply : error
-        }
+        return (Self.replyText(in: response.body), response.body)
     }
 
     // MARK: - Request

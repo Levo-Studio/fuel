@@ -23,6 +23,25 @@ nonisolated struct RecognisedItem: Codable, Hashable, Sendable, Identifiable {
     var name: String
     var kilocalories: Int
 
+    /// How much of this food the figures beside it were worked out for, in
+    /// grams.
+    ///
+    /// **A field of its own rather than a number read back out of `note`, and
+    /// the difference is what makes a quantity changeable.** The weight was
+    /// always known — the model is asked for it, and `FoodTableGrounding`
+    /// multiplies a CIQUAL row by it to price the row — but until this existed
+    /// the only place it was written down was the sentence under a photo item's
+    /// name, in a `case` that a typed item does not even have. Anything wanting
+    /// to say "one and a half times this" had to pattern-match a display note
+    /// for a number, and had nothing at all to match on for a text meal.
+    ///
+    /// `nil` where nothing ever supplied one: a text item whose model left the
+    /// field out, a row the user typed themselves, a meal repeated from the
+    /// Recent list, and any entry stored before this property existed. Read it
+    /// through `weightInGrams`, which also finds an older photo row's weight in
+    /// the note that used to be its only home.
+    var grams: Int?
+
     /// This item's own protein, carbohydrate and fat, when they are known.
     ///
     /// **`nil` far more often than not, and that is not a gap to fill.** The
@@ -48,12 +67,69 @@ nonisolated struct RecognisedItem: Codable, Hashable, Sendable, Identifiable {
 
     var note: Note
 
-    init(id: UUID = UUID(), name: String, kilocalories: Int, macros: MacroTotals? = nil, note: Note) {
+    init(
+        id: UUID = UUID(),
+        name: String,
+        kilocalories: Int,
+        grams: Int? = nil,
+        macros: MacroTotals? = nil,
+        note: Note
+    ) {
         self.id = id
         self.name = name
         self.kilocalories = kilocalories
+        self.grams = grams
         self.macros = macros
         self.note = note
+    }
+
+    // MARK: - Weight
+
+    /// The weight this row's figures were worked out for, from wherever it was
+    /// written down.
+    ///
+    /// **One reader for two homes, so nothing has to know there were ever
+    /// two.** `grams` is the first-class field and wins. Behind it is the place
+    /// a photo item's weight lived before that field existed — the
+    /// `approximateGrams` inside `.photo` — which is what an entry stored by an
+    /// older build still carries, and what every in-memory item built from a
+    /// note alone carries too.
+    ///
+    /// A zero in the note is not a weight. `EstimateContract` floors that field
+    /// at zero rather than dropping it, so a photo row whose weight could not
+    /// be read arrives here with a `0` that no measurement backs; pricing a
+    /// portion against it would be pricing nothing. `grams` is never written as
+    /// zero — see `setWeight(_:)`.
+    var weightInGrams: Int? {
+        if let grams {
+            return grams
+        }
+        if case .photo(_, let approximateGrams) = note, approximateGrams > 0 {
+            return approximateGrams
+        }
+        return nil
+    }
+
+    /// Records a new weight for this row.
+    ///
+    /// **Both homes are written, so the older one can never go stale.** A photo
+    /// row keeps a copy of its weight inside `note`, and a row whose quantity
+    /// has been changed since it was scanned would otherwise hold two different
+    /// numbers with only the reading order deciding which is true.
+    ///
+    /// The confidence in that note is left exactly as the model set it: it says
+    /// how sure the model was about *what it was looking at*, which a change of
+    /// amount does not answer either way.
+    ///
+    /// **Refuses anything that is not a real amount.** Zero and below is not a
+    /// smaller portion, it is the absence of one, and a row that is not part of
+    /// the meal is a row the user removes rather than one this quietly empties.
+    mutating func setWeight(_ newGrams: Int) {
+        guard newGrams > 0 else { return }
+        grams = newGrams
+        if case .photo(let confidence, _) = note {
+            note = .photo(confidence: confidence, approximateGrams: newGrams)
+        }
     }
 
     // MARK: - The note under the name

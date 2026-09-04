@@ -321,4 +321,94 @@ struct RecognisedItemTests {
         let stored = try store.entries(on: at(19, 20)).first
         #expect(stored?.items == items)
     }
+
+    // MARK: - The weight
+
+    @Test("a weight survives a round trip through the store")
+    func weightSurvivesTheStore() throws {
+        let store = try FuelStore(inMemory: true, calendar: testCalendar)
+        let items = [
+            RecognisedItem(
+                name: "Salmon fillet",
+                kilocalories: 240,
+                grams: 150,
+                note: .photo(confidence: .confident, approximateGrams: 150)
+            ),
+            RecognisedItem(name: "Polenta", kilocalories: 150, grams: 180, note: .text(amount: .recognised)),
+        ]
+        try store.log(
+            title: "Salmon with polenta",
+            kilocalories: 390,
+            macros: .zero,
+            loggedAt: at(19, 20),
+            source: .photo,
+            items: items
+        )
+
+        let stored = try store.entries(on: at(19, 20)).first
+        #expect(stored?.items.map(\.grams) == [150, 180])
+    }
+
+    /// The field is new, so every row already on a device was written without
+    /// it. Decoding one has to succeed and read as "not stated" — a throw here
+    /// would take the whole breakdown of that meal with it.
+    @Test("a row written before the field existed decodes with no weight")
+    func decodesWithoutTheField() throws {
+        let stored = Data(
+            #"""
+            {"id":"1FB0C99C-4E52-4B18-9C99-3F2E1A0D6B77","name":"Polenta",
+            "kilocalories":150,"note":{"kind":"text","amount":"estimated"}}
+            """#.utf8
+        )
+
+        let item = try JSONDecoder().decode(RecognisedItem.self, from: stored)
+
+        #expect(item.grams == nil)
+        #expect(item.weightInGrams == nil)
+        #expect(item.kilocalories == 150)
+    }
+
+    /// The same row in the shape a photo scan wrote it: the weight was only
+    /// ever in the note, and that is where it is found.
+    @Test("an older photo row's weight is found in the note it used to live in")
+    func recoversTheWeightFromAnOlderNote() throws {
+        let stored = Data(
+            #"""
+            {"id":"1FB0C99C-4E52-4B18-9C99-3F2E1A0D6B77","name":"Rice",
+            "kilocalories":232,"note":{"kind":"photo","confidence":"confident",
+            "approximateGrams":150}}
+            """#.utf8
+        )
+
+        let item = try JSONDecoder().decode(RecognisedItem.self, from: stored)
+
+        #expect(item.grams == nil)
+        #expect(item.weightInGrams == 150)
+    }
+
+    @Test("setting a weight refreshes the copy inside a photo note")
+    func settingAWeightRefreshesTheNote() {
+        var item = RecognisedItem(
+            name: "Rice",
+            kilocalories: 232,
+            grams: 150,
+            note: .photo(confidence: .confident, approximateGrams: 150)
+        )
+
+        item.setWeight(300)
+
+        #expect(item.grams == 300)
+        #expect(item.note == .photo(confidence: .confident, approximateGrams: 300))
+    }
+
+    @Test("a weight of zero or less is not a smaller portion and is refused")
+    func refusesAnEmptyWeight() {
+        var item = RecognisedItem(name: "Rice", kilocalories: 232, grams: 150, note: .text(amount: .recognised))
+
+        item.setWeight(0)
+        #expect(item.grams == 150)
+
+        item.setWeight(-40)
+        #expect(item.grams == 150)
+    }
 }

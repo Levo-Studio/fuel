@@ -133,6 +133,150 @@
         }
       }
     },
+    "chat.adjusted" : {
+      "comment" : "What a reply reads as when it moved something but wrote no sentence about it. The rows under it say what moved. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amounts adjusted."
+          }
+        }
+      }
+    },
+    "chat.change.grams %lld" : {
+      "comment" : "A changed row's new weight, beside its name. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld g"
+          }
+        }
+      }
+    },
+    "chat.change.noAmount" : {
+      "comment" : "A changed row with no weight to state. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "—"
+          }
+        }
+      }
+    },
+    "chat.close" : {
+      "comment" : "Puts the conversation sheet away, keeping what has been said; the style uppercases it. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        }
+      }
+    },
+    "chat.empty" : {
+      "comment" : "What the sheet says before anything has been said in it. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tell me how the meal differed from what is recorded — a bigger portion, a second helping, the oil it was fried in."
+          }
+        }
+      }
+    },
+    "chat.hint" : {
+      "comment" : "Under the sheet's title, saying what the conversation can and cannot do: it moves the recorded amounts, and every figure follows from them. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Say how this meal differed and the amounts are adjusted. The calories and macros follow from the food table."
+          }
+        }
+      }
+    },
+    "chat.nothingChanged" : {
+      "comment" : "The note under a reply that changed nothing at all, so a sentence with no change under it cannot read as a change that happened. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The meal is unchanged. Naming an amount is what lets it be adjusted."
+          }
+        }
+      }
+    },
+    "chat.open" : {
+      "comment" : "The trailing corner control on a logged meal, which opens the conversation about it, for VoiceOver. The mark itself is an SF Symbol and so has no key. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adjust the amounts"
+          }
+        }
+      }
+    },
+    "chat.placeholder" : {
+      "comment" : "The empty message field. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I had a second, smaller portion"
+          }
+        }
+      }
+    },
+    "chat.send" : {
+      "comment" : "The send control, which is an arrow and no word, for VoiceOver. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send"
+          }
+        }
+      }
+    },
+    "chat.title" : {
+      "comment" : "The title of the conversation sheet. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adjust the amounts"
+          }
+        }
+      }
+    },
+    "chat.unchanged" : {
+      "comment" : "What a reply reads as when it moved nothing and said nothing either. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing to adjust from that."
+          }
+        }
+      }
+    },
     "detail.delete" : {
       "comment" : "The filled footer action on a logged meal, in the place screens 14 and 15 draw Hinzufügen. Not in the export.",
       "extractionState" : "manual",
