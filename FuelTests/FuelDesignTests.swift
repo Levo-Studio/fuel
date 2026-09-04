@@ -135,6 +135,25 @@ struct FuelPaletteTests {
         }
     }
 
+    /// The accent is what fills Today's floating add button, and that button
+    /// floats over a list the user scrolls underneath it. An accent carrying
+    /// any alpha at all would put a row's calorie figure through the circle —
+    /// the one thing a control drawn on top of moving content must not do.
+    ///
+    /// Every value in the table is written opaque today and this holds them
+    /// there, because the failure is silent: a `.opacity()` added to an accent
+    /// for a selection state elsewhere would tint one control and break a
+    /// different one, and nothing about the drawing of either would say so.
+    @Test("no accent and no on-colour carries alpha")
+    func accentsAreOpaque() {
+        for accent in FuelAccent.allCases {
+            for theme in FuelTheme.allCases {
+                #expect(accent.rgba(for: theme).opacity == 1, "\(accent) / \(theme)")
+                #expect(accent.onRGBA(for: theme).opacity == 1, "\(accent) on / \(theme)")
+            }
+        }
+    }
+
     @Test("mono is the default accent and dark is what the app opens on")
     func defaults() {
         let palette = FuelPalette(theme: .dark)
