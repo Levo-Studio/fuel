@@ -41,6 +41,95 @@ extension HostedScreen {
     }
 }
 
+// MARK: - Nothing asks in the platform's words
+
+/// The one dialog rule, swept over the app: no screen in Fuel raises a question
+/// in iOS's own drawing.
+///
+/// **A sweep rather than four tests, for the reason `FuelMetrics.allDrawnValues`
+/// is a roster.** Pinning the four call sites that were replaced proves nothing
+/// about the fifth; what is being kept out is a whole mechanism, and the only
+/// way to keep one out is to look everywhere every time. It is also the one
+/// check here that would have gone red before this change and green after it,
+/// on all four call sites at once.
+///
+/// **A view's own structure, not its source.** `some View` resolves to a
+/// concrete type that names every modifier applied inside the body, so a screen
+/// that raises a system dialog carries `AlertModifier` or
+/// `ConfirmationDialogModifier` in the name of its `Body` and one that raises
+/// Fuel's carries `FuelDialogModifier`. Reading it off the type needs no
+/// fixture, no render and no instance — which also means it cannot trip over a
+/// screen whose model is expensive to build.
+///
+/// Reading the source instead was the first attempt and cannot work from here:
+/// the test host runs in the simulator and macOS refuses it the repository at
+/// all when the repository is under `~/Desktop` — `NSCocoaErrorDomain 257`,
+/// "you don't have permission to view it".
+///
+/// What the sweep cannot see is a `private` view's body, since a name it cannot
+/// write is a type it cannot ask about. Every screen that presents anything is
+/// public to the module and is on the list below.
+@Suite("Dialog · nothing asks in the platform's words")
+@MainActor
+struct FuelDialogSweepTests {
+
+    /// Every screen in the app that owns a body a dialog could be raised from.
+    private static let screens: [(name: String, body: Any.Type)] = [
+        ("RootShell", RootShell.Body.self),
+        ("TodayView", TodayView.Body.self),
+        ("TodaySummaryView", TodaySummaryView.Body.self),
+        ("TodayDayList", TodayDayList.Body.self),
+        ("TodayGettingStartedView", TodayGettingStartedView.Body.self),
+        ("SettingsScreen", SettingsScreen.Body.self),
+        ("AIModelSection", AIModelSection.Body.self),
+        ("AppearanceSection", AppearanceSection.Body.self),
+        ("AccentSection", AccentSection.Body.self),
+        ("CountingSection", CountingSection.Body.self),
+        ("AutomaticLabelsSection", AutomaticLabelsSection.Body.self),
+        ("OnboardingFlow", OnboardingFlow.Body.self),
+        ("APIKeyScreen", APIKeyScreen.Body.self),
+        ("KeyTestScreen", KeyTestScreen.Body.self),
+        ("GoalScreen", GoalScreen.Body.self),
+        ("LogFlowView", LogFlowView.Body.self),
+        ("CameraTabView", CameraTabView.Body.self),
+        ("TextTabView", TextTabView.Body.self),
+        ("RecentMealsView", RecentMealsView.Body.self),
+        ("AnalysisView", AnalysisView.Body.self),
+        ("AnalysisFailureView", AnalysisFailureView.Body.self),
+        ("MealDetailView", MealDetailView.Body.self),
+        ("MealChatSheet", MealChatSheet.Body.self),
+        ("MealResultView", MealResultView<MealPhotoLede>.Body.self),
+        ("PhotoResultView", PhotoResultView.Body.self),
+        ("TextResultView", TextResultView.Body.self),
+    ]
+
+    @Test("no screen in Fuel raises a system dialog")
+    func noSystemDialogs() {
+        let platformsOwn = ["AlertModifier", "ConfirmationDialogModifier"]
+        let asking = Self.screens.filter { screen in
+            let structure = String(describing: screen.body)
+            return platformsOwn.contains { structure.contains($0) }
+        }
+
+        #expect(asking.map(\.name) == [])
+    }
+
+    /// The other half of the same claim: the four questions the app asks are
+    /// still asked, on the three screens that ask them.
+    @Test("every question the app asks is Fuel's own", arguments: [
+        ("MealDetailView", 1),
+        ("MealResultView", 2),
+        ("RootShell", 1),
+    ])
+    func questionsAreFuelsOwn(_ screen: String, _ expected: Int) throws {
+        let body = try #require(Self.screens.first { $0.name == screen }?.body)
+        let structure = String(describing: body)
+        let raised = structure.components(separatedBy: "FuelDialogModifier").count - 1
+
+        #expect(raised == expected, "\(screen) raises \(raised) of its own questions")
+    }
+}
+
 // MARK: - What a dialog draws
 
 /// The dialog Fuel asks its questions on: what it puts on the screen and where
