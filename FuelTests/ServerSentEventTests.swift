@@ -133,3 +133,178 @@ struct StreamedRefusalTests {
         #expect(AIError.from(status: 400, body: body, provider: .mistral) == .noCredit(for: .mistral))
     }
 }
+
+// MARK: - Framing the bytes
+
+/// How a body's bytes become the lines the decoder reads.
+///
+/// **This is the seam the chat was broken in, and it was broken for every
+/// message on both providers.** `URLSession.stream` handed the body to
+/// Foundation's `AsyncLineSequence`, which documents itself as not wanting to
+/// return an empty line and therefore drops every blank one. In this format the
+/// blank line is the dispatch: it is the only thing that says "the fields
+/// gathered so far are an event, deliver them". Without it
+/// `ServerSentEventDecoder` gathers `data` fields forever and returns `nil` for
+/// every line, `MealChatStreamAssembler` is never fed a character, and the turn
+/// ends at `MealChatContract.intent(from: "")` — `AIError.malformedResponse`,
+/// drawn as "The answer did not come back in a form Fuel could read."
+///
+/// Nothing above this level could see it. The transport double is handed a list
+/// of lines the test wrote, blank ones included, so the decoder was fed exactly
+/// what it wanted and every client test passed against a wire nobody framed.
+///
+/// **Nothing here touches a network.** The rule is a pure function of bytes and
+/// is tested as one.
+@Suite("Server-sent events · framing")
+struct ServerSentEventFramingTests {
+
+    /// A whole body, framed the way `URLSession.stream` frames one.
+    private func lines(of body: String) -> [String] {
+        var splitter = ServerSentEventLineSplitter()
+        var framed: [String] = []
+        for byte in Array(body.utf8) {
+            if let line = splitter.append(byte) {
+                framed.append(line)
+            }
+        }
+        if let last = splitter.flush() {
+            framed.append(last)
+        }
+        return framed
+    }
+
+    // MARK: - The line that means something
+
+    @Test("the blank line between two events is delivered, because it is the dispatch")
+    func blankLineSurvives() {
+        #expect(lines(of: "data: one\n\ndata: two\n\n") == ["data: one", "", "data: two", ""])
+    }
+
+    /// The counter-check, and the reason this type exists rather than a call to
+    /// `bytes.lines`. The same bytes, read the way Foundation reads prose: the
+    /// dispatch is gone, and with it the whole answer.
+    @Test("Foundation's own line reader drops that line, and the events with it")
+    func foundationDropsTheDispatch() async throws {
+        var read: [String] = []
+        for try await line in Bytes(of: "data: one\n\ndata: two\n\n").lines {
+            read.append(line)
+        }
+
+        #expect(read == ["data: one", "data: two"])
+
+        var decoder = ServerSentEventDecoder()
+        #expect(read.compactMap { decoder.decode($0) }.isEmpty)
+    }
+
+    // MARK: - The three terminators
+
+    @Test("a carriage return ends a line on its own")
+    func carriageReturn() {
+        #expect(lines(of: "data: one\r\rdata: two\r\r") == ["data: one", "", "data: two", ""])
+    }
+
+    @Test("a carriage return and a line feed together end one line and not two")
+    func carriageReturnLineFeed() {
+        #expect(lines(of: "data: one\r\n\r\n") == ["data: one", ""])
+    }
+
+    @Test("a line feed after ordinary bytes is not swallowed as half a pair")
+    func lineFeedAfterText() {
+        #expect(lines(of: "a\rb\nc\n") == ["a", "b", "c"])
+    }
+
+    // MARK: - The ends of the body
+
+    @Test("a body that ends without a terminator still delivers its last line")
+    func unterminatedTail() {
+        #expect(lines(of: "data: one\n\ndata: two") == ["data: one", "", "data: two"])
+    }
+
+    /// A body that ended on its terminator has nothing left, and must not gain
+    /// a blank line it never sent — a spurious dispatch would deliver whatever
+    /// was gathered as though the provider had said to.
+    @Test("a body that ends on a terminator gains no line of its own")
+    func terminatedTail() {
+        #expect(lines(of: "data: one\n") == ["data: one"])
+        #expect(lines(of: "") == [])
+    }
+
+    // MARK: - A whole turn
+
+    /// The claim that matters: a provider's own transcript, framed from its
+    /// bytes, dispatches every event in it.
+    @Test("an Anthropic transcript framed from its bytes dispatches every event")
+    func anthropicTranscript() {
+        let body = """
+            event: message_start
+            data: {"type":"message_start","message":{"id":"msg_1","role":"assistant"}}
+
+            event: content_block_delta
+            data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hi"}}
+
+            event: message_delta
+            data: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+
+
+            """
+
+        var decoder = ServerSentEventDecoder()
+        let payloads = lines(of: body).compactMap { decoder.decode($0) }
+
+        #expect(payloads.count == 4)
+        #expect(payloads.contains(#"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hi"}}"#))
+    }
+
+    /// Mistral's, including the sentinel that is not JSON.
+    @Test("a Mistral transcript framed from its bytes dispatches every event")
+    func mistralTranscript() {
+        let body = """
+            data: {"id":"c1","choices":[{"index":0,"delta":{"content":"Hi"},"finish_reason":null}]}
+
+            data: {"id":"c1","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+            data: [DONE]
+
+
+            """
+
+        var decoder = ServerSentEventDecoder()
+        let payloads = lines(of: body).compactMap { decoder.decode($0) }
+
+        #expect(payloads.count == 3)
+        #expect(payloads.last == "[DONE]")
+    }
+}
+
+// MARK: - Bytes
+
+/// A body as a byte sequence, so the counter-check above can put the same bytes
+/// through Foundation's reader that `URLSession.stream` used to.
+private struct Bytes: AsyncSequence, Sendable {
+
+    typealias Element = UInt8
+
+    let bytes: [UInt8]
+
+    init(of body: String) {
+        bytes = Array(body.utf8)
+    }
+
+    struct Iterator: AsyncIteratorProtocol {
+
+        var rest: ArraySlice<UInt8>
+
+        mutating func next() async -> UInt8? {
+            guard let first = rest.first else { return nil }
+            rest = rest.dropFirst()
+            return first
+        }
+    }
+
+    func makeAsyncIterator() -> Iterator {
+        Iterator(rest: bytes[...])
+    }
+}

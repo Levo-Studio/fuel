@@ -1,5 +1,82 @@
 import Foundation
 
+// MARK: - Framing
+
+/// Splits a `text/event-stream` body into its lines, **empty ones included**.
+///
+/// **Written out rather than taken from Foundation's `AsyncLineSequence`, and
+/// that is the entire reason this type exists.** That sequence is built for
+/// reading prose and documents itself as not wanting to hand back an empty
+/// line, so it silently swallows every blank one. In every other format a blank
+/// line is nothing. In this one it is the only byte sequence that *means*
+/// something: it is the dispatch, and the `data` fields before it are delivered
+/// by it and by nothing else.
+///
+/// Read with `.lines`, a perfectly ordinary provider stream therefore arrives
+/// as a run of `data:` fields that are gathered and never delivered.
+/// `ServerSentEventDecoder` returns `nil` for every line, not one byte of the
+/// model's answer reaches `MealChatStreamAssembler`, and the turn ends at
+/// `MealChatContract.intent(from: "")` — which is `AIError.malformedResponse`,
+/// and on screen "The answer did not come back in a form Fuel could read."
+/// Every message, on both providers, with nothing wrong at either end.
+///
+/// It was invisible to the suite because the test transport hands the decoder a
+/// list of lines the test itself wrote, blank ones and all. Splitting the bytes
+/// was the one part of reading a stream that nothing exercised, on the grounds
+/// that `URLSession` already did it. It does — by a different rule than this
+/// format has.
+///
+/// The rule here is the format's own: `\n`, `\r` and `\r\n` each end one line,
+/// and whatever follows the last terminator is a line as well.
+nonisolated struct ServerSentEventLineSplitter {
+
+    private var buffer: [UInt8] = []
+
+    /// Whether the previous byte was a `\r`, so an `\n` behind it is the other
+    /// half of one terminator rather than a second, empty line.
+    private var afterCarriageReturn = false
+
+    init() {}
+
+    /// Feeds one byte and returns the line it ended, if it ended one. A blank
+    /// line comes back as the empty string, which is the whole point.
+    mutating func append(_ byte: UInt8) -> String? {
+        if afterCarriageReturn {
+            afterCarriageReturn = false
+            if byte == Self.lineFeed {
+                return nil
+            }
+        }
+
+        switch byte {
+        case Self.carriageReturn:
+            afterCarriageReturn = true
+            return take()
+        case Self.lineFeed:
+            return take()
+        default:
+            buffer.append(byte)
+            return nil
+        }
+    }
+
+    /// Whatever the body ended on with no terminator behind it.
+    ///
+    /// `nil` rather than an empty string for a body that ended on one, so a
+    /// well-formed stream does not gain a blank line it never sent.
+    mutating func flush() -> String? {
+        buffer.isEmpty ? nil : take()
+    }
+
+    private mutating func take() -> String {
+        defer { buffer.removeAll(keepingCapacity: true) }
+        return String(decoding: buffer, as: UTF8.self)
+    }
+
+    private static let lineFeed = UInt8(ascii: "\n")
+    private static let carriageReturn = UInt8(ascii: "\r")
+}
+
 // MARK: - Server-sent events
 
 /// The framing both providers stream in, decoded once rather than in each
