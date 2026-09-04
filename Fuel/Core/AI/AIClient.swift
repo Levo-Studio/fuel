@@ -215,13 +215,19 @@ extension AIError {
         return .providerRefused
     }
 
-    /// Whether the body says, in words, that the balance is spent.
+    /// How much of a refusal is worth reading at all.
     ///
-    /// The 8 KiB bound is documented on `from(status:body:provider:)` above,
-    /// with the reason it is a guard rather than a limitation.
+    /// The reason it is a guard rather than a limitation is on
+    /// `from(status:body:provider:)` above. It is named rather than written
+    /// inline because a streamed refusal has to be *collected* before it can be
+    /// mapped, and collecting more than will ever be searched is work done at
+    /// the request of whoever sent it — see `HTTPStreamResponse.refusalBody()`.
+    static let readableErrorBody = 8 * 1024
+
+    /// Whether the body says, in words, that the balance is spent.
     private static func mentionsExhaustedCredit(_ body: Data) -> Bool {
         guard
-            body.count < 8 * 1024,
+            body.count < readableErrorBody,
             let text = String(data: body, encoding: .utf8)?.lowercased()
         else {
             return false

@@ -17,14 +17,35 @@ import UIKit
 /// It records requests as well as answering them, because half of what is
 /// worth asserting is on the way out: which header the key went into, and
 /// which ones it did not.
-private final class RecordingTransport: HTTPTransport, @unchecked Sendable {
+private final class RecordingTransport: StreamingHTTPTransport, @unchecked Sendable {
 
     private let lock = NSLock()
     private var queued: [Result<HTTPResponse, any Error>]
     private var recorded: [URLRequest] = []
 
+    /// One recorded `text/event-stream`, as its lines arrived, and how it
+    /// ended.
+    ///
+    /// **A transcript rather than bytes**, for the reason `HTTPStreamResponse`
+    /// carries lines: the split is `URLSession`'s job, and a test that guessed
+    /// chunk boundaries would be testing its own guess. The framing itself —
+    /// blank lines, comments, a payload split across two `data` fields — is
+    /// `ServerSentEventDecoder`'s subject and is exercised there, line by line.
+    ///
+    /// `interruption` is the one failure a collected response cannot have: a
+    /// body that stops in the middle after the head said `200`.
+    private var transcript: (statusCode: Int, lines: [String], interruption: (any Error)?)?
+
     init(_ responses: [Result<HTTPResponse, any Error>]) {
         queued = responses
+    }
+
+    /// Answers `stream` with a recorded transcript, and `send` with a failure —
+    /// a test that reaches for the wrong one of the two fails rather than
+    /// quietly getting the other's answer.
+    convenience init(streaming lines: [String], status: Int = 200, thenFailingWith error: (any Error)? = nil) {
+        self.init([.failure(URLError(.badServerResponse))])
+        transcript = (status, lines, error)
     }
 
     /// Answers every request with the same recorded response.
@@ -54,6 +75,31 @@ private final class RecordingTransport: HTTPTransport, @unchecked Sendable {
             return queued.count > 1 ? queued.removeFirst() : (queued.first ?? .failure(URLError(.badServerResponse)))
         }
         return try outcome.get()
+    }
+
+    func stream(_ request: URLRequest) async throws -> HTTPStreamResponse {
+        let recording: (statusCode: Int, lines: [String], interruption: (any Error)?)? = lock.withLock {
+            recorded.append(request)
+            return transcript
+        }
+
+        guard let recording else {
+            throw URLError(.badServerResponse)
+        }
+
+        return HTTPStreamResponse(
+            statusCode: recording.statusCode,
+            lines: AsyncThrowingStream { continuation in
+                for line in recording.lines {
+                    continuation.yield(line)
+                }
+                if let interruption = recording.interruption {
+                    continuation.finish(throwing: interruption)
+                } else {
+                    continuation.finish()
+                }
+            }
+        )
     }
 }
 
