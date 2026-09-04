@@ -21,8 +21,58 @@ nonisolated enum TodayCopy {
         String(localized: "today.title")
     }
 
+    /// The drawn `Heute` when the day shown is today, and a name for the day
+    /// when it is not.
+    ///
+    /// **`Yesterday` is not in the export**, which draws one day and one word
+    /// for it. It is here because browsing back is the owner's instruction and
+    /// the drawn word cannot stand over a day that is not today. The weekday
+    /// case is a date rendering rather than copy, so it comes from
+    /// `TodayFormat`.
+    static func dayTitle(_ title: TodayDayTitle) -> String {
+        switch title {
+        case .today: Self.title
+        case .yesterday: String(localized: "today.title.yesterday")
+        case .weekday(let day): TodayFormat.weekday(day)
+        }
+    }
+
     static var settingsLabel: String {
         String(localized: "today.settings.label")
+    }
+
+    // MARK: - Day navigation
+
+    // Nothing below is in the export either. Screens 05 and 06 draw a header
+    // with no navigation of any kind; the arrows, the date jump and the line an
+    // empty past day carries are all the owner's instruction, and every key
+    // says so in its comment in the catalog.
+
+    static var previousDayLabel: String {
+        String(localized: "today.day.previous.label")
+    }
+
+    static var nextDayLabel: String {
+        String(localized: "today.day.next.label")
+    }
+
+    /// What the date and title together do when they are tapped. The drawn
+    /// block is a label, so there is nothing to name — only what it leads to.
+    static var dayPickerHint: String {
+        String(localized: "today.day.picker.hint")
+    }
+
+    static var dayPickerTitle: String {
+        String(localized: "today.day.picker.title")
+    }
+
+    static var dayPickerDone: String {
+        String(localized: "today.day.picker.done")
+    }
+
+    /// The one line a past day with nothing on it carries.
+    static var emptyPastDay: String {
+        String(localized: "today.day.empty")
     }
 
     static var addLabel: String {
@@ -169,6 +219,27 @@ nonisolated enum TodayFormat {
                 .weekday(.abbreviated)
                 .day()
                 .month(.wide)
+        )
+    }
+
+    /// A day's own name, wide, for the title over the eyebrow.
+    ///
+    /// Wide where the eyebrow above it is abbreviated — `Tuesday` over
+    /// `Tue, September 2` — because the two are not the same statement. The
+    /// title is the name of the day and the eyebrow is which one, and drawing
+    /// them at the same width would read as the abbreviation having simply been
+    /// set larger.
+    ///
+    /// Pinned to `eyebrowLocale` for the reason it is: Fuel's interface is
+    /// English and only English, and a device set to German would otherwise put
+    /// `Dienstag` in the one place on the screen that is a whole word.
+    static func weekday(
+        _ date: Date,
+        locale: Locale = eyebrowLocale,
+        timeZone: TimeZone = .current
+    ) -> String {
+        date.formatted(
+            Date.FormatStyle(locale: locale, timeZone: timeZone).weekday(.wide)
         )
     }
 

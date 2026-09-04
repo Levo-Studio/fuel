@@ -2143,6 +2143,78 @@
         }
       }
     },
+    "today.day.empty" : {
+      "comment" : "Stands in the day list's place on a past day nothing was logged to. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing was logged on this day."
+          }
+        }
+      }
+    },
+    "today.day.next.label" : {
+      "comment" : "Accessibility label of the forward arrow in Today's header. Disabled on today, because the future is not browsable. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next day"
+          }
+        }
+      }
+    },
+    "today.day.picker.done" : {
+      "comment" : "Closes the day picker without changing the day. Takes its word from Settings' own Done. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        }
+      }
+    },
+    "today.day.picker.hint" : {
+      "comment" : "VoiceOver hint on Today's date and title, which open the day picker. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the day picker"
+          }
+        }
+      }
+    },
+    "today.day.picker.title" : {
+      "comment" : "Heading of the sheet that jumps Today to a chosen day. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to a day"
+          }
+        }
+      }
+    },
+    "today.day.previous.label" : {
+      "comment" : "Accessibility label of the back arrow in Today's header. Disabled at the day of the first meal ever logged. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous day"
+          }
+        }
+      }
+    },
     "today.entry.hint" : {
       "comment" : "VoiceOver hint on a row of the day list, which opens the meal. Not in the export.",
       "extractionState" : "manual",
@@ -2439,6 +2511,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Today"
+          }
+        }
+      }
+    },
+    "today.title.yesterday" : {
+      "comment" : "Replaces the drawn Today when the day shown is the one before. Older days are named by their weekday instead. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yesterday"
           }
         }
       }
