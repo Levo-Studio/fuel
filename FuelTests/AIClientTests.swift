@@ -237,11 +237,15 @@ struct PhotoEstimateTests {
         #expect(estimate.items[0].macros == nil)
         #expect(estimate.items[1].kilocalories == 208)
         #expect(estimate.items[1].macros == MacroTotals(protein: 3, carbs: 33, fat: 6))
-        // A photo carries a confidence and an approximate weight; the note is
-        // the second line of the row on screen 14. Grounding never touches
-        // the note, whichever item it resolved.
+        // A photo carries a confidence and an approximate weight. Grounding
+        // writes the weight it priced with back onto the row, and for a photo
+        // item that weight is the one the note already held — so the note
+        // comes out of the pass reading exactly as the model wrote it, and
+        // `grams` now says the same thing as its own field.
         #expect(estimate.items[0].note == .photo(confidence: .confident, approximateGrams: 250))
         #expect(estimate.items[1].note == .photo(confidence: .unsure, approximateGrams: 90))
+        #expect(estimate.items[0].grams == 250)
+        #expect(estimate.items[1].grams == 90)
     }
 
     @Test("the photo travels as a base64 image block ahead of the instruction")
@@ -423,11 +427,40 @@ struct TextEstimateTests {
         let estimate = try await client.estimate(text: "porridge with berries")
 
         #expect(estimate.kilocalories == 420)
-        // Typed text gives no confidence and no weight — only whether an
-        // amount was written down. The same reply must not produce a photo
-        // note here.
+        // Typed text gives no confidence — only whether an amount was written
+        // down. The same reply must not produce a photo note here.
         #expect(estimate.items[0].note == .text(amount: .recognised))
         #expect(estimate.items[1].note == .text(amount: .estimated))
+        // The weight the reply named is kept for a typed meal too, where it
+        // used to be dropped for want of anything reading it. Grounding
+        // declines this sentence — two items, so nothing says which weight is
+        // whose — so these are the model's own numbers, straight off the wire.
+        #expect(estimate.items[0].grams == 250)
+        #expect(estimate.items[1].grams == 90)
+    }
+
+    @Test("a reply that names no weight leaves the row's amount unstated")
+    func textWithoutGrams() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let reply = """
+            {"title":"Soup","kilocalories":180,"protein_g":6,"carbs_g":20,\
+            "fat_g":8,"items":[{"name":"Zzznotafood soup","kilocalories":180,\
+            "amount":"estimated"}]}
+            """
+        let transport = RecordingTransport(status: 200, body: Reply.anthropic(reply))
+        let client = AnthropicClient(transport: transport, keys: keys.source)
+
+        let estimate = try await client.estimate(text: "a bowl of soup")
+
+        // A typed row without a weight is still a usable row — unlike a photo
+        // row, which is dropped, because the export draws a weight on one and
+        // not on the other. It simply has no amount to state, and `nil` says
+        // so rather than a zero nobody measured.
+        #expect(estimate.items.count == 1)
+        #expect(estimate.items[0].grams == nil)
+        #expect(estimate.items[0].weightInGrams == nil)
     }
 
     @Test("the typed sentence reaches the request")

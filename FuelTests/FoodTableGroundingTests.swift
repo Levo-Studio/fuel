@@ -255,6 +255,88 @@ struct FoodTableGroundingTests {
         #expect(grounded.items[1].kilocalories != 300)
     }
 
+    // MARK: - The weight that was used
+
+    /// The weight is the one thing this pass knows that nothing downstream can
+    /// work out again: for a typed meal it was read out of the user's own
+    /// sentence, and the entry does not keep the sentence a re-analysis was
+    /// built from. It used to be spent on one multiplication and dropped.
+    @Test("A typed sentence's weight is written onto the row it priced")
+    func textWeightIsRecovered() {
+        let estimate = MealEstimate(
+            title: "Polenta",
+            kilocalories: 72,
+            macros: .zero,
+            items: [
+                RecognisedItem(name: "Polenta", kilocalories: 72, note: .text(amount: .recognised))
+            ]
+        )
+
+        let grounded = FoodTableGrounding.ground(
+            estimate, mode: .text, originalText: "r45g polenta", table: table
+        )
+
+        #expect(estimate.items[0].grams == nil)
+        #expect(grounded.items[0].grams == 45)
+        #expect(grounded.items[0].weightInGrams == 45)
+    }
+
+    @Test("A photo row's weight ends up in its own field as well as in its note")
+    func photoWeightIsRecovered() {
+        let estimate = MealEstimate(
+            title: "Rice",
+            kilocalories: 999,
+            macros: .zero,
+            items: [
+                RecognisedItem(
+                    name: "Rice",
+                    kilocalories: 999,
+                    note: .photo(confidence: .unsure, approximateGrams: 150)
+                )
+            ]
+        )
+
+        let grounded = FoodTableGrounding.ground(estimate, mode: .photo, originalText: nil, table: table)
+
+        #expect(grounded.items[0].grams == 150)
+        // The note is refreshed with the same number it already held, so what
+        // the row says about itself does not change.
+        #expect(grounded.items[0].note == .photo(confidence: .unsure, approximateGrams: 150))
+    }
+
+    /// A row whose own field has been changed since it was scanned is priced
+    /// at the amount that now stands, not at the one the photograph suggested.
+    /// This is what a quantity adjustment relies on.
+    @Test("A weight in the row's own field wins over the one in its note")
+    func ownFieldWinsOverNote() throws {
+        let estimate = MealEstimate(
+            title: "Rice",
+            kilocalories: 232,
+            macros: .zero,
+            items: [
+                RecognisedItem(
+                    name: "Rice",
+                    kilocalories: 232,
+                    grams: 300,
+                    note: .photo(confidence: .confident, approximateGrams: 150)
+                )
+            ]
+        )
+
+        let grounded = FoodTableGrounding.ground(estimate, mode: .photo, originalText: nil, table: table)
+
+        // Pinned against the table row itself rather than against "twice the
+        // 150 g price": `PortionCalculator` rounds each portion once, at the
+        // end, so two portions of a food are not always exactly one portion
+        // of twice as much — 150 g of this row prices at 212 and 300 g at
+        // 423, not 424. The question here is which weight was used, and the
+        // row's own arithmetic is what answers it.
+        let row = try #require(table.search("Rice", preferring: .prepared, limit: 1).first)
+        #expect(grounded.items[0].kilocalories == PortionCalculator.portion(of: row.per100g, grams: 300).kilocalories)
+        #expect(grounded.items[0].kilocalories != PortionCalculator.portion(of: row.per100g, grams: 150).kilocalories)
+        #expect(grounded.items[0].note == .photo(confidence: .confident, approximateGrams: 300))
+    }
+
     // MARK: - Where matching declines rather than guesses
 
     /// CIQUAL's best guess at "grilled salmon sandwich" is plain grilled
@@ -279,7 +361,14 @@ struct FoodTableGroundingTests {
             estimate, mode: .text, originalText: "300g grilled salmon sandwich", table: table
         )
 
-        #expect(grounded == estimate)
+        // Figures untouched rather than the whole value untouched: the
+        // sentence names a weight, and that weight is written down whether or
+        // not the table can price it. See `RecognisedItem.grams`.
+        #expect(grounded.kilocalories == estimate.kilocalories)
+        #expect(grounded.macros == estimate.macros)
+        #expect(grounded.items[0].kilocalories == estimate.items[0].kilocalories)
+        #expect(grounded.items[0].macros == nil)
+        #expect(grounded.items[0].grams == 300)
     }
 
     @Test("A food absent from the table is not groundable")
@@ -297,7 +386,13 @@ struct FoodTableGroundingTests {
             estimate, mode: .text, originalText: "200g zzznotafood", table: table
         )
 
-        #expect(grounded == estimate)
+        // Same reading as `partialCoverageDeclines`: the price is the model's
+        // own, and the weight the sentence named is kept.
+        #expect(grounded.kilocalories == estimate.kilocalories)
+        #expect(grounded.macros == estimate.macros)
+        #expect(grounded.items[0].kilocalories == estimate.items[0].kilocalories)
+        #expect(grounded.items[0].macros == nil)
+        #expect(grounded.items[0].grams == 200)
     }
 
     // MARK: - Meal-level arithmetic
