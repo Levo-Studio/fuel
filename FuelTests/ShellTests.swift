@@ -897,9 +897,8 @@ private struct PushedMealProbe: View {
     }
 }
 
-/// What lets the system's own interactive pop win a drag that starts at the
-/// leading edge of the meal screen: `FuelInteractivePop`, applied by
-/// `MealDetailView`.
+/// What lets the system's own interactive pop win a horizontal drag anywhere on
+/// the meal screen: `FuelInteractivePop`, applied by `MealDetailView`.
 ///
 /// **A suite of its own inside this file, and serialized.** Each test here
 /// stands a real window on the test host's scene, which two of them doing it at
@@ -908,9 +907,10 @@ private struct PushedMealProbe: View {
 /// own because it is navigation, which is what this file is about.
 ///
 /// **What these cannot reach, and it is worth being plain about.** They pin the
-/// requirement — that the breakdown's scroll view waits for the navigation
-/// controller's back gesture, that the tie stops at the screen it was applied
-/// to. They do not pin whether a real finger now wins the race, because touch
+/// requirement — that the breakdown's scroll view waits for both of the
+/// navigation controller's back gestures, that the tie stops at the screen it
+/// was applied to. They do not pin whether a real finger now wins the race, or
+/// what waiting for the mid-content pop costs a scroll, because touch
 /// delivery is not something a unit test can synthesise: there is no UI-test
 /// target, and a gesture driven by hand through UIKit's own action is not the
 /// event a thumb sends. That last step is checked on a build, not here.
@@ -1068,6 +1068,34 @@ struct MealDetailBackGestureTests {
         #expect(waits(edge, for: breakdown) == false)
     }
 
+    /// The same requirement against the other back gesture, which is what makes
+    /// the swipe work from the middle of the screen and not only from the strip.
+    ///
+    /// `interactiveContentPopGestureRecognizer` is iOS 26's second pop, reading
+    /// a horizontal pan across the whole content area. Without a requirement it
+    /// loses the same race the edge pan lost, and for the same reason — so a
+    /// drag across the empty space under the breakdown scrolled a list with
+    /// nowhere sideways to go, while the identical drag two centimetres to the
+    /// left popped the screen.
+    @Test("The breakdown waits for the mid-content back gesture too")
+    func breakdownWaitsForTheContentBackGesture() throws {
+        let navigation = try host(PushedMealProbe(model: try makeModel(), presentsSheet: false))
+        let contentPop = try #require(navigation.interactiveContentPopGestureRecognizer)
+        let pushed = try #require(navigation.viewControllers.last)
+
+        let breakdown = try scrollView(in: pushed).panGestureRecognizer
+        #expect(waits(breakdown, for: contentPop))
+        // The direction, for the reason the edge test gives: UIKit records the
+        // pair on both recognisers, so a reading that only noticed they were
+        // mentioned together would pass with the tie made backwards.
+        #expect(waits(contentPop, for: breakdown) == false)
+        // Not one requirement replacing the other. Both are what the screen
+        // needs: the edge pan answers a drag that starts in the strip, where
+        // the content pop by its own documentation does not recognise.
+        let edge = try #require(navigation.interactivePopGestureRecognizer)
+        #expect(waits(breakdown, for: edge))
+    }
+
     /// The other half of the same rule, and the one that keeps Today's day swipe
     /// out of this.
     ///
@@ -1112,6 +1140,13 @@ struct MealDetailBackGestureTests {
         let edge = try #require(navigation.interactivePopGestureRecognizer)
         #expect(waits(above.panGestureRecognizer, for: edge))
         #expect(waits(underneath.panGestureRecognizer, for: edge) == false)
+
+        // The mid-content pop is the wider gesture of the two, so it is the one
+        // whose scope is worth pinning: a tie that searched from the window
+        // would put it in front of every list in the app, Today's included.
+        let contentPop = try #require(navigation.interactiveContentPopGestureRecognizer)
+        #expect(waits(above.panGestureRecognizer, for: contentPop))
+        #expect(waits(underneath.panGestureRecognizer, for: contentPop) == false)
     }
 
     /// A sheet over the meal screen — the shape the conversation arrives in — is
@@ -1202,5 +1237,14 @@ struct MealDetailBackGestureTests {
         #expect(watch.cancelsTouchesInView == false)
         #expect(watch.delaysTouchesBegan == false)
         #expect(watch.delaysTouchesEnded == false)
+        // Nothing on the screen waits for it either — the tie is stated against
+        // the pops, and the watch is not one of them. A list made to wait for a
+        // recogniser that fails on `touchesBegan` would be harmless in practice
+        // and still wrong to have written.
+        #expect(waits(try scrollView(in: pushed).panGestureRecognizer, for: watch) == false)
+        // And it answers no delegate questions: it stands in front of nothing
+        // the screen was already asking, which is the other half of taking
+        // nothing from the list.
+        #expect(watch.delegate == nil)
     }
 }

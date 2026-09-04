@@ -3,8 +3,8 @@ import UIKit
 
 // MARK: - Interactive pop
 
-/// Gives the navigation controller's own back gesture the first claim on a drag
-/// that begins at the leading edge of a pushed screen.
+/// Gives the navigation controller's own back gestures the first claim on a
+/// horizontal drag anywhere on a pushed screen.
 ///
 /// **This draws nothing and is not a gesture of Fuel's.** It restores the one
 /// iOS has always had — the page follows the finger off to the right, the screen
@@ -29,18 +29,17 @@ import UIKit
 /// moves. So the drag becomes a scroll that goes nowhere, on a list that has
 /// nowhere sideways to go, and the screen stays.
 ///
-/// The tie below is the remedy `UINavigationController`'s own documentation
-/// describes for exactly this: *"Use this property to retrieve the gesture
-/// recognizer and tie it to the behavior of other gesture recognizers in your
-/// user interface."* It costs nothing away from the edge, because a screen-edge
-/// pan fails the moment a touch begins outside its strip, and a requirement on a
-/// recogniser that has already failed delays nothing.
+/// The tie below is the one thing `UINavigationController` publishes either back
+/// gesture for. The SDK header says it of both in the same words — *"This
+/// property should only be used to set up failure requirements with it."* — so
+/// stating a requirement is the sanctioned use of the property rather than a
+/// workaround built on top of it.
 enum FuelInteractivePop {
 
     // MARK: - Tying the two together
 
-    /// Makes every scroll view on this view's screen wait for the navigation
-    /// controller's edge pan, once.
+    /// Makes every scroll view on this view's screen wait for both of the
+    /// navigation controller's back gestures, once.
     ///
     /// **`require(toFail:)` and not the delegate methods UIKit prefers, because
     /// the delegate methods are not Fuel's to answer.** That documentation
@@ -49,12 +48,12 @@ enum FuelInteractivePop {
     /// is asked once per attempt to recognise and so can never go stale. It is
     /// the better mechanism and Fuel cannot reach it: the two delegates it would
     /// have to stand in for are the scroll view, which is SwiftUI's own and
-    /// relies on that delegate for how it scrolls, and the edge pan's, which is
-    /// the navigation controller's interactive transition — the object that
-    /// drives the animation, and one shared with Today rather than belonging to
-    /// this screen. Replacing either would put Fuel in the middle of a
-    /// conversation it has no part in, and the second would reach a screen this
-    /// has no business touching.
+    /// relies on that delegate for how it scrolls, and the back gestures' own,
+    /// which is the navigation controller's interactive transition — the object
+    /// that drives the animation, and one shared with Today rather than
+    /// belonging to this screen. Replacing either would put Fuel in the middle
+    /// of a conversation it has no part in, and the second would reach a screen
+    /// this has no business touching.
     ///
     /// So the requirement is stated directly, and what the delegate form would
     /// have given for free — being asked again rather than remembered — is
@@ -62,38 +61,58 @@ enum FuelInteractivePop {
     /// is idempotent, so restating costs one walk of the screen's views and
     /// leaves one entry however many times it runs.
     ///
-    /// **Only the edge pan, never `interactiveContentPopGestureRecognizer`.**
-    /// iOS 26 added a second pop gesture that reads a horizontal pan anywhere in
-    /// the content, and its documentation says it exists to have failure
-    /// requirements set up with it — so tying it here would be its sanctioned
-    /// use, not a misuse. It is still not what this screen wants: that pan is
-    /// not confined to a strip, so every vertical scroll on the screen would
-    /// have to wait for it to fail rather than only a drag that starts at the
-    /// edge, and UIKit already has the content pan wait for the edge pan.
-    /// **The consequence is worth naming rather than leaving to be found: on
-    /// this screen the mid-content back swipe iOS 26 offers stays swallowed by
-    /// the list, and only the edge one works.** That is the trade the bug was
-    /// reported as — a swipe from the edge — and widening it is a question for
-    /// the owner rather than something to take here.
+    /// **Both back gestures, and the second one is the whole point.** iOS 26
+    /// publishes a second pop recogniser beside the edge pan:
+    /// `interactiveContentPopGestureRecognizer`, which the SDK header describes
+    /// as recognising *"on the entire content area of the navigation controller
+    /// in cases that are not covered by the interactive pop gesture
+    /// recognizer"*. Tying only the edge pan left that one still swallowed by
+    /// the list, so the back swipe worked in the leading strip and nowhere else
+    /// — and the owner, drawing an arrow straight across the empty space under
+    /// the breakdown, has said it must be there on the whole screen. The two
+    /// requirements together are what make it so: the edge one for a drag that
+    /// starts in the strip, the content one for a drag that starts in the
+    /// middle or in that empty space.
+    ///
+    /// **The second requirement is not free, and this is the screen that can
+    /// afford it.** Unlike the edge pan, the content pop has not already failed
+    /// when a touch lands away from the edge, so a vertical drag waits for it
+    /// to give up before the list moves. What it waits for is UIKit deciding
+    /// the pan is not horizontal, which is settled from the first few points of
+    /// movement rather than after a timeout — and the meal screen is short,
+    /// frequently one or two breakdown rows above a lot of nothing, so the list
+    /// this delays is a list with barely anywhere to go. That is a judgement
+    /// about this screen, not a general one, which is the other reason the
+    /// modifier is applied here and nowhere else.
     ///
     /// **It reaches one screen and stops.** The search starts at the view
     /// controller this view belongs to, which on a navigation stack is the
     /// pushed screen and nothing else. Today is a different controller, so its
-    /// day swipe is untouched — and on the root the edge pan cannot begin
-    /// anyway, there being nothing to pop. A sheet is its own presentation with
+    /// day swipe is untouched — and on the root neither pop can begin anyway,
+    /// there being nothing to pop. A sheet is its own presentation with
     /// its own controller, so what is inside one is out of reach here.
     static func tie(from view: UIView) {
         guard
             let screen = view.fuelOwningViewController,
             let navigation = screen.navigationController,
-            let edge = navigation.interactivePopGestureRecognizer,
             let content = screen.viewIfLoaded
         else {
             return
         }
 
+        // Whichever of the two the controller is holding, rather than both
+        // demanded: a navigation controller is free to publish neither, and a
+        // screen that got one requirement is better off than one that got none
+        // because the other was missing.
+        let pops = [
+            navigation.interactivePopGestureRecognizer,
+            navigation.interactiveContentPopGestureRecognizer,
+        ].compactMap { $0 }
+
         for scroll in scrollViews(in: content) {
-            scroll.panGestureRecognizer.require(toFail: edge)
+            for pop in pops {
+                scroll.panGestureRecognizer.require(toFail: pop)
+            }
         }
     }
 
@@ -247,14 +266,19 @@ private struct FuelInteractivePopModifier: ViewModifier {
 
 extension View {
 
-    /// Lets the system's interactive pop win a drag that starts at the leading
-    /// edge of this screen, ahead of any scroll view on it.
+    /// Lets the system's interactive pop win a horizontal drag anywhere on this
+    /// screen, ahead of any scroll view on it.
     ///
     /// **Apply it to a screen that is pushed on a navigation stack.** On a
     /// screen presented some other way there is nothing to pop and this does
     /// nothing at all — which is the honest outcome, not a silent failure: a
     /// covered screen has no system gesture to give priority to, and
     /// `fuelBackSwipe` is what those screens use instead.
+    ///
+    /// **And apply it deliberately, screen by screen.** The mid-content half of
+    /// this puts every vertical scroll on the screen behind a gesture that has
+    /// to fail first, which `tie(from:)` argues is a fair price on a short
+    /// screen and does not argue anywhere else.
     func fuelInteractivePop() -> some View {
         modifier(FuelInteractivePopModifier())
     }
