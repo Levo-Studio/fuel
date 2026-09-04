@@ -170,7 +170,7 @@ struct SettingsSegmentedControl<Value: Hashable>: View {
                             lineWidth: FuelMetrics.Line.hairline
                         )
                 )
-                .contentShape(RoundedRectangle(cornerRadius: FuelMetrics.Radius.pill))
+                .overlay { hitTarget }
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
@@ -208,6 +208,43 @@ struct SettingsSegmentedControl<Value: Hashable>: View {
         case .theme: palette.onAccent
         case .camera: FuelPalette.Camera.onInk
         }
+    }
+
+    // MARK: - Hit target
+
+    /// The region a segment answers a finger in, which is taller than the one
+    /// it draws.
+    ///
+    /// A segment is a 13pt label between the export's 11 or 12 points of
+    /// padding — 38.67 or 40.67 tall drawn, either way short of the 44 a
+    /// fingertip needs. An overlay is offered its host's size and may take a
+    /// larger one without the host growing, so asking for `minimumHitTarget`
+    /// here widens the region symmetrically around the pill and leaves the
+    /// drawn box, and everything laid out around it, where the export puts
+    /// them. It replaces the pill's own content shape rather than joining it,
+    /// because the taller pill contains the drawn one.
+    ///
+    /// `Control.hitTargetOverhang(around:)` — which Today's gear and the
+    /// camera's gallery control use — wants a drawn size to subtract from, and
+    /// both of those pass `circleButton`, a number the design layer states. A
+    /// segment's height is a line height the text engine resolves at render
+    /// time, so there is nothing to hand it that would not first have to be
+    /// invented. Asking for the minimum reaches the same geometry without the
+    /// invention.
+    ///
+    /// The growth is vertical only, and it belongs to the segment rather than
+    /// to the control, because a segment is what a tap selects. Each one is
+    /// already far wider than a finger, so nothing needs to grow sideways —
+    /// which is what keeps the export's 8pt gutter out of it. The two regions
+    /// stay disjoint in x and cannot overlap, and a tap between the options
+    /// still selects neither of them. Grown sideways they would meet inside
+    /// that gutter, and a tap aimed at the space between two options would go
+    /// to whichever region is hit-tested first rather than to the one the user
+    /// was pointing at.
+    private var hitTarget: some View {
+        Color.clear
+            .frame(minHeight: FuelMetrics.Control.minimumHitTarget)
+            .contentShape(RoundedRectangle(cornerRadius: FuelMetrics.Radius.pill))
     }
 }
 
