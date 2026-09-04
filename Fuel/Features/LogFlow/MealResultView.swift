@@ -198,24 +198,37 @@ struct MealResultView<Lede: View>: View {
             // layout with the footer at `bottom:34`, and there is no drawn
             // second position for it. Nothing here needs the screen to move
             // either: the one field this screen can open is the item editor,
-            // and it lives in a system alert, which the platform lifts clear
-            // of the keyboard itself.
+            // and it lives on a sheet, which the platform lifts clear of the
+            // keyboard itself — the same reason this was safe while that field
+            // lived in a system alert.
             .ignoresSafeArea(.keyboard, edges: .bottom)
         }
-        // A system alert with one field, rather than a sheet drawn in the
-        // app's own language. The export has no editor of any kind, so
-        // anything here is undrawn; the platform's own answer is the honest
-        // one, and it brings the ordinary keyboard, the cancel that changes
-        // nothing and the focus behaviour for free.
-        .alert(MealResultCopy.itemEditTitle, isPresented: $isEditingItem) {
-            TextField(MealResultCopy.itemEditPlaceholder, text: $editedText)
-
-            Button(MealResultCopy.itemEditCancel, role: .cancel) {}
-
-            Button(MealResultCopy.itemEditConfirm) { commitItemEdit() }
-        } message: {
-            Text(MealResultCopy.itemEditMessage)
-        }
+        // The field an item is written into, drawn in the app's own language
+        // rather than inside a system alert. The export has no editor of any
+        // kind, so anything here is undrawn — but what a sheet leaves undrawn
+        // is only how it arrives, and `FuelDialog` keeps all of that the
+        // platform's: the keyboard, the corner, the dimming, and the swipe
+        // that puts it away without writing anything.
+        //
+        // Screen 12's own arrangement, because this is screen 12's own errand:
+        // a heading, the line that says how to answer it, and one field under
+        // them.
+        .fuelDialog(
+            FuelDialogCopy(
+                title: MealResultCopy.itemEditTitle,
+                hint: MealResultCopy.itemEditMessage,
+                confirm: MealResultCopy.itemEditConfirm,
+                cancel: MealResultCopy.itemEditCancel
+            ),
+            isPresented: $isEditingItem,
+            entry: FuelDialogEntry(
+                text: $editedText,
+                prompt: MealResultCopy.itemEditPlaceholder,
+                accessibilityLabel: MealResultCopy.itemEditTitle
+            ),
+            onConfirm: commitItemEdit,
+            onCancel: cancelItemEdit
+        )
         // The same question the meal screen asks before a meal is deleted, in
         // the same drawing: the export draws no modal of any kind, so how it
         // comes up is the platform's and what it says is this app's.
@@ -306,6 +319,20 @@ struct MealResultView<Lede: View>: View {
         } else {
             onAddItem(editedText)
         }
+        clearItemEdit()
+    }
+
+    /// What every other way out of the field does, which is nothing to the
+    /// breakdown — the swipe down and the tap outside included.
+    ///
+    /// It clears what was in the field, which the system alert did not need to:
+    /// a line the user backed out of is not a line, and the next thing to open
+    /// this field opens it on its own text rather than on the one before it.
+    private func cancelItemEdit() {
+        clearItemEdit()
+    }
+
+    private func clearItemEdit() {
         editedText = ""
         editedItem = nil
     }
