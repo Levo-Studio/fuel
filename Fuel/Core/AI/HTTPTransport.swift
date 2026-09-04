@@ -151,11 +151,14 @@ extension StreamingHTTPTransport {
 /// A response whose head has arrived and whose body has not.
 ///
 /// **Lines rather than bytes**, because every stream Fuel reads is
-/// `text/event-stream` and every event stream is line-oriented. Splitting the
-/// bytes is `URLSession`'s own job and it already does it; handing a client raw
-/// chunks would mean both provider clients reimplementing the same split, and a
-/// test double supplying plausible chunk boundaries rather than a recorded
-/// transcript.
+/// `text/event-stream` and every event stream is line-oriented. Handing a
+/// client raw chunks would mean both provider clients reimplementing the same
+/// split, and a test double supplying plausible chunk boundaries rather than a
+/// recorded transcript.
+///
+/// **The split is `ServerSentEventLineSplitter`'s and not `URLSession`'s**, for
+/// the reason that type is written out at length: Foundation's own line
+/// sequence drops blank lines, and a blank line is this format's dispatch.
 ///
 /// No headers, for the reason `HTTPResponse` carries none.
 nonisolated struct HTTPStreamResponse: Sendable {
@@ -219,11 +222,18 @@ extension URLSession: StreamingHTTPTransport {
     /// arrived and leaves the body to be pulled, which is the whole difference
     /// between the two methods on this protocol.
     ///
-    /// The lines are re-wrapped into an `AsyncThrowingStream` rather than
+    /// The bytes are framed into an `AsyncThrowingStream` of lines rather than
     /// handed over as `URLSession.AsyncBytes.AsyncLineSequence`, so
     /// `HTTPStreamResponse` names one concrete type that a test double can also
     /// produce. The inner task is cancelled when the caller stops iterating,
     /// which is what tears the connection down when a message is called off.
+    ///
+    /// **`ServerSentEventLineSplitter` and not `bytes.lines`.** The convenience
+    /// was the bug: Foundation's line sequence discards blank lines, and in
+    /// `text/event-stream` the blank line is the dispatch. Read with `.lines`,
+    /// every conversation reached the user as "the answer did not come back in
+    /// a form Fuel could read", because none of it was ever delivered. That
+    /// type says the whole of it.
     nonisolated func stream(_ request: URLRequest) async throws -> HTTPStreamResponse {
         let (bytes, response) = try await self.bytes(for: request)
 
@@ -236,8 +246,14 @@ extension URLSession: StreamingHTTPTransport {
             lines: AsyncThrowingStream { continuation in
                 let pump = Task {
                     do {
-                        for try await line in bytes.lines {
-                            continuation.yield(line)
+                        var splitter = ServerSentEventLineSplitter()
+                        for try await byte in bytes {
+                            if let line = splitter.append(byte) {
+                                continuation.yield(line)
+                            }
+                        }
+                        if let last = splitter.flush() {
+                            continuation.yield(last)
                         }
                         continuation.finish()
                     } catch {

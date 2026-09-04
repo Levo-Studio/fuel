@@ -26,11 +26,18 @@ private final class RecordingTransport: StreamingHTTPTransport, @unchecked Senda
     /// One recorded `text/event-stream`, as its lines arrived, and how it
     /// ended.
     ///
-    /// **A transcript rather than bytes**, for the reason `HTTPStreamResponse`
-    /// carries lines: the split is `URLSession`'s job, and a test that guessed
-    /// chunk boundaries would be testing its own guess. The framing itself —
-    /// blank lines, comments, a payload split across two `data` fields — is
-    /// `ServerSentEventDecoder`'s subject and is exercised there, line by line.
+    /// **A transcript rather than bytes, and that was a blind spot rather than
+    /// a saving.** It used to say the split was `URLSession`'s job and not
+    /// worth a test. It was `URLSession`'s job, `URLSession` did it by the wrong
+    /// rule — Foundation's line reader drops blank lines, which is this
+    /// format's dispatch — and every test in this file passed against a wire
+    /// nobody had framed, while the chat failed on every message in the app.
+    /// `init(streamingBody:)` below is the answer: the same bytes a provider
+    /// sends, framed by the code that frames them in `URLSession.stream`.
+    ///
+    /// A list of lines is still the right double for everything a transcript is
+    /// *about* — what the model wrote, where the deltas broke, how it ended —
+    /// and those tests keep it.
     ///
     /// `interruption` is the one failure a collected response cannot have: a
     /// body that stops in the middle after the head said `200`.
@@ -46,6 +53,29 @@ private final class RecordingTransport: StreamingHTTPTransport, @unchecked Senda
     convenience init(streaming lines: [String], status: Int = 200, thenFailingWith error: (any Error)? = nil) {
         self.init([.failure(URLError(.badServerResponse))])
         transcript = (status, lines, error)
+    }
+
+    /// Answers `stream` with a body's own bytes, framed the way
+    /// `URLSession.stream` frames them.
+    ///
+    /// **The seam the whole chat was broken in.** A transcript handed over as
+    /// ready-made lines is a transcript whose blank lines the test wrote; a
+    /// provider sends bytes, and what turns those into lines is the thing that
+    /// was wrong. `ServerSentEventLineSplitter` is the code the app runs, so a
+    /// test built on this fails when the framing does.
+    convenience init(streamingBody body: String, status: Int = 200) {
+        self.init([.failure(URLError(.badServerResponse))])
+        var splitter = ServerSentEventLineSplitter()
+        var framed: [String] = []
+        for byte in Array(body.utf8) {
+            if let line = splitter.append(byte) {
+                framed.append(line)
+            }
+        }
+        if let last = splitter.flush() {
+            framed.append(last)
+        }
+        transcript = (status, framed, nil)
     }
 
     /// Answers every request with the same recorded response.
@@ -247,6 +277,13 @@ private enum Reply {
             "",
         ]
         return lines
+    }
+
+    /// A transcript as the bytes a provider puts on the wire: every line
+    /// terminated, blank ones included, which is what makes the blank ones
+    /// something a reader can lose.
+    static func wire(_ lines: [String]) -> String {
+        lines.map { $0 + "\n" }.joined()
     }
 
     private static func split(_ text: String, into chunks: Int) -> [String] {
@@ -2517,5 +2554,69 @@ struct MealAdjustmentClientTests {
         await #expect(throws: AIError.truncatedReply) {
             _ = try await outcome(of: client.adjust(Self.meal(), history: [], message: "more"))
         }
+    }
+
+    // MARK: - The wire, framed
+
+    /// **The regression test for the bug that broke the chat outright.** Every
+    /// other streamed test in this file hands the client a list of lines the
+    /// test wrote. A provider hands it bytes, and turning those into lines is
+    /// where it went wrong: `URLSession.stream` used Foundation's line reader,
+    /// which drops blank lines, and a blank line is what dispatches an event.
+    /// Nothing reached the assembler, every conversation ended at
+    /// `AIError.malformedResponse`, and no test in the repository could see it.
+    ///
+    /// So this one is fed the transcript as bytes and framed by the code the
+    /// app frames with.
+    @Test("a conversation framed out of the wire's own bytes still lands")
+    func anthropicOverTheWire() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let client = AnthropicClient(
+            transport: RecordingTransport(
+                streamingBody: Reply.wire(Reply.anthropicStream(Self.raisesTheRice, chunks: 6))
+            ),
+            keys: keys.source
+        )
+
+        let turn = try await outcome(of: client.adjust(Self.meal(), history: [], message: "a second portion"))
+
+        #expect(turn.reply == "Raised the rice to 300 g.")
+        #expect(try #require(turn.meal).items[0].grams == 300)
+    }
+
+    @Test("the other provider's wire frames the same way")
+    func mistralOverTheWire() async throws {
+        let keys = try KeyFixture(provider: .mistral, secret: "0123456789abcdefghij")
+        defer { keys.tearDown(provider: .mistral) }
+
+        let client = MistralClient(
+            transport: RecordingTransport(
+                streamingBody: Reply.wire(Reply.mistralStream(Self.raisesTheRice, chunks: 6))
+            ),
+            keys: keys.source
+        )
+
+        let turn = try await outcome(of: client.adjust(Self.meal(), history: [], message: "a second portion"))
+
+        #expect(turn.reply == "Raised the rice to 300 g.")
+        #expect(try #require(turn.meal).items[0].grams == 300)
+    }
+
+    /// The same body with `\r\n` behind every line, which is what a proxy in
+    /// front of an API may well hand back.
+    @Test("a wire that ends its lines with a carriage return frames the same")
+    func carriageReturnsOverTheWire() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let body = Reply.wire(Reply.anthropicStream(Self.raisesTheRice, chunks: 4))
+            .replacingOccurrences(of: "\n", with: "\r\n")
+        let client = AnthropicClient(transport: RecordingTransport(streamingBody: body), keys: keys.source)
+
+        let turn = try await outcome(of: client.adjust(Self.meal(), history: [], message: "a second portion"))
+
+        #expect(turn.reply == "Raised the rice to 300 g.")
     }
 }
