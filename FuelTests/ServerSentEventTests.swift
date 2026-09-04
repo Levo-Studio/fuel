@@ -159,11 +159,11 @@ struct StreamedRefusalTests {
 struct ServerSentEventFramingTests {
 
     /// A whole body, framed the way `URLSession.stream` frames one.
-    private func lines(of body: String) -> [String] {
+    private func lines(of body: String) throws -> [String] {
         var splitter = ServerSentEventLineSplitter()
         var framed: [String] = []
         for byte in Array(body.utf8) {
-            if let line = splitter.append(byte) {
+            if let line = try splitter.append(byte) {
                 framed.append(line)
             }
         }
@@ -176,8 +176,8 @@ struct ServerSentEventFramingTests {
     // MARK: - The line that means something
 
     @Test("the blank line between two events is delivered, because it is the dispatch")
-    func blankLineSurvives() {
-        #expect(lines(of: "data: one\n\ndata: two\n\n") == ["data: one", "", "data: two", ""])
+    func blankLineSurvives() throws {
+        #expect(try lines(of: "data: one\n\ndata: two\n\n") == ["data: one", "", "data: two", ""])
     }
 
     /// The counter-check, and the reason this type exists rather than a call to
@@ -199,34 +199,65 @@ struct ServerSentEventFramingTests {
     // MARK: - The three terminators
 
     @Test("a carriage return ends a line on its own")
-    func carriageReturn() {
-        #expect(lines(of: "data: one\r\rdata: two\r\r") == ["data: one", "", "data: two", ""])
+    func carriageReturn() throws {
+        #expect(try lines(of: "data: one\r\rdata: two\r\r") == ["data: one", "", "data: two", ""])
     }
 
     @Test("a carriage return and a line feed together end one line and not two")
-    func carriageReturnLineFeed() {
-        #expect(lines(of: "data: one\r\n\r\n") == ["data: one", ""])
+    func carriageReturnLineFeed() throws {
+        #expect(try lines(of: "data: one\r\n\r\n") == ["data: one", ""])
     }
 
     @Test("a line feed after ordinary bytes is not swallowed as half a pair")
-    func lineFeedAfterText() {
-        #expect(lines(of: "a\rb\nc\n") == ["a", "b", "c"])
+    func lineFeedAfterText() throws {
+        #expect(try lines(of: "a\rb\nc\n") == ["a", "b", "c"])
     }
 
     // MARK: - The ends of the body
 
     @Test("a body that ends without a terminator still delivers its last line")
-    func unterminatedTail() {
-        #expect(lines(of: "data: one\n\ndata: two") == ["data: one", "", "data: two"])
+    func unterminatedTail() throws {
+        #expect(try lines(of: "data: one\n\ndata: two") == ["data: one", "", "data: two"])
     }
 
     /// A body that ended on its terminator has nothing left, and must not gain
     /// a blank line it never sent — a spurious dispatch would deliver whatever
     /// was gathered as though the provider had said to.
     @Test("a body that ends on a terminator gains no line of its own")
-    func terminatedTail() {
-        #expect(lines(of: "data: one\n") == ["data: one"])
-        #expect(lines(of: "") == [])
+    func terminatedTail() throws {
+        #expect(try lines(of: "data: one\n") == ["data: one"])
+        #expect(try lines(of: "") == [])
+    }
+
+    // MARK: - A line that is not a line
+
+    /// The bound is there to catch a body with no terminator in it, not to
+    /// refuse a long answer, so a line that reaches it exactly still frames.
+    @Test("a line as long as the bound allows is still a line")
+    func lineAtTheBound() throws {
+        let line = String(repeating: "x", count: ServerSentEventLineSplitter.maximumLineLength)
+        #expect(try lines(of: line + "\n") == [line])
+    }
+
+    /// **The buffer used to be the whole body.** A `200` `text/event-stream`
+    /// that never sends a terminator accumulated every byte of it in memory,
+    /// bounded only by the request timeout — a setting about waiting, not about
+    /// what a response may cost. The count is asserted as well as the throw:
+    /// stopping at the bound is the whole claim, and a splitter that read the
+    /// body and then complained would satisfy `#expect(throws:)` on its own.
+    @Test("a body that runs past the bound fails the stream, at the bound")
+    func pastTheBound() {
+        var splitter = ServerSentEventLineSplitter()
+        var read = 0
+
+        #expect(throws: AIError.malformedResponse) {
+            for byte in Array(repeating: UInt8(ascii: "x"), count: 4 * ServerSentEventLineSplitter.maximumLineLength) {
+                _ = try splitter.append(byte)
+                read += 1
+            }
+        }
+
+        #expect(read == ServerSentEventLineSplitter.maximumLineLength)
     }
 
     // MARK: - A whole turn
@@ -234,7 +265,7 @@ struct ServerSentEventFramingTests {
     /// The claim that matters: a provider's own transcript, framed from its
     /// bytes, dispatches every event in it.
     @Test("an Anthropic transcript framed from its bytes dispatches every event")
-    func anthropicTranscript() {
+    func anthropicTranscript() throws {
         let body = """
             event: message_start
             data: {"type":"message_start","message":{"id":"msg_1","role":"assistant"}}
@@ -252,7 +283,7 @@ struct ServerSentEventFramingTests {
             """
 
         var decoder = ServerSentEventDecoder()
-        let payloads = lines(of: body).compactMap { decoder.decode($0) }
+        let payloads = try lines(of: body).compactMap { decoder.decode($0) }
 
         #expect(payloads.count == 4)
         #expect(payloads.contains(#"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hi"}}"#))
@@ -260,7 +291,7 @@ struct ServerSentEventFramingTests {
 
     /// Mistral's, including the sentinel that is not JSON.
     @Test("a Mistral transcript framed from its bytes dispatches every event")
-    func mistralTranscript() {
+    func mistralTranscript() throws {
         let body = """
             data: {"id":"c1","choices":[{"index":0,"delta":{"content":"Hi"},"finish_reason":null}]}
 
@@ -272,7 +303,7 @@ struct ServerSentEventFramingTests {
             """
 
         var decoder = ServerSentEventDecoder()
-        let payloads = lines(of: body).compactMap { decoder.decode($0) }
+        let payloads = try lines(of: body).compactMap { decoder.decode($0) }
 
         #expect(payloads.count == 3)
         #expect(payloads.last == "[DONE]")

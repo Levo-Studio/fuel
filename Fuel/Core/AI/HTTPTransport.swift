@@ -248,7 +248,7 @@ extension URLSession: StreamingHTTPTransport {
                     do {
                         var splitter = ServerSentEventLineSplitter()
                         for try await byte in bytes {
-                            if let line = splitter.append(byte) {
+                            if let line = try splitter.append(byte) {
                                 continuation.yield(line)
                             }
                         }

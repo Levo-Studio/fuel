@@ -223,6 +223,24 @@ nonisolated struct AnthropicClient: AIClient {
             throw AIError.transportFailure(error)
         }
 
+        // **A turn the user called off stops here, before it can buy
+        // anything.** Cancelling the task that iterates an
+        // `AsyncThrowingStream` terminates the stream and hands the iterator
+        // `nil`: the loop above exits *normally*, with nothing thrown and
+        // nothing to catch. A message cancelled before its first token
+        // therefore arrives at the guard below indistinguishable from a stream
+        // that framed perfectly and delivered no answer — which is the one case
+        // that spends a second request, and it is spent on a run
+        // `MealChatModel` has already retired, so the user pays for an answer
+        // nothing will ever show them. Cancelling is also not only `CANCEL`:
+        // sending a second message while the first is still thinking, and
+        // dismissing the sheet mid-turn, both cancel the conversation.
+        //
+        // Same check and same reason as `sendRetryingALostConnection`, one
+        // level down: a request the user has already backed out of must not buy
+        // a second one.
+        try Task.checkCancellation()
+
         // **A stream that delivered nothing is asked again without streaming.**
         // See `MealChatStreamAssembler.receivedNothing` for why this is a
         // different case from a reply Fuel could not read, and
@@ -251,7 +269,8 @@ nonisolated struct AnthropicClient: AIClient {
     /// `sendRetryingALostConnection` gives for its one extra attempt, and it is
     /// bounded the same way: this path does not stream, so it cannot reach
     /// itself. It is only entered when the stream produced no character at all,
-    /// which no answered request does.
+    /// which no answered request does — and only when the turn is still wanted,
+    /// which is what the cancellation check above the guard is for.
     private func unstreamed(body: Data, over meal: AdjustableMeal) async throws -> MealChatEvent {
         guard var object = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else {
             throw AIError.malformedResponse

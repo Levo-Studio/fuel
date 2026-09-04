@@ -40,7 +40,11 @@ nonisolated struct ServerSentEventLineSplitter {
 
     /// Feeds one byte and returns the line it ended, if it ended one. A blank
     /// line comes back as the empty string, which is the whole point.
-    mutating func append(_ byte: UInt8) -> String? {
+    ///
+    /// Throws `AIError.malformedResponse` where a line runs past
+    /// `maximumLineLength`, which is not a line this format carries — that
+    /// constant says why the stream fails rather than skipping it.
+    mutating func append(_ byte: UInt8) throws -> String? {
         if afterCarriageReturn {
             afterCarriageReturn = false
             if byte == Self.lineFeed {
@@ -55,6 +59,9 @@ nonisolated struct ServerSentEventLineSplitter {
         case Self.lineFeed:
             return take()
         default:
+            guard buffer.count < Self.maximumLineLength else {
+                throw AIError.malformedResponse
+            }
             buffer.append(byte)
             return nil
         }
@@ -72,6 +79,46 @@ nonisolated struct ServerSentEventLineSplitter {
         defer { buffer.removeAll(keepingCapacity: true) }
         return String(decoding: buffer, as: UTF8.self)
     }
+
+    // MARK: - Bounds
+
+    /// The longest line this format is allowed to carry, past which the stream
+    /// fails.
+    ///
+    /// **Without a bound the buffer is the whole body.** A `200`
+    /// `text/event-stream` that never sends a terminator — a proxy dumping an
+    /// HTML page under the wrong content type, an endpoint answering in
+    /// something that is not this format at all — accumulates every byte it
+    /// sends in memory. The only thing stopping it today is
+    /// `URLSession.fuel`'s sixty-second request timeout, which is an incidental
+    /// consequence of a setting about waiting, not a limit on what a body may
+    /// cost. The refusal path is already bounded at `AIError.readableErrorBody`
+    /// and the accepted path had nothing.
+    ///
+    /// **The stream fails rather than dropping the overlong line and carrying
+    /// on**, and that is the half of this worth arguing. Dropping a line leaves
+    /// `MealChatStreamAssembler` a reply with a hole in it, and a hole is not
+    /// reliably fatal: lose the delta carrying `"changes":[{"item":1,"grams":300}],`
+    /// and what is left is `{"additions":[],"reply":"Raised the rice to 300 g."}`,
+    /// which parses cleanly and tells the user nothing moved while the sentence
+    /// says it did. A quietly wrong answer is the one outcome this layer refuses
+    /// everywhere else — `ServerSentEventDecoder` will not dispatch half an
+    /// event for the same reason. Failing costs the user the retry state, which
+    /// is a screen the design draws, and `AIError.malformedResponse` is the
+    /// honest reading of it: the answer did not come back in a form Fuel could
+    /// read.
+    ///
+    /// **64 KiB, and deliberately not `AIError.readableErrorBody`.** That bound
+    /// is 8 KiB and answers a different question — how far into a *refused*
+    /// body it is worth searching for two substrings. On the accepted path a
+    /// single `data:` field may legitimately carry a whole answer, and
+    /// `MealChatContract.maxTokens` allows 2048 of them, which is already
+    /// somewhere near 8 KiB of text before JSON escaping and the envelope
+    /// around it. Reusing that number would refuse a valid stream. 64 KiB
+    /// clears any line either provider can send by a wide margin, and still
+    /// catches a body with no terminator in it in the first fraction of a
+    /// second instead of at the timeout.
+    static let maximumLineLength = 64 * 1024
 
     private static let lineFeed = UInt8(ascii: "\n")
     private static let carriageReturn = UInt8(ascii: "\r")
