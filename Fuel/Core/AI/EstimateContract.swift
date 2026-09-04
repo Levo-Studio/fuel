@@ -168,6 +168,17 @@ nonisolated enum EstimateContract {
         have one.
         """
 
+    /// The opening of the bracket `rawWeightConvention` asks a model to end a
+    /// raw-weighed item's name with: `Rice (raw 300 g)`.
+    ///
+    /// **A wire shape, not a piece of interface copy**, which is why it is a
+    /// constant here beside the paragraph that asks for it rather than a key
+    /// in the string catalog. Three things read or write it —
+    /// `rawWeightConvention` teaches it, `FoodTableGrounding` strips it before
+    /// a lookup, and `MealAdjuster` restates it when a quantity moves — and
+    /// they have to agree on the same six characters.
+    static let rawAnnotationOpening = " (raw "
+
     /// The user-turn instruction for typed text, with the user's own words
     /// appended.
     ///
@@ -447,7 +458,12 @@ nonisolated enum EstimateContract {
     /// Brace counting rather than a regular expression, and string-aware so a
     /// `}` inside a meal name — `"title": "Rice }"` — does not end the object
     /// early. Escapes are skipped so a `\"` inside a string does not close it.
-    private static func firstJSONObject(in reply: String) -> String? {
+    ///
+    /// Visible past this file because `MealChatContract` has the same problem
+    /// with the same providers — a model that opens with "Here is the
+    /// adjustment:" has still answered — and a second brace counter would be a
+    /// second place the string handling above could be got wrong.
+    static func firstJSONObject(in reply: String) -> String? {
         var depth = 0
         var start: String.Index?
         var insideString = false
@@ -670,7 +686,11 @@ private nonisolated struct LenientString: Decodable {
 /// which is the question being asked; `isFinite` only rules out NaN and the
 /// infinities. Nothing above this type can defend the trap, because a trap is
 /// not catchable.
-private nonisolated struct LenientInt: Decodable {
+///
+/// Visible past this file because `MealChatContract` reads numbers off the
+/// same providers under the same rules. A second copy of it there would be a
+/// second place the `Int(exactly:)` above could be lost.
+nonisolated struct LenientInt: Decodable {
 
     let value: Int?
 

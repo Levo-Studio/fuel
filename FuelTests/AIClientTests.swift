@@ -1788,3 +1788,296 @@ extension Reply {
         "confidence":"unsure","amount":"estimated"}]}
         """
 }
+
+// MARK: - Adjusting a meal
+
+/// The conversation path, which is the same client, the same transport, the
+/// same key source and the same status mapping asking a different question.
+@Suite("Meal adjustment over the wire")
+struct MealAdjustmentClientTests {
+
+    private static func meal() -> AdjustableMeal {
+        AdjustableMeal(
+            title: "Rice and something",
+            kilocalories: 500,
+            macros: MacroTotals(protein: 20, carbs: 60, fat: 12),
+            items: [
+                RecognisedItem(
+                    name: "Rice",
+                    kilocalories: 232,
+                    grams: 150,
+                    note: .photo(confidence: .confident, approximateGrams: 150)
+                )
+            ]
+        )
+    }
+
+    private static let raisesTheRice = """
+        {"reply":"Raised the rice to 300 g.","changes":[{"item":1,"grams":300}]}
+        """
+
+    // MARK: - No key, no request
+
+    /// **The one that has to hold whatever else does.** A user without a key
+    /// must not be able to cause a request, and the guard is structural: the
+    /// key is read before anything is built, so there is no `URLRequest` for a
+    /// keyless call to have sent.
+    @Test("with no stored key nothing is built and nothing is sent")
+    func keylessSendsNothing() async throws {
+        let store = KeychainStore(service: "apps.levo-studio.Fuel.tests.\(UUID().uuidString)")
+        let transport = RecordingTransport(status: 200, body: Reply.anthropic(Self.raisesTheRice))
+        let client = AnthropicClient(transport: transport, keys: ProviderKeySource(store: store, provider: .claude))
+
+        await #expect(throws: AIError.missingKey) {
+            _ = try await client.adjust(Self.meal(), history: [], message: "a bit more")
+        }
+        #expect(transport.requests.isEmpty)
+    }
+
+    @Test("the same holds for the other provider")
+    func keylessSendsNothingOnMistral() async throws {
+        let store = KeychainStore(service: "apps.levo-studio.Fuel.tests.\(UUID().uuidString)")
+        let transport = RecordingTransport(status: 200, body: Reply.mistral(Self.raisesTheRice))
+        let client = MistralClient(transport: transport, keys: ProviderKeySource(store: store, provider: .mistral))
+
+        await #expect(throws: AIError.missingKey) {
+            _ = try await client.adjust(Self.meal(), history: [], message: "a bit more")
+        }
+        #expect(transport.requests.isEmpty)
+    }
+
+    // MARK: - What goes out
+
+    @Test("the meal and the message go, and the photograph does not")
+    func requestShape() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let transport = RecordingTransport(status: 200, body: Reply.anthropic(Self.raisesTheRice))
+        let client = AnthropicClient(transport: transport, keys: keys.source)
+        _ = try await client.adjust(Self.meal(), history: [], message: "I had a second portion")
+
+        let body = try #require(transport.requests.first?.httpBody)
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(json["system"] as? String == MealChatContract.systemPrompt)
+
+        let messages = try #require(json["messages"] as? [[String: Any]])
+        #expect(messages.count == 1)
+        #expect(messages[0]["role"] as? String == "user")
+        let turn = try #require(messages[0]["content"] as? String)
+        #expect(turn.contains("1. Rice — 150 g"))
+        #expect(turn.hasSuffix("Message: I had a second portion"))
+
+        // No image block anywhere: the photograph has already been read, and
+        // re-sending it would charge image tokens per message.
+        let raw = try #require(String(data: body, encoding: .utf8))
+        #expect(!raw.contains("image"))
+        #expect(!raw.contains("base64"))
+
+        // The key is in its header and in nothing else.
+        let request = try #require(transport.requests.first)
+        #expect(request.value(forHTTPHeaderField: "x-api-key") == "sk-ant-abcdefghijklmnop")
+        #expect(request.url?.absoluteString == "https://api.anthropic.com/v1/messages")
+        #expect(!raw.contains("sk-ant-"))
+    }
+
+    @Test("the turns so far travel as roles, oldest first")
+    func historyTravels() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let transport = RecordingTransport(status: 200, body: Reply.anthropic(Self.raisesTheRice))
+        let client = AnthropicClient(transport: transport, keys: keys.source)
+        _ = try await client.adjust(
+            Self.meal(),
+            history: [
+                MealChatTurn(speaker: .user, text: "it was oily"),
+                MealChatTurn(speaker: .model, text: "How much oil roughly?"),
+            ],
+            message: "a tablespoon"
+        )
+
+        let body = try #require(transport.requests.first?.httpBody)
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let messages = try #require(json["messages"] as? [[String: Any]])
+
+        #expect(messages.count == 3)
+        #expect(messages[0]["role"] as? String == "user")
+        #expect(messages[0]["content"] as? String == "it was oily")
+        #expect(messages[1]["role"] as? String == "assistant")
+        #expect(messages[2]["role"] as? String == "user")
+        // The meal rides with the current question, not with the first one:
+        // a conversation changes the thing it is about.
+        #expect((messages[2]["content"] as? String)?.contains("1. Rice — 150 g") == true)
+    }
+
+    /// Every turn is re-sent on every request, so an uncapped history costs
+    /// the user a bill that grows with the square of what they have typed.
+    @Test("a long conversation sends only its most recent exchanges")
+    func historyIsCapped() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let exchanges = MealChatContract.maximumHistoryExchanges + 4
+        let history = (0..<exchanges).flatMap { index in
+            [
+                MealChatTurn(speaker: .user, text: "message \(index)"),
+                MealChatTurn(speaker: .model, text: "reply \(index)"),
+            ]
+        }
+
+        let transport = RecordingTransport(status: 200, body: Reply.anthropic(Self.raisesTheRice))
+        let client = AnthropicClient(transport: transport, keys: keys.source)
+        _ = try await client.adjust(Self.meal(), history: history, message: "and again")
+
+        let body = try #require(transport.requests.first?.httpBody)
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let messages = try #require(json["messages"] as? [[String: Any]])
+
+        #expect(messages.count == MealChatContract.maximumHistoryExchanges * 2 + 1)
+        // The oldest go, not the newest: what was said last is what the
+        // current message is a follow-up to.
+        #expect(messages[0]["content"] as? String == "message 4")
+        #expect(!(try #require(String(data: body, encoding: .utf8))).contains("message 0"))
+    }
+
+    @Test("Mistral carries the same prompt as a system message")
+    func mistralRequestShape() async throws {
+        let keys = try KeyFixture(provider: .mistral, secret: "0123456789abcdefghij")
+        defer { keys.tearDown(provider: .mistral) }
+
+        let transport = RecordingTransport(status: 200, body: Reply.mistral(Self.raisesTheRice))
+        let client = MistralClient(transport: transport, keys: keys.source)
+        _ = try await client.adjust(Self.meal(), history: [], message: "a bit more")
+
+        let body = try #require(transport.requests.first?.httpBody)
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let messages = try #require(json["messages"] as? [[String: Any]])
+
+        #expect(messages.count == 2)
+        #expect(messages[0]["role"] as? String == "system")
+        #expect(messages[0]["content"] as? String == MealChatContract.systemPrompt)
+        #expect(messages[1]["role"] as? String == "user")
+
+        let request = try #require(transport.requests.first)
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer 0123456789abcdefghij")
+    }
+
+    // MARK: - What comes back
+
+    @Test("the weight comes back priced against the table")
+    func appliesTheChange() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let client = AnthropicClient(
+            transport: RecordingTransport(status: 200, body: Reply.anthropic(Self.raisesTheRice)),
+            keys: keys.source
+        )
+
+        let outcome = try await client.adjust(Self.meal(), history: [], message: "a second, smaller portion")
+
+        #expect(outcome.reply == "Raised the rice to 300 g.")
+        let adjusted = try #require(outcome.meal)
+        #expect(adjusted.items[0].grams == 300)
+
+        let table = try FoodTable.bundled()
+        let row = try #require(FoodTableGrounding.bestMatch(for: "Rice", preferring: .prepared, in: table))
+        #expect(adjusted.items[0].kilocalories == PortionCalculator.portion(of: row.per100g, grams: 300).kilocalories)
+    }
+
+    /// The architecture, end to end through a real client: a model that
+    /// answers with its own nutrition figures moves the weight and nothing
+    /// else, because nothing on this path reads a figure from a reply.
+    @Test("a reply full of figures still only moves the weight")
+    func figuresInTheReplyAreIgnored() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let reply = """
+            {"reply":"Done.","kilocalories":9999,"protein_g":700,"carbs_g":700,\
+            "fat_g":700,"changes":[{"item":1,"grams":300,"kilocalories":9999,\
+            "protein_g":700}]}
+            """
+        let client = AnthropicClient(
+            transport: RecordingTransport(status: 200, body: Reply.anthropic(reply)),
+            keys: keys.source
+        )
+
+        let meal = Self.meal()
+        let adjusted = try #require(try await client.adjust(meal, history: [], message: "more").meal)
+
+        #expect(adjusted.kilocalories != 9999)
+        #expect(adjusted.macros.protein != 700)
+        // The one thing it did say that is read.
+        #expect(adjusted.items[0].grams == 300)
+    }
+
+    @Test("a message the model could not map comes back as no change at all")
+    func unmappableMessage() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let reply = #"{"reply":"Roughly how much oil?","changes":[],"additions":[]}"#
+        let client = AnthropicClient(
+            transport: RecordingTransport(status: 200, body: Reply.anthropic(reply)),
+            keys: keys.source
+        )
+
+        let outcome = try await client.adjust(Self.meal(), history: [], message: "it was quite oily")
+
+        #expect(outcome.reply == "Roughly how much oil?")
+        #expect(outcome.meal == nil)
+        #expect(!outcome.changedTheMeal)
+    }
+
+    // MARK: - Failures
+
+    @Test("a refused key on this path is the same refusal as on any other")
+    func refusedKey() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let client = AnthropicClient(
+            transport: RecordingTransport(status: 401, body: #"{"error":{"type":"authentication_error"}}"#),
+            keys: keys.source
+        )
+
+        await #expect(throws: AIError.invalidKey) {
+            _ = try await client.adjust(Self.meal(), history: [], message: "more")
+        }
+    }
+
+    @Test("prose instead of an object is a parse error and reaches no meal")
+    func proseReply() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let client = AnthropicClient(
+            transport: RecordingTransport(status: 200, body: Reply.anthropic("Sure, I have raised the rice!")),
+            keys: keys.source
+        )
+
+        await #expect(throws: AIError.malformedResponse) {
+            _ = try await client.adjust(Self.meal(), history: [], message: "more")
+        }
+    }
+
+    @Test("an answer cut off at the token ceiling is reported as one")
+    func truncatedReply() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let client = AnthropicClient(
+            transport: RecordingTransport(
+                status: 200,
+                body: Reply.anthropicOutOfTokens(#"{"reply":"Raised the ri"#)
+            ),
+            keys: keys.source
+        )
+
+        await #expect(throws: AIError.truncatedReply) {
+            _ = try await client.adjust(Self.meal(), history: [], message: "more")
+        }
+    }
+}

@@ -254,7 +254,14 @@ nonisolated enum FoodTableGrounding {
     /// citation. A query that fails this simply falls through to the model's
     /// own estimate, which is the safe side of this particular mistake — see
     /// this file's own asymmetry, one paragraph up from here.
-    private static func bestMatch(
+    ///
+    /// **The one place in the app that decides whether a food name resolves to
+    /// a row unattended**, and visible past this file for exactly that reason:
+    /// `MealAdjuster` asks the same question when a quantity moves, and a
+    /// second matcher would be a second coverage rule to keep as strict as
+    /// this one. It is also what makes a re-priced row keep its provenance —
+    /// same name, same table, same preparation, same row.
+    static func bestMatch(
         for name: String,
         preferring preparation: FoodPreparation,
         in table: FoodTable
@@ -289,7 +296,9 @@ nonisolated enum FoodTableGrounding {
     /// proves the marker was read would be exactly what stops the lookup from
     /// finding anything.
     private static func strippingRawAnnotation(_ name: String) -> String {
-        guard let range = name.range(of: " (raw ", options: .caseInsensitive) else {
+        guard
+            let range = name.range(of: EstimateContract.rawAnnotationOpening, options: .caseInsensitive)
+        else {
             return name
         }
         return String(name[..<range.lowerBound])

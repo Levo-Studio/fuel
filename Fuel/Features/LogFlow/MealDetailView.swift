@@ -382,4 +382,14 @@ private struct PreviewEstimator: AIClient {
     func estimate(photo: MealPhoto, context: String?) async throws -> MealEstimate { throw AIError.cancelled }
 
     func estimate(text: String) async throws -> MealEstimate { throw AIError.cancelled }
+
+    /// No conversation either. The canvas has nothing to adjust and no credit
+    /// to spend doing it.
+    func adjust(
+        _ meal: AdjustableMeal,
+        history: [MealChatTurn],
+        message: String
+    ) async throws -> MealAdjustmentOutcome {
+        throw AIError.cancelled
+    }
 }

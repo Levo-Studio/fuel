@@ -23,10 +23,12 @@ nonisolated enum KeyCheckResult: Sendable, Equatable {
 
 /// What a provider client does, independent of which provider it is.
 ///
-/// Three operations, and there is no fourth. The clients hold no conversation,
-/// no session and no history: every call is one request and one answer, which
-/// is what lets the key be read from the Keychain at the moment of the call
-/// and released with the request body.
+/// **The clients hold no session and no history of their own.** Every call is
+/// one request and one answer, which is what lets the key be read from the
+/// Keychain at the moment of the call and released with the request body.
+/// `adjust(_:history:message:)` is a conversation and is not an exception to
+/// that: the turns so far are an argument, handed over by the screen that is
+/// holding them, and nothing about them outlives the call.
 ///
 /// **There is no Levo Studio endpoint behind any of this.** A request goes
 /// from the device to `api.anthropic.com` or `api.mistral.ai` and nowhere
@@ -71,6 +73,54 @@ nonisolated protocol AIClient: Sendable {
 
     /// Estimates a meal from the sentence the user typed.
     func estimate(text: String) async throws -> MealEstimate
+
+    /// Adjusts the amounts of a meal that is already logged, from something
+    /// the user has said about it.
+    ///
+    /// **A different question from the two above, and a different contract.**
+    /// The three of them share this file, the transport, the key source and
+    /// the status mapping; what differs is the shape asked for. See
+    /// `MealChatContract` for what goes over the wire and `MealAdjuster` for
+    /// why nothing numeric in the reply is read.
+    ///
+    /// `history` is the exchange so far, oldest first, and belongs to the
+    /// caller. `message` is the user's own words and is placed last in the
+    /// request, labelled, so it is described rather than obeyed.
+    ///
+    /// The outcome carries the model's sentence and, separately, the meal —
+    /// which is `nil` when nothing it asked for could be made. That is an
+    /// answer rather than a failure, and it is not thrown.
+    func adjust(
+        _ meal: AdjustableMeal,
+        history: [MealChatTurn],
+        message: String
+    ) async throws -> MealAdjustmentOutcome
+}
+
+// MARK: - One turn of a conversation
+
+/// Something that was said about a meal, in the only two shapes there are.
+///
+/// **In memory for as long as a screen is open, and written down nowhere.**
+/// Nothing persists a turn: not the store, not a file, not a log. The durable
+/// result of a conversation is the meal it adjusted, which is already an
+/// entry; the words that got it there are the user's own sentences about what
+/// they ate, and Fuel keeps no more of those than it has to.
+nonisolated struct MealChatTurn: Sendable, Equatable {
+
+    nonisolated enum Speaker: Sendable, Equatable {
+
+        case user
+        case model
+    }
+
+    var speaker: Speaker
+    var text: String
+
+    init(speaker: Speaker, text: String) {
+        self.speaker = speaker
+        self.text = text
+    }
 }
 
 // MARK: - Key access
