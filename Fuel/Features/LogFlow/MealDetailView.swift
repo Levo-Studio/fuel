@@ -149,11 +149,13 @@ struct MealDetailView: View {
         // presented in a cover, so the platform already has the gesture and a
         // hand-built one beside it would be a second recogniser answering the
         // same drag. What it needed was not to be armed but to be let through:
-        // the breakdown below is a scroll view from edge to edge, and it and
-        // the edge pan had no failure requirement between them, so a drag at
-        // the edge became a scroll on a list with nowhere sideways to go.
-        // `FuelInteractivePop` states the requirement the two were missing and
-        // says at length why it is stated the way it is.
+        // the breakdown below is a scroll view from edge to edge, and neither
+        // of the platform's two back gestures — the leading-edge pan, and the
+        // mid-content one iOS 26 added — had a failure requirement with it, so
+        // a horizontal drag became a scroll on a list with nowhere sideways to
+        // go. `FuelInteractivePop` states both requirements the recognisers
+        // were missing and says at length why they are stated the way they are,
+        // including what the second one costs a vertical scroll on this screen.
         //
         // The discard confirmation the gesture would otherwise walk straight
         // through is handled where the pop is caught rather than here:
