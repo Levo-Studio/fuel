@@ -149,48 +149,83 @@ final class DialogPresentation {
 /// all when the repository is under `~/Desktop` — `NSCocoaErrorDomain 257`,
 /// "you don't have permission to view it".
 ///
-/// What the sweep cannot see is a `private` view's body, since a name it cannot
-/// write is a type it cannot ask about. Every screen that presents anything is
-/// public to the module and is on the list below.
+/// **What it reaches is every view the module can name, and no more.** That is
+/// the whole of `Fuel/` that is not `private` — the list below is checked
+/// against `grep -rn "^struct .*: View" Fuel/`, and it is a list rather than
+/// something enumerated because Swift has no registry of its own types. Two
+/// things are therefore outside it and are stated rather than implied: a
+/// `private` view's body, which has no name to ask about, and a modifier
+/// applied inside one. Measured, to be sure the gap is the one described: an
+/// `.alert` put inside `private struct TodayDayPicker` passes this sweep, and
+/// the same `.alert` on any view below fails it.
 @Suite("Dialog · nothing asks in the platform's words")
 @MainActor
 struct FuelDialogSweepTests {
 
-    /// Every screen in the app that owns a body a dialog could be raised from.
-    private static let screens: [(name: String, body: Any.Type)] = [
+    /// Every view in `Fuel/` the module can name.
+    ///
+    /// Generic ones are asked with an argument that has nothing to do with the
+    /// answer: what a body applies to itself does not vary with what it is
+    /// handed.
+    private static let views: [(name: String, body: Any.Type)] = [
         ("RootShell", RootShell.Body.self),
         ("TodayView", TodayView.Body.self),
         ("TodaySummaryView", TodaySummaryView.Body.self),
         ("TodayDayList", TodayDayList.Body.self),
         ("TodayGettingStartedView", TodayGettingStartedView.Body.self),
+        ("TodayHairline", TodayHairline.Body.self),
         ("SettingsScreen", SettingsScreen.Body.self),
+        ("SettingsSection", SettingsSection<EmptyView>.Body.self),
+        ("SettingsRow", SettingsRow<EmptyView>.Body.self),
+        ("SettingsHeader", SettingsHeader.Body.self),
+        ("SettingsHairline", SettingsHairline.Body.self),
+        ("SettingsSegmentedControl", SettingsSegmentedControl<Int>.Body.self),
         ("AIModelSection", AIModelSection.Body.self),
         ("AppearanceSection", AppearanceSection.Body.self),
         ("AccentSection", AccentSection.Body.self),
         ("CountingSection", CountingSection.Body.self),
         ("AutomaticLabelsSection", AutomaticLabelsSection.Body.self),
         ("OnboardingFlow", OnboardingFlow.Body.self),
+        ("OnboardingScreen", OnboardingScreen<EmptyView, EmptyView>.Body.self),
+        ("OnboardingButton", OnboardingButton.Body.self),
+        ("OnboardingEyebrow", OnboardingEyebrow.Body.self),
+        ("OnboardingFootnote", OnboardingFootnote.Body.self),
+        ("OnboardingHairline", OnboardingHairline.Body.self),
+        ("OnboardingSelectionDot", OnboardingSelectionDot.Body.self),
         ("APIKeyScreen", APIKeyScreen.Body.self),
         ("KeyTestScreen", KeyTestScreen.Body.self),
+        ("KeyTestStepMarker", KeyTestStepMarker.Body.self),
         ("GoalScreen", GoalScreen.Body.self),
         ("LogFlowView", LogFlowView.Body.self),
+        ("LogFlowScaffold", LogFlowScaffold<EmptyView, EmptyView>.Body.self),
         ("CameraTabView", CameraTabView.Body.self),
+        ("CameraGalleryButton", CameraGalleryButton.Body.self),
         ("TextTabView", TextTabView.Body.self),
+        ("MealTextField", MealTextField.Body.self),
         ("RecentMealsView", RecentMealsView.Body.self),
         ("AnalysisView", AnalysisView.Body.self),
         ("AnalysisFailureView", AnalysisFailureView.Body.self),
         ("MealDetailView", MealDetailView.Body.self),
         ("MealChatSheet", MealChatSheet.Body.self),
         ("MealResultView", MealResultView<MealPhotoLede>.Body.self),
+        ("MealResultPrimaryButton", MealResultPrimaryButton.Body.self),
+        ("MealAccuracyLabel", MealAccuracyLabel.Body.self),
+        ("MealPhotoLede", MealPhotoLede.Body.self),
+        ("MealQuoteLede", MealQuoteLede.Body.self),
+        ("MealTitleLede", MealTitleLede.Body.self),
         ("PhotoResultView", PhotoResultView.Body.self),
+        ("PhotoHatch", PhotoHatch.Body.self),
         ("TextResultView", TextResultView.Body.self),
+        ("FuelDialog", FuelDialog.Body.self),
+        ("FuelListFade", FuelListFade.Body.self),
+        ("FuelListTopFade", FuelListTopFade.Body.self),
     ]
 
-    @Test("no screen in Fuel raises a system dialog")
+    @Test("no view in Fuel raises a system dialog")
     func noSystemDialogs() {
         let platformsOwn = ["AlertModifier", "ConfirmationDialogModifier"]
-        let asking = Self.screens.filter { screen in
-            let structure = String(describing: screen.body)
+        let asking = Self.views.filter { view in
+            let structure = String(describing: view.body)
             return platformsOwn.contains { structure.contains($0) }
         }
 
@@ -205,7 +240,7 @@ struct FuelDialogSweepTests {
         ("RootShell", 1),
     ])
     func questionsAreFuelsOwn(_ screen: String, _ expected: Int) throws {
-        let body = try #require(Self.screens.first { $0.name == screen }?.body)
+        let body = try #require(Self.views.first { $0.name == screen }?.body)
         let structure = String(describing: body)
         let raised = structure.components(separatedBy: "FuelDialogModifier").count - 1
 
