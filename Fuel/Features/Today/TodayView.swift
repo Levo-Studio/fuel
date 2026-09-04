@@ -286,6 +286,13 @@ private struct TodayHeader: View {
                         .fuelStyle(FuelTypography.meta)
                         .foregroundStyle(palette.muted)
 
+                    // One line, because the alternative is worse in the one way
+                    // this feature was told not to be. The drawn word is
+                    // `Heute`, and the longest thing that now stands in its
+                    // place is a weekday at the largest accessibility size; if
+                    // that wrapped, the header would grow and push the totals
+                    // and the whole day list down. A title that truncates is a
+                    // title the eyebrow above it has already spelled out.
                     Text(TodayCopy.dayTitle(navigation.title))
                         .fuelStyle(FuelTypography.screenTitle)
                         .foregroundStyle(palette.ink)

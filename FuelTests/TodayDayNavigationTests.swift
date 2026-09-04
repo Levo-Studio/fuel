@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import UIKit
 
 @testable import Fuel
 
@@ -175,5 +176,44 @@ struct TodayDayTitleTests {
             TodayFormat.weekday(day, timeZone: .gmt)
                 != TodayFormat.weekday(day, locale: Locale(identifier: "de_DE"), timeZone: .gmt)
         )
+    }
+}
+
+// MARK: - The header the arrows sit in
+
+/// The condition on this feature was that the drawn header does not move for
+/// the navigation added to it. Two of the three claims that rest on are
+/// arithmetic and are held here; the third — that the eyebrow and the title
+/// keep the leading edge and the gear the trailing one — is layout and is held
+/// by reading the view.
+@Suite("Today · the header the arrows sit in")
+struct TodayHeaderGeometryTests {
+
+    /// The three header controls are 34pt circles with 44pt regions around
+    /// them. At a `Space.s10` gap their centres are 44 apart, so the regions
+    /// abut exactly: none of them steals a touch from its neighbour, and none
+    /// of them leaves a dead strip between.
+    @Test("the three header controls' touch regions abut without overlapping")
+    func headerControlsTileTheirTouchRegions() {
+        let pitch = FuelMetrics.Control.circleButton + FuelMetrics.Space.s10
+
+        #expect(pitch == FuelMetrics.Control.minimumHitTarget)
+    }
+
+    /// The date and the title are the third way into the browse, so the block
+    /// has to answer a finger. It carries `minimumHitTarget` as a floor, and
+    /// this is what makes that a floor rather than something that grows the
+    /// drawn header: the two drawn lines are already taller than a fingertip on
+    /// their own, so the frame is never the thing deciding the height.
+    ///
+    /// Line heights rather than a rendered measurement, because that is what
+    /// SwiftUI stacks: neither style sets a `lineHeightMultiple`, so each line
+    /// occupies its font's own.
+    @Test("the drawn date and title are past a fingertip without a frame saying so")
+    func titleBlockClearsTheMinimumOnItsOwn() {
+        let drawnHeight = FuelTypography.meta.uiFont.lineHeight
+            + FuelTypography.screenTitle.uiFont.lineHeight
+
+        #expect(drawnHeight > FuelMetrics.Control.minimumHitTarget)
     }
 }
