@@ -73,17 +73,8 @@ struct ServerSentEventTests {
     /// whole is the failure the rest of this layer refuses everywhere else.
     @Test("a payload whose blank line never arrived is not dispatched")
     func undispatched() {
-        var decoder = ServerSentEventDecoder()
-        #expect(decoder.decode(#"data: {"partial":"#) == nil)
-        #expect(decoder.hasUndispatchedEvent)
-    }
-
-    @Test("a stream that ended cleanly has nothing left over")
-    func nothingLeftOver() {
-        var decoder = ServerSentEventDecoder()
-        _ = decoder.decode("data: done")
-        _ = decoder.decode("")
-        #expect(!decoder.hasUndispatchedEvent)
+        #expect(events(from: [#"data: {"partial":"#]).isEmpty)
+        #expect(events(from: [#"data: {"whole":1}"#, "", #"data: {"partial":"#]) == [#"{"whole":1}"#])
     }
 }
 

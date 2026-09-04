@@ -31,6 +31,10 @@ nonisolated struct ServerSentEventDecoder {
     ///
     /// An event with no `data` field — a bare `event: ping`, a comment —
     /// dispatches nothing, so a keep-alive costs the caller no iteration.
+    /// An event whose blank line never arrives is never returned, which is the
+    /// spec's own rule and the right one here: a payload missing its last line
+    /// is half a JSON object, and half an object read as whole is the failure
+    /// the parser refuses everywhere else.
     mutating func decode(_ line: String) -> String? {
         // A line starting with a colon is a comment. Both providers use one as
         // a keep-alive, and the spec says to ignore it.
@@ -68,15 +72,5 @@ nonisolated struct ServerSentEventDecoder {
         }
         pending.append(String(value))
         return nil
-    }
-
-    /// Whether the stream ended in the middle of an event.
-    ///
-    /// The spec discards an undispatched event at the end of a stream, and so
-    /// does Fuel: a payload whose blank line never arrived is a payload whose
-    /// last line may also be missing, and half a JSON object read as if it were
-    /// whole is exactly the failure the parser refuses everywhere else.
-    var hasUndispatchedEvent: Bool {
-        !pending.isEmpty
     }
 }
