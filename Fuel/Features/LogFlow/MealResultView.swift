@@ -218,7 +218,10 @@ struct MealResultView<Lede: View>: View {
                 title: MealResultCopy.itemEditTitle,
                 hint: MealResultCopy.itemEditMessage,
                 confirm: MealResultCopy.itemEditConfirm,
-                cancel: MealResultCopy.itemEditCancel
+                cancel: MealResultCopy.itemEditCancel,
+                // The only question this app asks that destroys nothing: what
+                // it does with an answer is write a line down.
+                destroys: false
             ),
             isPresented: $isEditingItem,
             entry: FuelDialogEntry(

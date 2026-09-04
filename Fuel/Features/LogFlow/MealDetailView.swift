@@ -119,14 +119,16 @@ struct MealDetailView: View {
         //
         // **Harder to answer by accident than the sheet it replaces, not
         // easier.** The way out is the leading pill, under the corner the trash
-        // mark it was raised from occupies, and every dismissal that is not the
-        // trailing pill — the swipe, the tap outside — keeps the meal. Nothing
-        // deletes a meal but a deliberate press on the far side of the row.
+        // mark it was raised from occupies, and it is also the wide one; the
+        // destructive verb hugs its own label at the far end of the row. Every
+        // dismissal that is not that one small pill — the swipe, the tap
+        // outside, the app going to the background — keeps the entry.
         .fuelDialog(
             FuelDialogCopy(
                 title: MealDetailCopy.deleteTitle,
                 confirm: MealDetailCopy.deleteConfirm,
-                cancel: MealDetailCopy.deleteCancel
+                cancel: MealDetailCopy.deleteCancel,
+                destroys: true
             ),
             isPresented: $isConfirmingDelete,
             onConfirm: delete

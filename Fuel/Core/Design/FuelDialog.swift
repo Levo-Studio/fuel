@@ -5,10 +5,10 @@ import SwiftUI
 /// The words on a dialog: the question, the line under it where there is one,
 /// and the two answers.
 ///
-/// A value rather than four parameters, because the same three or four strings
-/// travel together to more than one caller and one of them — the discard
-/// question — is deliberately shared word for word between two screens. A type
-/// keeps that one value one value.
+/// A value rather than four parameters, because the same strings travel
+/// together to more than one caller and one of them — the discard question — is
+/// deliberately shared word for word between two screens. A type keeps that one
+/// value one value.
 nonisolated struct FuelDialogCopy {
 
     /// The question itself.
@@ -26,11 +26,21 @@ nonisolated struct FuelDialogCopy {
     /// The way out, which changes nothing.
     let cancel: String
 
-    init(title: String, hint: String? = nil, confirm: String, cancel: String) {
+    /// Whether the answer that goes ahead destroys something.
+    ///
+    /// It decides which of the two answers the dialog puts its weight behind —
+    /// see `FuelDialog.answers` — so it is stated by the caller rather than
+    /// guessed from the verb. Three of the four questions this app asks destroy
+    /// something and the fourth writes a line of text down, and no reading of
+    /// the words would tell them apart.
+    let destroys: Bool
+
+    init(title: String, hint: String? = nil, confirm: String, cancel: String, destroys: Bool) {
         self.title = title
         self.hint = hint
         self.confirm = confirm
         self.cancel = cancel
+        self.destroys = destroys
     }
 }
 
@@ -61,10 +71,11 @@ struct FuelDialogEntry {
 /// Fuel's own question, drawn in Fuel's own language.
 ///
 /// **The export draws no dialog** — no modal, no card over content, no scrim,
-/// no destructive colour. Anything here is therefore undrawn, and the whole of
-/// this view is a recomposition of things the export does draw, on the
-/// owner's instruction that a question the app asks should look like the app
-/// asking it rather than like iOS asking on its behalf.
+/// and no destructive control of any kind on any of the seventeen screens.
+/// Anything here is therefore undrawn, and the whole of this view is a
+/// recomposition of things the export does draw, on the owner's instruction
+/// that a question the app asks should look like the app asking it rather than
+/// like iOS asking on its behalf.
 ///
 /// **The presentation is the platform's own, and that is the point of using a
 /// sheet rather than inventing a panel.** A `.sheet` is the one surface this
@@ -84,27 +95,20 @@ struct FuelDialogEntry {
 ///   them.
 /// - The gap from the question to whatever answers it is screen 12's `s24`,
 ///   which is the distance that screen puts between its prompt and its field.
-/// - The two answers are the footer pair screens 14 and 15 draw: an outlined
-///   pill that hugs its label on the leading side, an accent-filled pill that
-///   takes the rest on the trailing side, `s10` between them.
+/// - The two answers are the footer pair screens 14 and 15 draw: a pill that
+///   hugs its label, an accent-filled pill that takes the rest, `s10` between
+///   them. Which of the two carries which answer is `answers`' subject.
 /// - The field is screen 12's own — `textEntry`, the type that screen sets a
 ///   written sentence in — over the hairline rule the onboarding key field
 ///   draws under itself, which is the export's only chrome on a field on a
 ///   themed surface.
 ///
 /// **Every way out of this sheet except the confirm button is the safe
-/// answer.** The swipe down, the tap outside, and the leading pill all cancel;
-/// only the trailing pill goes ahead. That is what lets the platform's own
-/// dismissal be left switched on for a question about deleting a meal — a
-/// gesture made by accident, an app sent to the background, a device rotated,
-/// all end with the meal still there.
-///
-/// **The destructive verb sits in the trailing pill, which is the corner no
-/// control that raises this dialog occupies.** Both controls that can reach a
-/// destructive question — the trash circle on a logged meal and the trash pill
-/// on a scan result — are drawn in the *leading* corner of a footer, so a
-/// second tap that arrives before the sheet is up lands on the answer that
-/// changes nothing.
+/// answer.** The swipe down, the tap outside, and the way out itself all
+/// cancel. That is what lets the platform's own dismissal be left switched on
+/// for a question about deleting an entry — a gesture made by accident, an app
+/// sent to the background, a device rotated, all end with the entry still
+/// there.
 struct FuelDialog: View {
 
     let copy: FuelDialogCopy
@@ -214,18 +218,63 @@ struct FuelDialog: View {
     // MARK: - The answers
 
     /// The footer pair screens 14 and 15 draw, with this dialog's two words in
-    /// it: the outlined pill hugging on the leading side, the accent-filled one
-    /// taking the rest.
+    /// it: one pill hugging its label, one accent-filled pill taking the rest,
+    /// `s10` between them.
     ///
-    /// **One deviation from that pair, and it is the label size on the way
-    /// out.** The export sets its hugging secondary at `600 14px` and this sets
-    /// it at `buttonLabel`, the `600 15px` it draws on every other labelled
-    /// button — including the one full-width secondary it draws, screen 02's
-    /// `Cancel`. The 14 belongs to `chipLabel`, which is pinned against Dynamic
-    /// Type: right for the `New` chip and for a trash mark, wrong for a word a
-    /// user has to read before deciding something irreversible. Everything else
-    /// about the pair is the drawn one — the `s17`/`s20` padding, the hairline,
-    /// the `Radius.pill`, the `s10` between them.
+    /// **Which answer gets the fill is decided by what the other one does.**
+    /// The app puts its weight behind the answer it would rather the user
+    /// took: on a question that only writes something down that is the answer
+    /// that goes ahead, and on a question that destroys something it is the way
+    /// out. So the filled pill carries `Done` on the item field and `Keep` in
+    /// front of a delete, and the hugging pill carries the other one. It is the
+    /// owner's ruling, and it is the platform's own convention on the dialog
+    /// this replaced — iOS draws the destructive verb apart and leaves the
+    /// default weight on the safe answer — so a user's muscle memory is not
+    /// being retrained by this app alone.
+    ///
+    /// **The way out keeps the leading side either way**, which is what makes
+    /// the arrangement safer rather than only different. Both controls that can
+    /// raise a destructive question — the trash circle on a logged meal, the
+    /// trash pill on a scan result — are drawn in the *leading* corner of a
+    /// footer, so a second tap that arrives before the sheet is up lands on the
+    /// answer that changes nothing; and the largest, easiest control on the
+    /// sheet is now that same answer, so a careless deliberate tap fails safe
+    /// too. The pair is therefore mirrored against the export's own footer,
+    /// which draws the hug leading and the fill trailing.
+    ///
+    /// **The destructive verb is drawn in `palette.error`, and only its ink
+    /// is.** The export draws no destructive control anywhere and no red — the
+    /// only chromatic marks in the seventeen screens are the four accent
+    /// swatches in Settings — so the colour cannot come from the screens. It
+    /// comes from the notes, which specify a sixth value that is explicitly not
+    /// an accent: `oklch(0.62 0.17 25)`, `design/Fuel Design Notes.md` lines 82
+    /// to 84. Three things follow from how that value is specified and used,
+    /// and together they decide the whole treatment:
+    ///
+    /// - It carries **no on-colour**, unlike every accent, so it cannot fill
+    ///   anything: there is no stated ink for a label sitting on it, and
+    ///   inventing one is the gap the design rules forbid filling with taste.
+    /// - Everywhere it is already drawn it is **ink** — the failed-key note in
+    ///   Settings and the failed-estimate title on the analysis surface — so
+    ///   ink is the use the design system actually establishes for it.
+    /// - The notes say the accent drives filled buttons, and a filled pill in
+    ///   the accent is what `Add` and `Continue` are. A destructive verb drawn
+    ///   that way would be the same button as those, in the user's own accent.
+    ///
+    /// So the destructive answer is the drawn outlined pill with one thing
+    /// changed: its label's ink. Its hairline stays `hair` and its shape,
+    /// padding and type stay the pill's — recolouring the border would be a
+    /// second decision the export does not support.
+    ///
+    /// **One deviation from the drawn pair beyond that, and it is the label
+    /// size on the hugging pill.** The export sets it at `600 14px` and this
+    /// sets it at `buttonLabel`, the `600 15px` it draws on every other
+    /// labelled button — including the one full-width secondary it draws,
+    /// screen 02's `Cancel`. The 14 belongs to `chipLabel`, which is pinned
+    /// against Dynamic Type: right for the `New` chip and for a trash mark,
+    /// wrong for a word a user has to read before deciding something
+    /// irreversible. Everything else is the drawn one — the `s17`/`s20`
+    /// padding, the hairline, the `Radius.pill`, the `s10` between them.
     ///
     /// Drawn here rather than reached for: the two pills this recomposes live
     /// in feature files — `MealResultPrimaryButton` in the log flow and
@@ -233,32 +282,47 @@ struct FuelDialog: View {
     /// upwards into a feature for a shape.
     private var answers: some View {
         HStack(alignment: .center, spacing: FuelMetrics.Space.s10) {
-            Button(action: onCancel) {
-                Text(copy.cancel)
-                    .fuelStyle(FuelTypography.buttonLabel)
-                    .foregroundStyle(palette.ink)
-                    .padding(.vertical, FuelMetrics.Space.s17)
-                    .padding(.horizontal, FuelMetrics.Space.s20)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: FuelMetrics.Radius.pill)
-                            .strokeBorder(palette.hair, lineWidth: FuelMetrics.Line.hairline)
-                    }
-                    .contentShape(.rect(cornerRadius: FuelMetrics.Radius.pill))
+            if copy.destroys {
+                filled(copy.cancel, perform: onCancel)
+                hugging(copy.confirm, ink: palette.error, perform: onConfirm)
+            } else {
+                hugging(copy.cancel, ink: palette.ink, perform: onCancel)
+                filled(copy.confirm, perform: onConfirm)
             }
-            .buttonStyle(FuelPressButtonStyle())
-
-            Button(action: onConfirm) {
-                Text(copy.confirm)
-                    .fuelStyle(FuelTypography.buttonLabel)
-                    .foregroundStyle(palette.onAccent)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, FuelMetrics.Space.s17)
-                    .background(palette.accentColor, in: .rect(cornerRadius: FuelMetrics.Radius.pill))
-                    .contentShape(.rect(cornerRadius: FuelMetrics.Radius.pill))
-            }
-            .buttonStyle(FuelPressButtonStyle())
         }
     }
+
+    /// The accent-filled pill, which takes whatever width the other one leaves.
+    private func filled(_ title: String, perform: @escaping () -> Void) -> some View {
+        Button(action: perform) {
+            Text(title)
+                .fuelStyle(FuelTypography.buttonLabel)
+                .foregroundStyle(palette.onAccent)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, FuelMetrics.Space.s17)
+                .background(palette.accentColor, in: .rect(cornerRadius: FuelMetrics.Radius.pill))
+                .contentShape(.rect(cornerRadius: FuelMetrics.Radius.pill))
+        }
+        .buttonStyle(FuelPressButtonStyle())
+    }
+
+    /// The outlined pill, which hugs its label.
+    private func hugging(_ title: String, ink: Color, perform: @escaping () -> Void) -> some View {
+        Button(action: perform) {
+            Text(title)
+                .fuelStyle(FuelTypography.buttonLabel)
+                .foregroundStyle(ink)
+                .padding(.vertical, FuelMetrics.Space.s17)
+                .padding(.horizontal, FuelMetrics.Space.s20)
+                .overlay {
+                    RoundedRectangle(cornerRadius: FuelMetrics.Radius.pill)
+                        .strokeBorder(palette.hair, lineWidth: FuelMetrics.Line.hairline)
+                }
+                .contentShape(.rect(cornerRadius: FuelMetrics.Radius.pill))
+        }
+        .buttonStyle(FuelPressButtonStyle())
+    }
+
 }
 
 // MARK: - Raising one

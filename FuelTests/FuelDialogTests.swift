@@ -13,11 +13,11 @@ import UIKit
 /// accessibility elements while no assistive technology is attached — measured,
 /// `accessibilityElementCount()` is zero on every view of a hosted screen — and
 /// there is no public way to hand it a touch. So what these suites prove about
-/// a button is where it is drawn and how big it is, and what they prove about
-/// an answer is proved by running the answer. The field is the exception, and
-/// it is a real one: a `TextField` is backed by a `UITextView` that is in the
-/// hierarchy and takes text through `UITextInput`, so what the user types can
-/// actually be typed.
+/// a button is what it draws and where, and what they prove about an answer is
+/// proved by running the answer. The field is the exception, and it is a real
+/// one: a `TextField` is backed by a `UITextView` that is in the hierarchy and
+/// takes text through `UITextInput`, so what the user types can actually be
+/// typed.
 @MainActor
 extension HostedScreen {
 
@@ -41,6 +41,91 @@ extension HostedScreen {
     }
 }
 
+// MARK: - Words on the screen
+
+/// Where a drawing has something on it, read as bands and runs rather than as
+/// one box.
+///
+/// **This is what it takes to assert that a word reached the screen.** A colour
+/// box says a pill was filled; it says nothing about what is written on it, and
+/// three separate mutations of `FuelDialog` — dropping the title, dropping the
+/// line under it, and putting the wrong one of the two words on the filled pill
+/// so it reads `Keep` and deletes — passed every test in this file while it was
+/// only reading boxes. Text cannot be read back from pixels, but its extent
+/// can: a longer word is a wider run, and a second paragraph is a second band.
+/// Both change when the wrong string is drawn, and neither changes when the
+/// right one is.
+@MainActor
+extension DrawnPixels {
+
+    /// The bands of rows in `region` that have anything drawn on them, top
+    /// first. A line of text is one band; a title over a hint is two.
+    func bands(over ground: Channels, in region: CGRect) -> [Range<Int>] {
+        var found: [Range<Int>] = []
+        var start: Int?
+        for y in Int(region.minY)..<Int(region.maxY) {
+            let inked = peakDeviation(fromColour: ground, y: y, x: Int(region.minX)..<Int(region.maxX)) > Self.tolerance
+            switch (inked, start) {
+            case (true, nil):
+                start = y
+            case (false, .some(let from)):
+                found.append(from..<y)
+                start = nil
+            default:
+                break
+            }
+        }
+        if let start { found.append(start..<Int(region.maxY)) }
+        return found
+    }
+
+    /// The tightest column range in `region` with anything drawn in it, or
+    /// nothing where the region is empty.
+    func inked(over ground: Channels, in region: CGRect) -> Range<Int>? {
+        var first: Int?
+        var last: Int?
+        for x in Int(region.minX)..<Int(region.maxX) {
+            let inked = (Int(region.minY)..<Int(region.maxY)).contains { y in
+                deviation(fromColour: ground, x: x, y: y) > Self.tolerance
+            }
+            guard inked else { continue }
+            first = first ?? x
+            last = x
+        }
+        guard let first, let last else { return nil }
+        return first..<(last + 1)
+    }
+
+    /// The longest run of columns painted solidly in `colour` on one row.
+    ///
+    /// A fill and a label are the same colour on the mono accent, where the
+    /// accent *is* the ink — so nothing that only asks "is this colour on the
+    /// screen" can tell the filled pill from the words above it. A solid run
+    /// can: a pill is painted across its whole width and a letter is not.
+    func solidRun(ofColour colour: Channels, y: Int, x range: Range<Int>) -> Int {
+        var longest = 0
+        var run = 0
+        for x in range {
+            if deviation(fromColour: colour, x: x, y: y) <= Self.tolerance {
+                run += 1
+                longest = max(longest, run)
+            } else {
+                run = 0
+            }
+        }
+        return longest
+    }
+}
+
+/// Whether a question is up, held outside the screen that raises it so a test
+/// can raise it the way a tap does — after the screen underneath has been laid
+/// out — rather than at the same instant the screen is built.
+@MainActor
+@Observable
+final class DialogPresentation {
+    var isUp = false
+}
+
 // MARK: - Nothing asks in the platform's words
 
 /// The one dialog rule, swept over the app: no screen in Fuel raises a question
@@ -49,9 +134,7 @@ extension HostedScreen {
 /// **A sweep rather than four tests, for the reason `FuelMetrics.allDrawnValues`
 /// is a roster.** Pinning the four call sites that were replaced proves nothing
 /// about the fifth; what is being kept out is a whole mechanism, and the only
-/// way to keep one out is to look everywhere every time. It is also the one
-/// check here that would have gone red before this change and green after it,
-/// on all four call sites at once.
+/// way to keep one out is to look everywhere every time.
 ///
 /// **A view's own structure, not its source.** `some View` resolves to a
 /// concrete type that names every modifier applied inside the body, so a screen
@@ -132,101 +215,321 @@ struct FuelDialogSweepTests {
 
 // MARK: - What a dialog draws
 
-/// The dialog Fuel asks its questions on: what it puts on the screen and where
-/// it stands.
+/// The dialog Fuel asks its questions on: the words it puts on the screen and
+/// where it stands.
 ///
 /// **Rendered rather than asserted, for the reason `MealResultFooterTests`
-/// gives.** That `FuelDialogCopy` holds the three strings it was handed is not
-/// a claim worth a test. That a question drawn by this app carries an
-/// accent-filled answer at the export's own inset, an outlined one hugging its
-/// label beside it, and both past a fingertip, is — and none of it is visible
-/// in a constant.
+/// gives.** That `FuelDialogCopy` holds the strings it was handed is not a
+/// claim worth a test. That the question is drawn, that the line under it is
+/// drawn only when there is one, that the answer that destroys something is
+/// drawn apart from the one that does not, and that each word is on the pill it
+/// belongs to — none of that is visible in a constant, and all of it is what
+/// this branch claims.
 @Suite("Dialog · what it draws", .serialized)
 @MainActor
 struct FuelDialogDrawingTests {
 
     private static let palette = FuelPalette(theme: .light, accent: .blue)
 
-    private static let copy = FuelDialogCopy(
-        title: "Delete this meal?",
-        confirm: "Delete",
-        cancel: "Keep"
-    )
-
-    private func accentBox(_ copy: FuelDialogCopy, palette: FuelPalette = palette) throws -> DrawnPixels.Box {
-        let screen = try HostedScreen(dialog(copy), palette: palette)
-        let drawing = try #require(screen.drawing)
-        return try #require(drawing.box(ofColour: DrawnPixels.Channels(palette.accentColor)))
+    /// The delete question's own shape: one sentence, a destructive verb, and
+    /// a way out.
+    private static func question(
+        title: String = "Do you really want to delete this entry?",
+        hint: String? = nil,
+        confirm: String = "Delete",
+        cancel: String = "Keep",
+        destroys: Bool = true
+    ) -> FuelDialogCopy {
+        FuelDialogCopy(title: title, hint: hint, confirm: confirm, cancel: cancel, destroys: destroys)
     }
 
-    // MARK: - The answers
+    // MARK: - Hosting
 
-    /// The filled pill is the footer primary screens 14 and 15 draw: it takes
-    /// the width that is left and stops at the drawn `28`.
-    @Test("the answer that goes ahead is the accent pill, at the drawn inset")
-    func confirmIsTheAccentPill() throws {
-        expect(try accentBox(Self.copy).right, isTheDrawn: FuelMetrics.Screen.horizontalPadding)
-    }
-
-    /// `s17` above and below `buttonLabel`, which is what the export draws on
-    /// both pills of that footer, is already past a fingertip — but the pill is
-    /// what a destructive answer is pressed on, so the floor is measured rather
-    /// than reasoned about.
-    @Test("the answer that goes ahead answers a finger")
-    func answersAnswerAFinger() throws {
-        let box = try accentBox(Self.copy)
-        let height = 874 - box.bottom - box.top
-
-        #expect(CGFloat(height) >= FuelMetrics.Control.minimumHitTarget, "the filled answer is \(height) tall")
-    }
-
-    /// The way out hugs its label on the leading side and the answer that goes
-    /// ahead takes the rest, which is the only two-button row the export draws.
-    ///
-    /// Measured by giving the way out a longer word: an outlined pill that hugs
-    /// its label pushes the filled one further along, and one that does not
-    /// leaves it where it was.
-    @Test("the way out hugs its label, and the answer beside it takes the rest")
-    func theWayOutHugsItsLabel() throws {
-        let short = try accentBox(Self.copy)
-        let long = try accentBox(
-            FuelDialogCopy(title: Self.copy.title, confirm: Self.copy.confirm, cancel: "Keep this meal")
+    private func hosted(_ copy: FuelDialogCopy, palette: FuelPalette = palette) throws -> Drawn {
+        let screen = try HostedScreen(
+            FuelDialog(copy: copy, entry: nil, onConfirm: {}, onCancel: {})
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                // The ground under the whole window, safe areas included, and
+                // the dialog standing on the window's own bottom edge. Both
+                // matter to a scan: what these call ink is anything that is not
+                // the ground, so the hosting controller's own white showing
+                // through at the top would read as a line of text, and a
+                // dialog held off the bottom by the home indicator's strip puts
+                // its answers where the scans below do not look for them.
+                .background(palette.background)
+                .ignoresSafeArea(),
+            palette: palette
         )
-
-        #expect(CGFloat(short.left) > FuelMetrics.Screen.horizontalPadding, "nothing stands beside the filled answer")
-        #expect(long.left > short.left, "the filled answer did not move for a longer word: \(long.left) against \(short.left)")
+        let drawing = try #require(screen.drawing)
+        return Drawn(pixels: drawing, palette: palette, size: screen.window.bounds.size)
     }
 
-    /// Every accent and both themes, because the filled answer is the one thing
-    /// on a dialog that follows the user's choice.
-    @Test("the filled answer follows every accent", arguments: FuelAccent.allCases)
-    func everyAccent(_ accent: FuelAccent) throws {
-        for theme in FuelTheme.allCases {
-            let palette = FuelPalette(theme: theme, accent: accent)
-            #expect(throws: Never.self) { try accentBox(Self.copy, palette: palette) }
+    /// One rendered dialog, with the regions its parts stand in.
+    private struct Drawn {
+
+        let pixels: DrawnPixels
+
+        let palette: FuelPalette
+
+        let size: CGSize
+
+        var ground: DrawnPixels.Channels { DrawnPixels.Channels(palette.background) }
+
+        /// The band the answer row stands in.
+        ///
+        /// **The lowest band with anything drawn on it**, rather than a region
+        /// measured down from the bottom of the screen. The answers are the last
+        /// thing on the dialog, so the lowest band is always them — while a
+        /// region guessed at a hundred points tall reached the question's own
+        /// descenders on a short dialog, and then reported the answer row as
+        /// starting at the bottom of the title.
+        func answerRow() throws -> CGRect {
+            let whole = CGRect(origin: .zero, size: size)
+            let band = try #require(pixels.bands(over: ground, in: whole).last)
+            return CGRect(
+                x: 0,
+                y: CGFloat(band.lowerBound),
+                width: size.width,
+                height: CGFloat(band.count)
+            )
+        }
+
+        /// The filled pill, which is the one thing on that row painted in a
+        /// colour of its own.
+        ///
+        /// Searched inside the row rather than the screen: on the mono accent
+        /// the fill *is* the ink, and a scan of the whole drawing would find the
+        /// question's own letters as well.
+        func answers() throws -> DrawnPixels.Box {
+            try #require(
+                pixels.box(ofColour: DrawnPixels.Channels(palette.accentColor), in: try answerRow())
+            )
+        }
+
+        /// Everything above the answer row, which is the question and the line
+        /// under it where there is one.
+        func aboveTheAnswers() throws -> CGRect {
+            CGRect(x: 0, y: 0, width: size.width, height: try answerRow().minY)
         }
     }
 
-    /// The largest text size the platform offers without the accessibility
-    /// sizes, which is where a fixed-height panel would fail first.
-    @Test("the answers stay whole at the largest text size")
-    func largestTextSize() throws {
-        let screen = try HostedScreen(
-            dialog(Self.copy).environment(\.dynamicTypeSize, .accessibility3),
-            palette: Self.palette
-        )
-        let drawing = try #require(screen.drawing)
-        let box = try #require(drawing.box(ofColour: DrawnPixels.Channels(Self.palette.accentColor)))
+    // MARK: - The words
 
-        expect(box.right, isTheDrawn: FuelMetrics.Screen.horizontalPadding)
-        #expect(box.top > 0, "the filled answer is drawn off the top of the screen")
+    /// The question is drawn, at the inset every body of a screen sits in, and
+    /// what is drawn is the question rather than something the same size.
+    @Test("the question is on the screen, and it is the question that was asked")
+    func theQuestionIsDrawn() throws {
+        let short = try hosted(Self.question(title: "Delete?"))
+        let long = try hosted(Self.question(title: "Delete this?"))
+
+        let shortBands = short.pixels.bands(over: short.ground, in: try short.aboveTheAnswers())
+        #expect(shortBands.count == 1, "the question drew \(shortBands.count) lines")
+
+        let shortInk = try #require(short.pixels.inked(over: short.ground, in: try short.aboveTheAnswers()))
+        let longInk = try #require(long.pixels.inked(over: long.ground, in: try long.aboveTheAnswers()))
+
+        expect(shortInk.lowerBound, isTheDrawn: FuelMetrics.Screen.horizontalPadding)
+        #expect(
+            longInk.count > shortInk.count,
+            "a longer question drew \(longInk.count) points against \(shortInk.count)"
+        )
     }
 
-    // MARK: - Fixtures
+    /// The line under the question is drawn where there is one and nothing
+    /// stands there where there is not — which is the difference between the
+    /// delete question, one sentence by the owner's ruling, and the item field,
+    /// which says how to fill itself in.
+    @Test("the line under the question is drawn only when the question has one")
+    func theLineUnderTheQuestion() throws {
+        let alone = try hosted(Self.question())
+        let withLine = try hosted(Self.question(hint: "Write the item as you would say it."))
 
-    private func dialog(_ copy: FuelDialogCopy, entry: FuelDialogEntry? = nil) -> some View {
-        FuelDialog(copy: copy, entry: entry, onConfirm: {}, onCancel: {})
-            .frame(maxHeight: .infinity, alignment: .bottom)
+        let aloneBands = alone.pixels.bands(over: alone.ground, in: try alone.aboveTheAnswers())
+        let withLineBands = withLine.pixels.bands(over: withLine.ground, in: try withLine.aboveTheAnswers())
+
+        #expect(withLineBands.count == aloneBands.count + 1, "a hint added \(withLineBands.count - aloneBands.count) bands")
+    }
+
+    /// The word on the filled pill is the way out, not the verb that goes
+    /// ahead — which is the whole of the owner's ruling on emphasis, and the
+    /// difference between a pill that reads `Keep` and one that reads `Keep`
+    /// and deletes.
+    @Test("the filled answer carries the way out")
+    func theFilledAnswerCarriesTheWayOut() throws {
+        let plain = try hosted(Self.question())
+        let longerWayOut = try hosted(Self.question(cancel: "Keep this entry"))
+        let longerVerb = try hosted(Self.question(confirm: "Delete this entry"))
+
+        #expect(
+            try label(inTheFilledPillOf: longerWayOut) > label(inTheFilledPillOf: plain),
+            "a longer way out did not widen the label on the filled pill"
+        )
+        #expect(
+            try label(inTheFilledPillOf: longerVerb) == label(inTheFilledPillOf: plain),
+            "a longer destructive verb changed the label on the filled pill"
+        )
+    }
+
+    /// And the verb that goes ahead is on the pill that hugs it, which is the
+    /// other half of the same claim: it grows with its own word and not with
+    /// the other one.
+    @Test("the answer that goes ahead hugs its own label")
+    func theVerbHugsItsLabel() throws {
+        let plain = try hosted(Self.question())
+        let longerVerb = try hosted(Self.question(confirm: "Delete this entry"))
+        let longerWayOut = try hosted(Self.question(cancel: "Keep this entry"))
+
+        // The hugging pill stands at the trailing end, so the filled pill's
+        // right-hand inset is what its width costs.
+        #expect(
+            try longerVerb.answers().right > plain.answers().right,
+            "a longer destructive verb did not widen the pill that hugs it"
+        )
+        #expect(
+            try longerWayOut.answers().right == plain.answers().right,
+            "a longer way out widened the pill that hugs the other word"
+        )
+    }
+
+    /// How wide the label on the filled pill is drawn, measured against the
+    /// fill it sits on.
+    ///
+    /// Read across the middle of the pill rather than the whole of it: a
+    /// `Radius.pill` end is a semicircle, so near the top and bottom rows the
+    /// fill does not reach the pill's own edges and every column there would
+    /// count as something drawn on it. Across the middle the fill is solid from
+    /// end to end and the only thing interrupting it is the word.
+    private func label(inTheFilledPillOf drawn: Drawn) throws -> Int {
+        let box = try drawn.answers()
+        let row = try drawn.answerRow()
+        let middle = CGRect(
+            x: CGFloat(box.left) + 2,
+            y: row.midY - 8,
+            width: drawn.size.width - CGFloat(box.right) - CGFloat(box.left) - 4,
+            height: 16
+        )
+        let ink = try #require(drawn.pixels.inked(over: DrawnPixels.Channels(drawn.palette.accentColor), in: middle))
+        return ink.count
+    }
+
+    // MARK: - The destructive treatment
+
+    /// The verb that destroys something is drawn in the one colour the design
+    /// system keeps for a state gone wrong, and it is the only thing on the
+    /// dialog drawn in it.
+    @Test("the destructive verb is drawn in the error ink")
+    func theDestructiveVerbIsDrawnInTheErrorInk() throws {
+        let drawn = try hosted(Self.question())
+        let row = try drawn.answerRow()
+        let box = try drawn.answers()
+
+        let error = try #require(
+            drawn.pixels.box(ofColour: DrawnPixels.Channels(drawn.palette.error)),
+            "nothing on the dialog is drawn in the error ink"
+        )
+
+        #expect(CGFloat(error.top) >= row.minY, "the error ink is drawn above the answer row")
+        #expect(
+            error.left > Int(drawn.size.width) - box.right,
+            "the error ink is not on the trailing pill"
+        )
+    }
+
+    /// A question that destroys nothing draws none of it — the item field's
+    /// `Done` is not a warning.
+    @Test("a question that destroys nothing draws no error ink")
+    func aHarmlessQuestionDrawsNoErrorInk() throws {
+        let drawn = try hosted(
+            Self.question(title: "Item", confirm: "Done", cancel: "Cancel", destroys: false)
+        )
+
+        #expect(drawn.pixels.box(ofColour: DrawnPixels.Channels(drawn.palette.error)) == nil)
+    }
+
+    /// And it puts its weight the other way round: the filled pill carries the
+    /// answer that goes ahead when going ahead only writes something down.
+    @Test("a question that destroys nothing fills the answer that goes ahead")
+    func aHarmlessQuestionFillsTheAnswerThatGoesAhead() throws {
+        let plain = try hosted(Self.question(title: "Item", confirm: "Done", cancel: "Cancel", destroys: false))
+        let longerVerb = try hosted(Self.question(title: "Item", confirm: "Done with it", cancel: "Cancel", destroys: false))
+
+        #expect(
+            try label(inTheFilledPillOf: longerVerb) > label(inTheFilledPillOf: plain),
+            "the filled pill does not carry the answer that goes ahead"
+        )
+    }
+
+    // MARK: - The pair's geometry
+
+    /// The filled pill stands at the drawn inset on the side the way out keeps.
+    @Test("the filled answer stands at the drawn inset")
+    func theFilledAnswerStandsAtTheDrawnInset() throws {
+        let drawn = try hosted(Self.question())
+
+        expect(try drawn.answers().left, isTheDrawn: FuelMetrics.Screen.horizontalPadding)
+    }
+
+    /// `s17` above and below `buttonLabel` is already past a fingertip — but
+    /// this row is what an irreversible action is answered on, so the floor is
+    /// measured rather than reasoned about.
+    @Test("the answers answer a finger")
+    func answersAnswerAFinger() throws {
+        let drawn = try hosted(Self.question())
+        let height = try drawn.answerRow().height
+
+        #expect(height >= FuelMetrics.Control.minimumHitTarget, "the answer row is \(height) tall")
+    }
+
+    /// The question at a text size a user with poor sight actually sets.
+    ///
+    /// **What a fixed panel height would break first is the clearance under the
+    /// answers**, and that is asked of the card in
+    /// `FuelDialogPresentationTests.aLongerQuestionGrowsTheCard`, because a
+    /// text size set in the environment does not reach a sheet in a test host.
+    /// What this asks is the half that does apply here: the answers stay whole,
+    /// stay at the drawn inset, and stay on the screen when everything around
+    /// them grows.
+    @Test("the answers survive a larger text size")
+    func theAnswersSurviveALargerTextSize() throws {
+        let screen = try HostedScreen(
+            FuelDialog(copy: Self.question(), entry: nil, onConfirm: {}, onCancel: {})
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .background(Self.palette.background)
+                .ignoresSafeArea()
+                .dynamicTypeSize(.accessibility3),
+            palette: Self.palette
+        )
+        let pixels = try #require(screen.drawing)
+        let drawn = Drawn(pixels: pixels, palette: Self.palette, size: screen.window.bounds.size)
+
+        expect(try drawn.answers().left, isTheDrawn: FuelMetrics.Screen.horizontalPadding)
+        #expect(try drawn.answerRow().minY > 0, "the answers are drawn off the top of the screen")
+        #expect(try drawn.answerRow().height >= FuelMetrics.Control.minimumHitTarget)
+    }
+
+    /// Every accent and both themes.
+    ///
+    /// **A solid run rather than a box**, because on mono the accent is the ink
+    /// and a box would find the question's own letters. What this asks is that
+    /// a pill's worth of the accent is painted across the row without a break,
+    /// which no line of text does.
+    @Test("the filled answer is painted in every accent", arguments: FuelAccent.allCases)
+    func everyAccent(_ accent: FuelAccent) throws {
+        for theme in FuelTheme.allCases {
+            let palette = FuelPalette(theme: theme, accent: accent)
+            let drawn = try hosted(Self.question(), palette: palette)
+            let row = try drawn.answerRow()
+            let run = drawn.pixels.solidRun(
+                ofColour: DrawnPixels.Channels(palette.accentColor),
+                y: Int(row.midY),
+                x: 0..<Int(drawn.size.width)
+            )
+
+            #expect(
+                CGFloat(run) > FuelMetrics.Control.minimumHitTarget,
+                "\(accent) on \(theme) painted a run of \(run)"
+            )
+        }
     }
 }
 
@@ -237,17 +540,15 @@ struct FuelDialogDrawingTests {
 ///
 /// What this suite asks that the drawing suite cannot — that it comes up at
 /// all, that it is as tall as its question rather than as tall as the screen,
-/// that its answers clear the home indicator, and that its field is the one the
-/// user types into.
+/// that it is that tall from the first frame rather than growing under the
+/// user's finger, that its answers clear the home indicator at any text size,
+/// and that its field is the one the user types into.
 ///
-/// **Two things about a sheet cannot be asked here, and both were tried.** Its
-/// dismissal transition never finishes in a test host: a sheet put away by the
-/// binding it was raised with stalls mid-animation with the spring still
-/// attached after three seconds of run loop, so what runs when the user swipes
-/// it down is not something this harness can watch. And SwiftUI's focus engine
-/// does not engage there either, though UIKit's does — see `FuelDialog.field`.
-/// Neither is a claim about the app that has been dropped; both are claims the
-/// only harness available cannot answer.
+/// **One thing about a sheet cannot be asked here, and it was tried four
+/// ways.** Its dismissal transition never finishes in a test host: a sheet put
+/// away by the binding it was raised with stalls mid-animation with the spring
+/// still attached after three seconds of run loop. What runs when the user
+/// swipes it down is therefore not something this harness can watch at all.
 @Suite("Dialog · coming up over a screen", .serialized)
 @MainActor
 struct FuelDialogPresentationTests {
@@ -255,23 +556,52 @@ struct FuelDialogPresentationTests {
     private static let palette = FuelPalette(theme: .light, accent: .blue)
 
     private static let question = FuelDialogCopy(
-        title: "Delete this meal?",
+        title: "Do you really want to delete this entry?",
         confirm: "Delete",
-        cancel: "Keep"
+        cancel: "Keep",
+        destroys: true
     )
 
     private static let itemField = FuelDialogCopy(
         title: "Item",
         hint: "Write the item as you would say it, with the amount if you know it.",
         confirm: "Done",
-        cancel: "Cancel"
+        cancel: "Cancel",
+        destroys: false
     )
 
     @Test("the question comes up over the screen")
     func itComesUp() throws {
-        let screen = try HostedScreen(DialogHost(copy: Self.question), palette: Self.palette)
+        let screen = try raise(Self.question)
 
         #expect(screen.sheet != nil)
+    }
+
+    /// Raises a question the way a control does: over a screen that is already
+    /// on the window and has already been laid out.
+    ///
+    /// **Which is not the same thing as a screen built with its question
+    /// already up**, and the difference is the whole of the test below this
+    /// one. A dialog raised in the same update that builds the screen is raised
+    /// before anything has reported how wide that screen is, so it cannot be
+    /// opened at the height its question will need. Nothing in the app does
+    /// that: a question arrives on a tap, which is a great many frames after
+    /// the screen it is tapped on was laid out.
+    private func raise(
+        _ copy: FuelDialogCopy,
+        wantsField: Bool = false,
+        typing: Typing? = nil,
+        textSize: DynamicTypeSize = .large
+    ) throws -> HostedScreen {
+        let presentation = DialogPresentation()
+        let screen = try HostedScreen(
+            DialogHost(copy: copy, wantsField: wantsField, typing: typing, presentation: presentation)
+                .dynamicTypeSize(textSize),
+            palette: Self.palette
+        )
+        presentation.isUp = true
+        screen.settle(for: 0.6)
+        return screen
     }
 
     /// A question is as tall as the question. Nothing in the export draws a
@@ -283,13 +613,10 @@ struct FuelDialogPresentationTests {
     /// on an 874-point screen.
     @Test("it is as tall as what it says, not as tall as the screen")
     func itIsFittedToItsQuestion() throws {
-        let plain = try HostedScreen(DialogHost(copy: Self.question), palette: Self.palette)
+        let plain = try raise(Self.question)
         let plainHeight = try #require(plain.sheet).frame.height
 
-        let withField = try HostedScreen(
-            DialogHost(copy: Self.itemField, wantsField: true),
-            palette: Self.palette
-        )
+        let withField = try raise(Self.itemField, wantsField: true)
         let fieldHeight = try #require(withField.sheet).frame.height
 
         #expect(plainHeight < plain.window.bounds.height / 2, "the question came up \(plainHeight) tall")
@@ -305,9 +632,46 @@ struct FuelDialogPresentationTests {
     /// is not a number this app has any business pinning.
     @Test("the answers clear the home indicator by their own padding")
     func answersClearTheIndicator() throws {
-        let screen = try HostedScreen(DialogHost(copy: Self.question), palette: Self.palette)
-        let drawing = try #require(screen.drawing)
+        let screen = try raise(Self.question)
 
+        try expectAnswersClearTheIndicator(on: screen)
+    }
+
+    /// A longer question makes a taller card, and its answers still stand
+    /// where they are drawn against the card's own bottom edge — which is where
+    /// a panel with a height written into it would fail first.
+    ///
+    /// A longer question rather than a larger text size, and the difference is
+    /// the harness rather than the app: a text size set in the environment does
+    /// not reach a sheet's own hierarchy in a test host — measured, the card
+    /// came up the same 206.67 points at `.accessibility3` as at the default —
+    /// because a presented controller takes that from the window's traits.
+    /// `FuelDialogDrawingTests.theAnswersSurviveALargerTextSize` asks the type
+    /// question where the environment does apply.
+    @Test("a longer question makes a taller card without moving its answers")
+    func aLongerQuestionGrowsTheCard() throws {
+        let ordinary = try raise(Self.question)
+        let ordinaryHeight = try #require(ordinary.sheet).frame.height
+
+        let longer = try raise(
+            FuelDialogCopy(
+                title: "Do you really want to delete this entry, and everything the model wrote down about it?",
+                confirm: "Delete",
+                cancel: "Keep",
+                destroys: true
+            )
+        )
+        let longerHeight = try #require(longer.sheet).frame.height
+
+        #expect(longerHeight > ordinaryHeight, "the card did not grow: \(longerHeight) against \(ordinaryHeight)")
+        try expectAnswersClearTheIndicator(on: longer)
+    }
+
+    private func expectAnswersClearTheIndicator(
+        on screen: HostedScreen,
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) throws {
+        let drawing = try #require(screen.drawing)
         // The card is the only place the theme's own background is drawn at
         // full strength: everything behind it is under the system's dimming.
         let card = try #require(drawing.box(ofColour: DrawnPixels.Channels(Self.palette.background)))
@@ -319,7 +683,11 @@ struct FuelDialogPresentationTests {
         // exists to catch is the safe area spent twice, which is 34 wide.
         let measured = CGFloat(pill.bottom - card.bottom)
         let drawn = FuelMetrics.Space.s18 + screen.window.safeAreaInsets.bottom
-        #expect(abs(measured - drawn) <= 2, "measured \(measured) against a drawn \(drawn)")
+        #expect(
+            abs(measured - drawn) <= 2,
+            "measured \(measured) against a drawn \(drawn)",
+            sourceLocation: sourceLocation
+        )
     }
 
     // MARK: - The field
@@ -329,10 +697,7 @@ struct FuelDialogPresentationTests {
     @Test("what is typed into the field is what the caller is given")
     func theFieldWritesBack() throws {
         let typing = Typing()
-        let screen = try HostedScreen(
-            DialogHost(copy: Self.itemField, wantsField: true, typing: typing),
-            palette: Self.palette
-        )
+        let screen = try raise(Self.itemField, wantsField: true, typing: typing)
         let editor = try #require(screen.editor)
 
         editor.insertText("Polenta 150 g")
@@ -345,10 +710,7 @@ struct FuelDialogPresentationTests {
     /// like everything else on the dialog.
     @Test("the field stands at the drawn inset")
     func theFieldStandsAtTheDrawnInset() throws {
-        let screen = try HostedScreen(
-            DialogHost(copy: Self.itemField, wantsField: true),
-            palette: Self.palette
-        )
+        let screen = try raise(Self.itemField, wantsField: true)
         let editor = try #require(screen.editor)
         let sheet = try #require(screen.sheet)
         let inset = editor.convert(editor.bounds, to: sheet).minX
@@ -374,9 +736,9 @@ struct FuelDialogPresentationTests {
 
         var typing: Typing?
 
-        @Environment(\.fuelPalette) private var palette
+        let presentation: DialogPresentation
 
-        @State private var isPresented = true
+        @Environment(\.fuelPalette) private var palette
 
         @State private var text = ""
 
@@ -385,10 +747,14 @@ struct FuelDialogPresentationTests {
                 .ignoresSafeArea()
                 .fuelDialog(
                     copy,
-                    isPresented: $isPresented,
+                    isPresented: raised,
                     entry: wantsField ? FuelDialogEntry(text: written, prompt: "Polenta 150 g", accessibilityLabel: "Item") : nil,
                     onConfirm: {}
                 )
+        }
+
+        private var raised: Binding<Bool> {
+            Binding(get: { presentation.isUp }, set: { presentation.isUp = $0 })
         }
 
         /// The caller's own binding, so a test can read what the field wrote

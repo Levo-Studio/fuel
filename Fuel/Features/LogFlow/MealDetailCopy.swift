@@ -73,7 +73,8 @@ nonisolated enum MealDetailCopy {
         FuelDialogCopy(
             title: String(localized: "detail.discardEdits.title"),
             confirm: String(localized: "detail.discardEdits.confirm"),
-            cancel: String(localized: "detail.discardEdits.cancel")
+            cancel: String(localized: "detail.discardEdits.cancel"),
+            destroys: true
         )
     }
 }
