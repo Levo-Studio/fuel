@@ -421,6 +421,16 @@ struct FuelMotionTests {
         #expect(FuelMotion.resolvePacing(FuelMotion.placeholderExampleHold, reduceMotion: true) == nil)
     }
 
+    @Test("text still being written is revealed as it arrives, and not under reduced motion")
+    func progressiveRevealStopsRatherThanSoftens() {
+        // The same distinction `resolvePacing` draws, for the same reason: a
+        // reply appearing word by word is text rewriting itself while someone
+        // reads it, and softening that would be the same motion blurred. The
+        // caller keeps saying it is writing and draws the sentence once.
+        #expect(FuelMotion.resolveProgressiveReveal(reduceMotion: false))
+        #expect(!FuelMotion.resolveProgressiveReveal(reduceMotion: true))
+    }
+
     @Test("a dwell stays inside the bounds a dwell has")
     func dwellsStayInsideTheirBounds() {
         // A bound, not a regression test. Neither dwell is anywhere near

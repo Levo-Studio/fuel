@@ -21,9 +21,14 @@ nonisolated enum ProviderClients {
 
     /// The transport is injectable for the reason the clients take one:
     /// **no test in Fuel touches a live endpoint.**
+    ///
+    /// `StreamingHTTPTransport` because both clients hold a conversation as
+    /// well as answering a question, and a conversation is read as it arrives.
+    /// The key check and the estimate on either client still go through plain
+    /// `send`, unchanged.
     static func client(
         for provider: AIProvider,
-        transport: any HTTPTransport = URLSession.fuel
+        transport: any StreamingHTTPTransport = URLSession.fuel
     ) -> any AIClient {
         switch provider {
         case .claude: AnthropicClient(transport: transport)

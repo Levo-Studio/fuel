@@ -83,18 +83,57 @@ nonisolated protocol AIClient: Sendable {
     /// `MealChatContract` for what goes over the wire and `MealAdjuster` for
     /// why nothing numeric in the reply is read.
     ///
+    /// **The only one of the three that streams, and the only one with anything
+    /// to gain from it.** An estimate is a JSON object that means nothing until
+    /// it is whole; a conversation is prose with an object behind it, and the
+    /// prose reads the same arriving as it does arrived. So this returns a
+    /// sequence rather than a value: the sentence as it is written, a warning
+    /// as soon as the model commits to moving something, and the finished turn
+    /// last. See `MealChatEvent`.
+    ///
     /// `history` is the exchange so far, oldest first, and belongs to the
     /// caller. `message` is the user's own words and is placed last in the
     /// request, labelled, so it is described rather than obeyed.
     ///
-    /// The outcome carries the model's sentence and, separately, the meal —
-    /// which is `nil` when nothing it asked for could be made. That is an
-    /// answer rather than a failure, and it is not thrown.
+    /// Not `async throws`: the request has not been made when this returns, and
+    /// everything that can go wrong goes wrong inside the sequence. Abandoning
+    /// the sequence cancels the request, which is what a message the user
+    /// called off has to do to the connection carrying it.
     func adjust(
         _ meal: AdjustableMeal,
         history: [MealChatTurn],
         message: String
-    ) async throws -> MealAdjustmentOutcome
+    ) -> AsyncThrowingStream<MealChatEvent, any Error>
+}
+
+// MARK: - A turn as it happens
+
+/// What a conversation reports on the way to an answer.
+///
+/// Three cases, and the order they arrive in is the shape of the feature: any
+/// number of `sentence`s, at most one `adjusting`, and exactly one `finished`
+/// unless the stream throws instead.
+nonisolated enum MealChatEvent: Sendable, Equatable {
+
+    /// The model's sentence as far as it has been written, already bounded and
+    /// whole rather than a delta — so a screen drawing it cannot accumulate it
+    /// wrongly, and a screen that missed one is still correct after the next.
+    case sentence(String)
+
+    /// The model has committed to moving something, which the reply's own
+    /// `changes` or `additions` said before it finished saying it.
+    ///
+    /// **Advisory, and it touches nothing but the waiting screen.** What
+    /// actually moves is decided at the end, by the same parse and the same
+    /// `MealAdjuster` pass as before. This arrives early so the interface can
+    /// stop guessing what kind of turn it is waiting on; it is not consulted
+    /// about a single gram.
+    case adjusting
+
+    /// The turn, complete: what the model said, and what — if anything —
+    /// actually moved. `MealAdjustmentOutcome`'s own note explains why those
+    /// two are separate.
+    case finished(MealAdjustmentOutcome)
 }
 
 // MARK: - One turn of a conversation
@@ -215,13 +254,19 @@ extension AIError {
         return .providerRefused
     }
 
-    /// Whether the body says, in words, that the balance is spent.
+    /// How much of a refusal is worth reading at all.
     ///
-    /// The 8 KiB bound is documented on `from(status:body:provider:)` above,
-    /// with the reason it is a guard rather than a limitation.
+    /// The reason it is a guard rather than a limitation is on
+    /// `from(status:body:provider:)` above. It is named rather than written
+    /// inline because a streamed refusal has to be *collected* before it can be
+    /// mapped, and collecting more than will ever be searched is work done at
+    /// the request of whoever sent it — see `HTTPStreamResponse.refusalBody()`.
+    static let readableErrorBody = 8 * 1024
+
+    /// Whether the body says, in words, that the balance is spent.
     private static func mentionsExhaustedCredit(_ body: Data) -> Bool {
         guard
-            body.count < 8 * 1024,
+            body.count < readableErrorBody,
             let text = String(data: body, encoding: .utf8)?.lowercased()
         else {
             return false

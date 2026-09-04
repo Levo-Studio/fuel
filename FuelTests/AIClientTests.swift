@@ -17,14 +17,35 @@ import UIKit
 /// It records requests as well as answering them, because half of what is
 /// worth asserting is on the way out: which header the key went into, and
 /// which ones it did not.
-private final class RecordingTransport: HTTPTransport, @unchecked Sendable {
+private final class RecordingTransport: StreamingHTTPTransport, @unchecked Sendable {
 
     private let lock = NSLock()
     private var queued: [Result<HTTPResponse, any Error>]
     private var recorded: [URLRequest] = []
 
+    /// One recorded `text/event-stream`, as its lines arrived, and how it
+    /// ended.
+    ///
+    /// **A transcript rather than bytes**, for the reason `HTTPStreamResponse`
+    /// carries lines: the split is `URLSession`'s job, and a test that guessed
+    /// chunk boundaries would be testing its own guess. The framing itself —
+    /// blank lines, comments, a payload split across two `data` fields — is
+    /// `ServerSentEventDecoder`'s subject and is exercised there, line by line.
+    ///
+    /// `interruption` is the one failure a collected response cannot have: a
+    /// body that stops in the middle after the head said `200`.
+    private var transcript: (statusCode: Int, lines: [String], interruption: (any Error)?)?
+
     init(_ responses: [Result<HTTPResponse, any Error>]) {
         queued = responses
+    }
+
+    /// Answers `stream` with a recorded transcript, and `send` with a failure —
+    /// a test that reaches for the wrong one of the two fails rather than
+    /// quietly getting the other's answer.
+    convenience init(streaming lines: [String], status: Int = 200, thenFailingWith error: (any Error)? = nil) {
+        self.init([.failure(URLError(.badServerResponse))])
+        transcript = (status, lines, error)
     }
 
     /// Answers every request with the same recorded response.
@@ -54,6 +75,31 @@ private final class RecordingTransport: HTTPTransport, @unchecked Sendable {
             return queued.count > 1 ? queued.removeFirst() : (queued.first ?? .failure(URLError(.badServerResponse)))
         }
         return try outcome.get()
+    }
+
+    func stream(_ request: URLRequest) async throws -> HTTPStreamResponse {
+        let recording: (statusCode: Int, lines: [String], interruption: (any Error)?)? = lock.withLock {
+            recorded.append(request)
+            return transcript
+        }
+
+        guard let recording else {
+            throw URLError(.badServerResponse)
+        }
+
+        return HTTPStreamResponse(
+            statusCode: recording.statusCode,
+            lines: AsyncThrowingStream { continuation in
+                for line in recording.lines {
+                    continuation.yield(line)
+                }
+                if let interruption = recording.interruption {
+                    continuation.finish(throwing: interruption)
+                } else {
+                    continuation.finish()
+                }
+            }
+        )
     }
 }
 
@@ -104,14 +150,18 @@ private enum Reply {
         "confidence":"confident","amount":"recognised"}]}
         """
 
-    static func anthropic(_ text: String) -> String {
+    /// `text` as a JSON string literal, quotes included.
+    static func quoted(_ text: String) -> String {
         let escaped = String(
             data: try! JSONSerialization.data(withJSONObject: [text], options: .fragmentsAllowed),
             encoding: .utf8
         )!
         // `escaped` is `["…"]`; drop the brackets to get the quoted string.
-        let quoted = String(escaped.dropFirst().dropLast())
-        return #"{"content":[{"type":"text","text":\#(quoted)}],"stop_reason":"end_turn"}"#
+        return String(escaped.dropFirst().dropLast())
+    }
+
+    static func anthropic(_ text: String) -> String {
+        #"{"content":[{"type":"text","text":\#(quoted(text))}],"stop_reason":"end_turn"}"#
     }
 
     /// The same envelope with the answer cut off at the request's own token
@@ -125,12 +175,7 @@ private enum Reply {
     }
 
     static func mistral(_ text: String) -> String {
-        let escaped = String(
-            data: try! JSONSerialization.data(withJSONObject: [text], options: .fragmentsAllowed),
-            encoding: .utf8
-        )!
-        let quoted = String(escaped.dropFirst().dropLast())
-        return #"{"choices":[{"message":{"role":"assistant","content":\#(quoted)},"finish_reason":"stop"}]}"#
+        #"{"choices":[{"message":{"role":"assistant","content":\#(quoted(text))},"finish_reason":"stop"}]}"#
     }
 
     /// Mistral's word for the same thing, on the choice rather than on the
@@ -140,6 +185,78 @@ private enum Reply {
             of: #""finish_reason":"stop""#,
             with: #""finish_reason":"length""#
         )
+    }
+
+    // MARK: - The same answers, streamed
+
+    /// One Anthropic message stream, as its lines arrive.
+    ///
+    /// **`chunks` is the point of these fixtures.** A transcript with the whole
+    /// reply in one delta would never show whether the reader survives a
+    /// boundary falling inside a JSON string, inside a key, or between the two
+    /// halves of an escape — which is the only thing reading a half-written
+    /// object is difficult about.
+    static func anthropicStream(_ text: String, chunks: Int = 1, stopReason: String = "end_turn") -> [String] {
+        var lines = [
+            "event: message_start",
+            #"data: {"type":"message_start","message":{"id":"msg_1","role":"assistant"}}"#,
+            "",
+            "event: content_block_start",
+            #"data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}"#,
+            "",
+        ]
+
+        for piece in split(text, into: chunks) {
+            lines += [
+                "event: content_block_delta",
+                #"data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":\#(quoted(piece))}}"#,
+                "",
+            ]
+        }
+
+        lines += [
+            "event: content_block_stop",
+            #"data: {"type":"content_block_stop","index":0}"#,
+            "",
+            "event: message_delta",
+            #"data: {"type":"message_delta","delta":{"stop_reason":"\#(stopReason)"}}"#,
+            "",
+            "event: message_stop",
+            #"data: {"type":"message_stop"}"#,
+            "",
+        ]
+        return lines
+    }
+
+    /// The same, in the OpenAI shape Mistral streams — including the `[DONE]`
+    /// sentinel, which is not JSON and must not be parsed as any.
+    static func mistralStream(_ text: String, chunks: Int = 1, finishReason: String = "stop") -> [String] {
+        var lines: [String] = []
+
+        for piece in split(text, into: chunks) {
+            lines += [
+                #"data: {"id":"c1","choices":[{"index":0,"delta":{"content":\#(quoted(piece))},"finish_reason":null}]}"#,
+                "",
+            ]
+        }
+
+        lines += [
+            #"data: {"id":"c1","choices":[{"index":0,"delta":{},"finish_reason":"\#(finishReason)"}]}"#,
+            "",
+            "data: [DONE]",
+            "",
+        ]
+        return lines
+    }
+
+    private static func split(_ text: String, into chunks: Int) -> [String] {
+        guard chunks > 1 else {
+            return [text]
+        }
+        let size = max(1, text.count / chunks)
+        return stride(from: 0, to: text.count, by: size).map { start in
+            String(text.dropFirst(start).prefix(size))
+        }
     }
 }
 
@@ -1812,9 +1929,36 @@ struct MealAdjustmentClientTests {
         )
     }
 
+    /// The shape the prompt now asks for: the amounts first, the sentence last.
     private static let raisesTheRice = """
-        {"reply":"Raised the rice to 300 g.","changes":[{"item":1,"grams":300}]}
+        {"changes":[{"item":1,"grams":300}],"additions":[],\
+        "reply":"Raised the rice to 300 g."}
         """
+
+    // MARK: - Reading a turn
+
+    /// Everything a conversation said, in order.
+    private func events(
+        of stream: AsyncThrowingStream<MealChatEvent, any Error>
+    ) async throws -> [MealChatEvent] {
+        var collected: [MealChatEvent] = []
+        for try await event in stream {
+            collected.append(event)
+        }
+        return collected
+    }
+
+    /// The turn a conversation finished on.
+    private func outcome(
+        of stream: AsyncThrowingStream<MealChatEvent, any Error>
+    ) async throws -> MealAdjustmentOutcome {
+        for try await event in stream {
+            if case .finished(let outcome) = event {
+                return outcome
+            }
+        }
+        throw AIError.malformedResponse
+    }
 
     // MARK: - No key, no request
 
@@ -1825,11 +1969,11 @@ struct MealAdjustmentClientTests {
     @Test("with no stored key nothing is built and nothing is sent")
     func keylessSendsNothing() async throws {
         let store = KeychainStore(service: "apps.levo-studio.Fuel.tests.\(UUID().uuidString)")
-        let transport = RecordingTransport(status: 200, body: Reply.anthropic(Self.raisesTheRice))
+        let transport = RecordingTransport(streaming: Reply.anthropicStream(Self.raisesTheRice))
         let client = AnthropicClient(transport: transport, keys: ProviderKeySource(store: store, provider: .claude))
 
         await #expect(throws: AIError.missingKey) {
-            _ = try await client.adjust(Self.meal(), history: [], message: "a bit more")
+            _ = try await outcome(of: client.adjust(Self.meal(), history: [], message: "a bit more"))
         }
         #expect(transport.requests.isEmpty)
     }
@@ -1837,11 +1981,11 @@ struct MealAdjustmentClientTests {
     @Test("the same holds for the other provider")
     func keylessSendsNothingOnMistral() async throws {
         let store = KeychainStore(service: "apps.levo-studio.Fuel.tests.\(UUID().uuidString)")
-        let transport = RecordingTransport(status: 200, body: Reply.mistral(Self.raisesTheRice))
+        let transport = RecordingTransport(streaming: Reply.mistralStream(Self.raisesTheRice))
         let client = MistralClient(transport: transport, keys: ProviderKeySource(store: store, provider: .mistral))
 
         await #expect(throws: AIError.missingKey) {
-            _ = try await client.adjust(Self.meal(), history: [], message: "a bit more")
+            _ = try await outcome(of: client.adjust(Self.meal(), history: [], message: "a bit more"))
         }
         #expect(transport.requests.isEmpty)
     }
@@ -1853,9 +1997,9 @@ struct MealAdjustmentClientTests {
         let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
         defer { keys.tearDown(provider: .claude) }
 
-        let transport = RecordingTransport(status: 200, body: Reply.anthropic(Self.raisesTheRice))
+        let transport = RecordingTransport(streaming: Reply.anthropicStream(Self.raisesTheRice))
         let client = AnthropicClient(transport: transport, keys: keys.source)
-        _ = try await client.adjust(Self.meal(), history: [], message: "I had a second portion")
+        _ = try await outcome(of: client.adjust(Self.meal(), history: [], message: "I had a second portion"))
 
         let body = try #require(transport.requests.first?.httpBody)
         let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
@@ -1886,15 +2030,17 @@ struct MealAdjustmentClientTests {
         let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
         defer { keys.tearDown(provider: .claude) }
 
-        let transport = RecordingTransport(status: 200, body: Reply.anthropic(Self.raisesTheRice))
+        let transport = RecordingTransport(streaming: Reply.anthropicStream(Self.raisesTheRice))
         let client = AnthropicClient(transport: transport, keys: keys.source)
-        _ = try await client.adjust(
-            Self.meal(),
-            history: [
-                MealChatTurn(speaker: .user, text: "it was oily"),
-                MealChatTurn(speaker: .model, text: "How much oil roughly?"),
-            ],
-            message: "a tablespoon"
+        _ = try await outcome(
+            of: client.adjust(
+                Self.meal(),
+                history: [
+                    MealChatTurn(speaker: .user, text: "it was oily"),
+                    MealChatTurn(speaker: .model, text: "How much oil roughly?"),
+                ],
+                message: "a tablespoon"
+            )
         )
 
         let body = try #require(transport.requests.first?.httpBody)
@@ -1926,9 +2072,9 @@ struct MealAdjustmentClientTests {
             ]
         }
 
-        let transport = RecordingTransport(status: 200, body: Reply.anthropic(Self.raisesTheRice))
+        let transport = RecordingTransport(streaming: Reply.anthropicStream(Self.raisesTheRice))
         let client = AnthropicClient(transport: transport, keys: keys.source)
-        _ = try await client.adjust(Self.meal(), history: history, message: "and again")
+        _ = try await outcome(of: client.adjust(Self.meal(), history: history, message: "and again"))
 
         let body = try #require(transport.requests.first?.httpBody)
         let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
@@ -1946,9 +2092,9 @@ struct MealAdjustmentClientTests {
         let keys = try KeyFixture(provider: .mistral, secret: "0123456789abcdefghij")
         defer { keys.tearDown(provider: .mistral) }
 
-        let transport = RecordingTransport(status: 200, body: Reply.mistral(Self.raisesTheRice))
+        let transport = RecordingTransport(streaming: Reply.mistralStream(Self.raisesTheRice))
         let client = MistralClient(transport: transport, keys: keys.source)
-        _ = try await client.adjust(Self.meal(), history: [], message: "a bit more")
+        _ = try await outcome(of: client.adjust(Self.meal(), history: [], message: "a bit more"))
 
         let body = try #require(transport.requests.first?.httpBody)
         let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
@@ -1965,25 +2111,184 @@ struct MealAdjustmentClientTests {
 
     // MARK: - What comes back
 
-    @Test("the weight comes back priced against the table")
-    func appliesTheChange() async throws {
+    @Test(
+        "the weight comes back priced against the table, however the reply was chunked",
+        arguments: [1, 3, 9, 40]
+    )
+    func appliesTheChange(chunks: Int) async throws {
         let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
         defer { keys.tearDown(provider: .claude) }
 
         let client = AnthropicClient(
-            transport: RecordingTransport(status: 200, body: Reply.anthropic(Self.raisesTheRice)),
+            transport: RecordingTransport(streaming: Reply.anthropicStream(Self.raisesTheRice, chunks: chunks)),
             keys: keys.source
         )
 
-        let outcome = try await client.adjust(Self.meal(), history: [], message: "a second, smaller portion")
+        let turn = try await outcome(of: client.adjust(Self.meal(), history: [], message: "a second, smaller portion"))
 
-        #expect(outcome.reply == "Raised the rice to 300 g.")
-        let adjusted = try #require(outcome.meal)
+        #expect(turn.reply == "Raised the rice to 300 g.")
+        let adjusted = try #require(turn.meal)
         #expect(adjusted.items[0].grams == 300)
 
         let table = try FoodTable.bundled()
         let row = try #require(FoodTableGrounding.bestMatch(for: "Rice", preferring: .prepared, in: table))
         #expect(adjusted.items[0].kilocalories == PortionCalculator.portion(of: row.per100g, grams: 300).kilocalories)
+    }
+
+    /// Mistral's envelope, the same answer, and the `[DONE]` sentinel that is
+    /// not JSON.
+    @Test("the other provider's stream reaches the same turn", arguments: [1, 5])
+    func mistralAppliesTheChange(chunks: Int) async throws {
+        let keys = try KeyFixture(provider: .mistral, secret: "0123456789abcdefghij")
+        defer { keys.tearDown(provider: .mistral) }
+
+        let client = MistralClient(
+            transport: RecordingTransport(streaming: Reply.mistralStream(Self.raisesTheRice, chunks: chunks)),
+            keys: keys.source
+        )
+
+        let turn = try await outcome(of: client.adjust(Self.meal(), history: [], message: "more rice"))
+
+        #expect(turn.reply == "Raised the rice to 300 g.")
+        #expect(try #require(turn.meal).items[0].grams == 300)
+    }
+
+    // MARK: - What it says on the way
+
+    /// **The pin for the whole feature.** A reply that moves something says so
+    /// before it has finished saying it, and a reply that only answers a
+    /// question never says it at all — which is what lets the screen show the
+    /// analysis states for one and not the other.
+    @Test("a reply that moves something announces it before the sentence")
+    func announcesAnAdjustment() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let client = AnthropicClient(
+            transport: RecordingTransport(streaming: Reply.anthropicStream(Self.raisesTheRice, chunks: 20)),
+            keys: keys.source
+        )
+
+        let said = try await events(of: client.adjust(Self.meal(), history: [], message: "more rice"))
+        let adjusting = try #require(said.firstIndex(of: .adjusting))
+        let firstSentence = try #require(said.firstIndex { if case .sentence = $0 { true } else { false } })
+
+        #expect(adjusting < firstSentence)
+    }
+
+    @Test("a question is answered without ever announcing an adjustment")
+    func aQuestionAnnouncesNothing() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let answer = """
+            {"changes":[],"additions":[],"reply":"Polenta is boiled maize meal."}
+            """
+        let client = AnthropicClient(
+            transport: RecordingTransport(streaming: Reply.anthropicStream(answer, chunks: 20)),
+            keys: keys.source
+        )
+
+        let said = try await events(of: client.adjust(Self.meal(), history: [], message: "what is in polenta?"))
+
+        #expect(!said.contains(.adjusting))
+        #expect(said.last == .finished(MealAdjustmentOutcome(reply: "Polenta is boiled maize meal.", meal: nil)))
+    }
+
+    /// The sentence grows rather than repeating itself, and every value is the
+    /// whole of it — a screen that missed one is still right after the next.
+    @Test("the sentence arrives as a growing whole")
+    func sentenceGrows() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let client = AnthropicClient(
+            transport: RecordingTransport(streaming: Reply.anthropicStream(Self.raisesTheRice, chunks: 30)),
+            keys: keys.source
+        )
+
+        let sentences = try await events(of: client.adjust(Self.meal(), history: [], message: "more rice"))
+            .compactMap { event -> String? in
+                if case .sentence(let text) = event { text } else { nil }
+            }
+
+        #expect(sentences.count > 1)
+        #expect(sentences.last == "Raised the rice to 300 g.")
+        for (earlier, later) in zip(sentences, sentences.dropFirst()) {
+            #expect(later.hasPrefix(earlier))
+        }
+    }
+
+    /// The prompt asks for the arrays first; the reader does not require it.
+    /// A model that writes the sentence first costs a waiting screen and never
+    /// a weight.
+    @Test("a reply written in the old order still adjusts the meal")
+    func toleratesTheOtherOrder() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let answer = """
+            {"reply":"Raised the rice to 300 g.","changes":[{"item":1,"grams":300}]}
+            """
+        let client = AnthropicClient(
+            transport: RecordingTransport(streaming: Reply.anthropicStream(answer, chunks: 20)),
+            keys: keys.source
+        )
+
+        let said = try await events(of: client.adjust(Self.meal(), history: [], message: "more rice"))
+
+        #expect(said.contains(.adjusting))
+        guard case .finished(let turn) = try #require(said.last) else {
+            return
+        }
+        #expect(try #require(turn.meal).items[0].grams == 300)
+    }
+
+    // MARK: - A stream that stops
+
+    /// The failure only a stream can have: the head arrived, some of the answer
+    /// arrived, and then the connection went.
+    @Test("a body that dies part-way fails the turn rather than half-answering it")
+    func interruptedBody() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let partial = Array(Reply.anthropicStream(Self.raisesTheRice, chunks: 8).prefix(12))
+        let client = AnthropicClient(
+            transport: RecordingTransport(
+                streaming: partial,
+                thenFailingWith: URLError(.networkConnectionLost)
+            ),
+            keys: keys.source
+        )
+
+        var said: [MealChatEvent] = []
+        await #expect(throws: AIError.network) {
+            for try await event in client.adjust(Self.meal(), history: [], message: "more rice") {
+                said.append(event)
+            }
+        }
+
+        // It got as far as saying something, and no finished turn came of it.
+        #expect(!said.isEmpty)
+        #expect(!said.contains { if case .finished = $0 { true } else { false } })
+    }
+
+    /// A stream that ends cleanly with half an object in it is a reply Fuel
+    /// could not read, which is the retry state and not a silent nothing.
+    @Test("a stream that ends mid-object is a malformed reply")
+    func endsMidObject() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let client = AnthropicClient(
+            transport: RecordingTransport(streaming: Reply.anthropicStream(#"{"changes":[{"item":1,"#)),
+            keys: keys.source
+        )
+
+        await #expect(throws: AIError.malformedResponse) {
+            _ = try await outcome(of: client.adjust(Self.meal(), history: [], message: "more rice"))
+        }
     }
 
     /// The architecture, end to end through a real client: a model that
@@ -2000,12 +2305,12 @@ struct MealAdjustmentClientTests {
             "protein_g":700}]}
             """
         let client = AnthropicClient(
-            transport: RecordingTransport(status: 200, body: Reply.anthropic(reply)),
+            transport: RecordingTransport(streaming: Reply.anthropicStream(reply)),
             keys: keys.source
         )
 
         let meal = Self.meal()
-        let adjusted = try #require(try await client.adjust(meal, history: [], message: "more").meal)
+        let adjusted = try #require(try await outcome(of: client.adjust(meal, history: [], message: "more")).meal)
 
         #expect(adjusted.kilocalories != 9999)
         #expect(adjusted.macros.protein != 700)
@@ -2018,17 +2323,17 @@ struct MealAdjustmentClientTests {
         let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
         defer { keys.tearDown(provider: .claude) }
 
-        let reply = #"{"reply":"Roughly how much oil?","changes":[],"additions":[]}"#
+        let reply = #"{"changes":[],"additions":[],"reply":"Roughly how much oil?"}"#
         let client = AnthropicClient(
-            transport: RecordingTransport(status: 200, body: Reply.anthropic(reply)),
+            transport: RecordingTransport(streaming: Reply.anthropicStream(reply)),
             keys: keys.source
         )
 
-        let outcome = try await client.adjust(Self.meal(), history: [], message: "it was quite oily")
+        let turn = try await outcome(of: client.adjust(Self.meal(), history: [], message: "it was quite oily"))
 
-        #expect(outcome.reply == "Roughly how much oil?")
-        #expect(outcome.meal == nil)
-        #expect(!outcome.changedTheMeal)
+        #expect(turn.reply == "Roughly how much oil?")
+        #expect(turn.meal == nil)
+        #expect(!turn.changedTheMeal)
     }
 
     // MARK: - Failures
@@ -2039,12 +2344,15 @@ struct MealAdjustmentClientTests {
         defer { keys.tearDown(provider: .claude) }
 
         let client = AnthropicClient(
-            transport: RecordingTransport(status: 401, body: #"{"error":{"type":"authentication_error"}}"#),
+            transport: RecordingTransport(
+                streaming: [#"{"error":{"type":"authentication_error"}}"#],
+                status: 401
+            ),
             keys: keys.source
         )
 
         await #expect(throws: AIError.invalidKey) {
-            _ = try await client.adjust(Self.meal(), history: [], message: "more")
+            _ = try await outcome(of: client.adjust(Self.meal(), history: [], message: "more"))
         }
     }
 
@@ -2054,12 +2362,12 @@ struct MealAdjustmentClientTests {
         defer { keys.tearDown(provider: .claude) }
 
         let client = AnthropicClient(
-            transport: RecordingTransport(status: 200, body: Reply.anthropic("Sure, I have raised the rice!")),
+            transport: RecordingTransport(streaming: Reply.anthropicStream("Sure, I have raised the rice!")),
             keys: keys.source
         )
 
         await #expect(throws: AIError.malformedResponse) {
-            _ = try await client.adjust(Self.meal(), history: [], message: "more")
+            _ = try await outcome(of: client.adjust(Self.meal(), history: [], message: "more"))
         }
     }
 
@@ -2070,14 +2378,30 @@ struct MealAdjustmentClientTests {
 
         let client = AnthropicClient(
             transport: RecordingTransport(
-                status: 200,
-                body: Reply.anthropicOutOfTokens(#"{"reply":"Raised the ri"#)
+                streaming: Reply.anthropicStream(#"{"changes":[{"item":1,"gra"#, stopReason: "max_tokens")
             ),
             keys: keys.source
         )
 
         await #expect(throws: AIError.truncatedReply) {
-            _ = try await client.adjust(Self.meal(), history: [], message: "more")
+            _ = try await outcome(of: client.adjust(Self.meal(), history: [], message: "more"))
+        }
+    }
+
+    @Test("the other provider's word for the ceiling is read the same way")
+    func mistralTruncatedReply() async throws {
+        let keys = try KeyFixture(provider: .mistral, secret: "0123456789abcdefghij")
+        defer { keys.tearDown(provider: .mistral) }
+
+        let client = MistralClient(
+            transport: RecordingTransport(
+                streaming: Reply.mistralStream(#"{"changes":[{"item":1,"gra"#, finishReason: "length")
+            ),
+            keys: keys.source
+        )
+
+        await #expect(throws: AIError.truncatedReply) {
+            _ = try await outcome(of: client.adjust(Self.meal(), history: [], message: "more"))
         }
     }
 }

@@ -37,11 +37,11 @@ nonisolated struct MistralClient: AIClient {
     private static let baseURL = URL(string: "https://api.mistral.ai")!
 
 
-    private let transport: any HTTPTransport
+    private let transport: any StreamingHTTPTransport
     private let keys: ProviderKeySource
 
     init(
-        transport: any HTTPTransport = URLSession.fuel,
+        transport: any StreamingHTTPTransport = URLSession.fuel,
         keys: ProviderKeySource = ProviderKeySource(provider: .mistral)
     ) {
         self.transport = transport
@@ -123,11 +123,14 @@ nonisolated struct MistralClient: AIClient {
 
     // MARK: - Adjusting
 
+    /// The conversation, as a sequence rather than a value. The Anthropic
+    /// client's own note explains why the body is serialised before the task
+    /// starts and why the key is still read inside it.
     func adjust(
         _ meal: AdjustableMeal,
         history: [MealChatTurn],
         message: String
-    ) async throws -> MealAdjustmentOutcome {
+    ) -> AsyncThrowingStream<MealChatEvent, any Error> {
         // The turns so far, then the meal as it now stands with the new
         // message attached to it. See `MealChatContract.turn(for:message:)`
         // for why the meal rides with the current question rather than with
@@ -144,21 +147,89 @@ nonisolated struct MistralClient: AIClient {
             "model": Self.model,
             "max_tokens": MealChatContract.maxTokens,
             "response_format": ["type": "json_object"],
-            "messages": messages
+            "messages": messages,
+            "stream": true
         ]
+        let serialised = try? JSONSerialization.data(withJSONObject: body)
 
-        let reply = try await send(body: body)
-        let intent: MealAdjustmentIntent
+        return AsyncThrowingStream { continuation in
+            let run = Task {
+                do {
+                    guard let serialised else {
+                        throw AIError.malformedResponse
+                    }
+                    try await converse(body: serialised, over: meal) { continuation.yield($0) }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in run.cancel() }
+        }
+    }
+
+    /// One streamed conversation: sign, open, read, assemble. The shape is the
+    /// Anthropic client's, and everything that differs between the two is in
+    /// `step(in:)` and in how the request is signed.
+    private func converse(
+        body: Data,
+        over meal: AdjustableMeal,
+        yield: (MealChatEvent) -> Void
+    ) async throws {
+        // Read the key here, at the moment the request is built, and let it go
+        // out of scope with this function.
+        let key = try keys.key()
+        var request = URLRequest(url: Self.baseURL.appendingPathComponent("v1/chat/completions"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        request.httpBody = body
+        Self.authorise(&request, with: key)
+
+        let response: HTTPStreamResponse
         do {
-            intent = try MealChatContract.intent(from: reply.text)
+            response = try await transport.streamRetryingALostConnection(request)
         } catch {
-            throw Self.ranOutOfTokens(reply.body) ? AIError.truncatedReply : error
+            throw AIError.transportFailure(error)
         }
 
-        return MealAdjustmentOutcome(
-            reply: intent.reply,
-            meal: MealAdjuster.applyAgainstBundledTable(intent, to: meal)
-        )
+        guard (200..<300).contains(response.statusCode) else {
+            throw AIError.from(
+                status: response.statusCode,
+                body: await response.refusalBody(),
+                provider: provider
+            )
+        }
+
+        var events = ServerSentEventDecoder()
+        var assembler = MealChatStreamAssembler()
+
+        do {
+            for try await line in response.lines {
+                guard let payload = events.decode(line) else {
+                    continue
+                }
+                let step = Self.step(in: payload)
+                if let refusal = step.refusal {
+                    throw refusal
+                }
+                if step.ranOutOfTokens {
+                    assembler.noteRanOutOfTokens()
+                }
+                if let text = step.text {
+                    for event in assembler.append(text) {
+                        yield(event)
+                    }
+                }
+            }
+        } catch let error as AIError {
+            throw error
+        } catch {
+            // A body that died part-way. The turn fails rather than landing on
+            // half a sentence — see `MealChatModel.fail(with:as:)`.
+            throw AIError.transportFailure(error)
+        }
+
+        yield(try assembler.finish(over: meal))
     }
 
     // MARK: - The one request path
@@ -261,16 +332,60 @@ nonisolated struct MistralClient: AIClient {
             return ""
         }
 
-        if let text = message["content"] as? String {
+        return text(in: message["content"])
+    }
+
+    /// A `content` field, which Mistral serves either as a string or as an
+    /// array of parts. Joining the text parts is the same answer, written
+    /// differently.
+    private static func text(in content: Any?) -> String {
+        if let text = content as? String {
             return text
         }
-
-        // Mistral also serves `content` as an array of parts. Joining the text
-        // parts is the same answer, written differently.
-        if let parts = message["content"] as? [[String: Any]] {
+        if let parts = content as? [[String: Any]] {
             return parts.compactMap { $0["text"] as? String }.joined()
         }
-
         return ""
+    }
+
+    // MARK: - Streamed response
+
+    /// What one server-sent event from a chat-completions stream says.
+    ///
+    /// Mistral streams the OpenAI shape: the same envelope as a collected
+    /// answer, with `delta` where `message` would be, and a literal `[DONE]`
+    /// closing the stream. `[DONE]` is not JSON and carries nothing, which is
+    /// why it is refused before the parse rather than by it.
+    ///
+    /// **A payload with an `error` in it and no choices** is how a refusal
+    /// raised after the head arrives, and it goes through the same mapping a
+    /// refused status does — so nothing the provider wrote travels further than
+    /// that function.
+    private static func step(
+        in payload: String
+    ) -> (text: String?, ranOutOfTokens: Bool, refusal: AIError?) {
+        guard payload != "[DONE]" else {
+            return (nil, false, nil)
+        }
+
+        guard
+            let object = try? JSONSerialization.jsonObject(with: Data(payload.utf8)) as? [String: Any]
+        else {
+            return (nil, false, nil)
+        }
+
+        guard let choice = (object["choices"] as? [[String: Any]])?.first else {
+            guard object.keys.contains("error") else {
+                return (nil, false, nil)
+            }
+            return (nil, false, AIError.from(status: 200, body: Data(payload.utf8), provider: .mistral))
+        }
+
+        let delta = choice["delta"] as? [String: Any]
+        return (
+            text(in: delta?["content"]),
+            choice["finish_reason"] as? String == "length",
+            nil
+        )
     }
 }

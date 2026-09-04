@@ -86,13 +86,43 @@ final class ScriptedClient: AIClient, @unchecked Sendable {
         _ meal: AdjustableMeal,
         history: [MealChatTurn],
         message: String
-    ) async throws -> MealAdjustmentOutcome {
+    ) -> AsyncThrowingStream<MealChatEvent, any Error> {
         lastAdjustedMeal = meal
         lastHistory = history
         lastMessage = message
         let answer = adjustments[min(adjustRequests, adjustments.count - 1)]
         adjustRequests += 1
-        return try answer.get()
+
+        return AsyncThrowingStream { continuation in
+            switch answer {
+            case .success(let outcome):
+                for event in Self.events(for: outcome) {
+                    continuation.yield(event)
+                }
+                continuation.finish()
+            case .failure(let error):
+                continuation.finish(throwing: error)
+            }
+        }
+    }
+
+    /// The events a real client would produce on the way to `outcome`.
+    ///
+    /// **Derived rather than scripted beside it**, so a suite says what came
+    /// back and not also what order it came back in — and so the two cannot
+    /// disagree. The derivation is the rule itself: a turn announces that it is
+    /// adjusting exactly when it moved something, which on the wire is a
+    /// `changes` or `additions` array with an object in it.
+    static func events(for outcome: MealAdjustmentOutcome) -> [MealChatEvent] {
+        var events: [MealChatEvent] = []
+        if outcome.changedTheMeal {
+            events.append(.adjusting)
+        }
+        if let reply = outcome.reply {
+            events.append(.sentence(reply))
+        }
+        events.append(.finished(outcome))
+        return events
     }
 
     private func next() throws -> MealEstimate {
@@ -160,8 +190,50 @@ nonisolated struct UnusedEstimator: AIClient {
         _ meal: AdjustableMeal,
         history: [MealChatTurn],
         message: String
-    ) async throws -> MealAdjustmentOutcome {
-        throw AIError.cancelled
+    ) -> AsyncThrowingStream<MealChatEvent, any Error> {
+        AsyncThrowingStream { $0.finish(throwing: AIError.cancelled) }
+    }
+}
+
+/// A client whose reply begins and then stops: some of a sentence, and then a
+/// failure.
+///
+/// **The one failure only a streamed answer can have.** A collected response
+/// either arrives or does not, so the screen never had half of one to deal
+/// with. A stream can put four words into the transcript and then lose the
+/// connection, and what happens to those four words is what this exists to
+/// pin: they go, and the failure is shown in their place.
+final class InterruptedClient: AIClient, @unchecked Sendable {
+
+    let provider: AIProvider = .claude
+
+    private let sentence: String
+    private let failure: AIError
+    private(set) var adjustRequests = 0
+
+    init(sentence: String, failing failure: AIError = .network) {
+        self.sentence = sentence
+        self.failure = failure
+    }
+
+    func checkKey(_ key: APIKey) async -> KeyCheckResult { .passed }
+
+    func estimate(photo: MealPhoto, context: String?) async throws -> MealEstimate { throw AIError.cancelled }
+
+    func estimate(text: String) async throws -> MealEstimate { throw AIError.cancelled }
+
+    func adjust(
+        _ meal: AdjustableMeal,
+        history: [MealChatTurn],
+        message: String
+    ) -> AsyncThrowingStream<MealChatEvent, any Error> {
+        adjustRequests += 1
+        let sentence = sentence
+        let failure = failure
+        return AsyncThrowingStream { continuation in
+            continuation.yield(.sentence(sentence))
+            continuation.finish(throwing: failure)
+        }
     }
 }
 
@@ -263,30 +335,58 @@ final class GatedClient: AIClient, @unchecked Sendable {
     /// A conversation held open the same way, and counted in the same
     /// sequence: a screen that can re-analyse and talk at once has two kinds
     /// of request in flight, and `release(_:)` has to be able to name either.
+    ///
+    /// **Everything but the last event goes out before the gate.** The turn is
+    /// then parked exactly where a real one is parked while the model is still
+    /// writing — a sentence part-way in, and either the analysis states raised
+    /// or not — which is the only moment the difference between a question and
+    /// an adjustment is on the screen to be looked at.
     func adjust(
         _ meal: AdjustableMeal,
         history: [MealChatTurn],
         message: String
-    ) async throws -> MealAdjustmentOutcome {
-        let index = await waitForTurn()
-        return try adjustments[min(index, adjustments.count - 1)].get()
+    ) -> AsyncThrowingStream<MealChatEvent, any Error> {
+        AsyncThrowingStream { continuation in
+            let turn = Task {
+                let index = self.claimATurn()
+                let answer = self.adjustments[min(index, self.adjustments.count - 1)]
+
+                if case .success(let outcome) = answer {
+                    for event in ScriptedClient.events(for: outcome).dropLast() {
+                        continuation.yield(event)
+                    }
+                }
+
+                await self.waitForRelease(index)
+
+                switch answer {
+                case .success(let outcome):
+                    continuation.yield(.finished(outcome))
+                    continuation.finish()
+                case .failure(let error):
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in turn.cancel() }
+        }
     }
 
     private func next() async throws -> MealEstimate {
-        let index = await waitForTurn()
+        let index = claimATurn()
+        await waitForRelease(index)
         return try answers[min(index, answers.count - 1)].get()
     }
 
-    private func waitForTurn() async -> Int {
-        let index: Int = lock.withLock {
+    private func claimATurn() -> Int {
+        lock.withLock {
             defer { started += 1 }
             return started
         }
+    }
 
+    private func waitForRelease(_ index: Int) async {
         await withCheckedContinuation { continuation in
             lock.withLock { waiting[index] = continuation }
         }
-
-        return index
     }
 }

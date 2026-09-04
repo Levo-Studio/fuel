@@ -87,9 +87,120 @@ nonisolated struct HTTPResponse: Sendable, Equatable {
     }
 }
 
+// MARK: - Streaming
+
+/// The second thing a provider can be asked for: the answer as it is written,
+/// rather than once it is finished.
+///
+/// **A capability beside `send`, not a replacement for it.** An estimate is a
+/// single JSON object that is worth nothing until it is complete — a half-read
+/// meal is not a smaller meal, it is no meal — so the estimate path and the key
+/// check go on using `send` unchanged and gain nothing from a stream. A
+/// conversation is the opposite: the sentence is prose, it reads the same
+/// arriving as it does arrived, and waiting for the last token to draw the
+/// first word is a wait for nothing.
+///
+/// It refines `HTTPTransport` rather than standing alone because a client that
+/// streams also has to be able to ask a plain question — both provider clients
+/// check a key and estimate a meal — and a second, unrelated transport property
+/// on those types would be a second place a key could be sent from.
+nonisolated protocol StreamingHTTPTransport: HTTPTransport {
+
+    /// Sends `request` and returns as soon as the response head has arrived,
+    /// with the body still open.
+    ///
+    /// Throws for the same reasons `send` does and no others: a transport
+    /// failure before the head. A `4xx` or `5xx` arrives as a status on the
+    /// returned value, with its body still to be read — the caller decides
+    /// whether it is worth reading, which for a refusal means bounded and for
+    /// anything else means not at all.
+    func stream(_ request: URLRequest) async throws -> HTTPStreamResponse
+}
+
+// MARK: - A stream whose head never arrived
+
+extension StreamingHTTPTransport {
+
+    /// Opens `request`, and opens it once more if the first attempt died with
+    /// `NSURLErrorNetworkConnectionLost`.
+    ///
+    /// **The same guess as `sendRetryingALostConnection`, and it is a safer one
+    /// here rather than a riskier one.** That method's caveat is that `-1005`
+    /// can in principle arrive after the provider has already accepted and
+    /// billed the request. `stream` returns the moment the response head lands,
+    /// so a failure thrown *from it* is a failure before any head — the request
+    /// was written into a socket that was already gone. Nothing that had begun
+    /// answering can fail this way.
+    ///
+    /// A connection lost *after* the head is not retried and is not reachable
+    /// from here: it surfaces while the caller is iterating the body, which is
+    /// a half-written answer rather than an undelivered request. See
+    /// `MealChatModel` for what happens to one.
+    func streamRetryingALostConnection(_ request: URLRequest) async throws -> HTTPStreamResponse {
+        do {
+            return try await stream(request)
+        } catch let error as URLError where error.code == .networkConnectionLost {
+            try Task.checkCancellation()
+            return try await stream(request)
+        }
+    }
+}
+
+// MARK: - An answer still arriving
+
+/// A response whose head has arrived and whose body has not.
+///
+/// **Lines rather than bytes**, because every stream Fuel reads is
+/// `text/event-stream` and every event stream is line-oriented. Splitting the
+/// bytes is `URLSession`'s own job and it already does it; handing a client raw
+/// chunks would mean both provider clients reimplementing the same split, and a
+/// test double supplying plausible chunk boundaries rather than a recorded
+/// transcript.
+///
+/// No headers, for the reason `HTTPResponse` carries none.
+nonisolated struct HTTPStreamResponse: Sendable {
+
+    var statusCode: Int
+
+    /// The body, one line at a time, with the line breaks already removed.
+    /// Finishes when the provider closes the stream, and throws whatever the
+    /// connection threw if it dies part-way.
+    var lines: AsyncThrowingStream<String, any Error>
+
+    init(statusCode: Int, lines: AsyncThrowingStream<String, any Error>) {
+        self.statusCode = statusCode
+        self.lines = lines
+    }
+
+    /// The body of a refused stream, read only as far as the error mapping can
+    /// actually use.
+    ///
+    /// **Bounded at `AIError.readableErrorBody` for the reason that bound
+    /// exists**: a body larger than that is not an error message any provider
+    /// writes, and `AIError.from(status:body:provider:)` will not search it. A
+    /// refusal whose body is a megabyte of HTML from something in front of the
+    /// API would otherwise be a megabyte read, decoded and thrown away.
+    ///
+    /// Never called for a stream that was accepted, so a successful answer is
+    /// never buffered whole — which is the point of streaming it.
+    func refusalBody() async -> Data {
+        var body = Data()
+        do {
+            for try await line in lines {
+                body.append(contentsOf: line.utf8)
+                guard body.count < AIError.readableErrorBody else { break }
+            }
+        } catch {
+            // A refusal whose body did not finish arriving is still a refusal,
+            // and the status already says which. Whatever was read stands.
+        }
+        return body
+    }
+}
+
 // MARK: - URLSession
 
-extension URLSession: HTTPTransport {
+extension URLSession: StreamingHTTPTransport {
 
     nonisolated func send(_ request: URLRequest) async throws -> HTTPResponse {
         let (data, response) = try await data(for: request)
@@ -102,6 +213,40 @@ extension URLSession: HTTPTransport {
         }
 
         return HTTPResponse(statusCode: http.statusCode, body: data)
+    }
+
+    /// `bytes(for:)` rather than `data(for:)`: it returns once the head has
+    /// arrived and leaves the body to be pulled, which is the whole difference
+    /// between the two methods on this protocol.
+    ///
+    /// The lines are re-wrapped into an `AsyncThrowingStream` rather than
+    /// handed over as `URLSession.AsyncBytes.AsyncLineSequence`, so
+    /// `HTTPStreamResponse` names one concrete type that a test double can also
+    /// produce. The inner task is cancelled when the caller stops iterating,
+    /// which is what tears the connection down when a message is called off.
+    nonisolated func stream(_ request: URLRequest) async throws -> HTTPStreamResponse {
+        let (bytes, response) = try await self.bytes(for: request)
+
+        guard let http = response as? HTTPURLResponse else {
+            throw AIError.network
+        }
+
+        return HTTPStreamResponse(
+            statusCode: http.statusCode,
+            lines: AsyncThrowingStream { continuation in
+                let pump = Task {
+                    do {
+                        for try await line in bytes.lines {
+                            continuation.yield(line)
+                        }
+                        continuation.finish()
+                    } catch {
+                        continuation.finish(throwing: error)
+                    }
+                }
+                continuation.onTermination = { _ in pump.cancel() }
+            }
+        )
     }
 }
 

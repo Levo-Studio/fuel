@@ -48,6 +48,15 @@ struct MealChatSheet: View {
 
     @FocusState private var isWriting: Bool
 
+    /// How far the field grows before it scrolls inside itself.
+    ///
+    /// **Not a drawn value** — the export has no chat — and not a metric
+    /// either: it is a count of lines rather than a measurement, and what it
+    /// becomes in points is `FuelTypography.body`'s to say. Four is what the
+    /// field has always allowed; it is roughly what fits above a keyboard
+    /// without the transcript disappearing behind the composer.
+    private static let fieldLines = 4
+
     var body: some View {
         ZStack {
             palette.background
@@ -138,6 +147,10 @@ struct MealChatSheet: View {
                 ForEach(model.messages) { message in
                     turn(message)
                 }
+
+                if let arriving = model.arrivingReply {
+                    ArrivingTurn(sentence: arriving)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
@@ -147,6 +160,11 @@ struct MealChatSheet: View {
         .defaultScrollAnchor(.bottom)
         .frame(maxHeight: .infinity)
         .fuelAnimation(FuelMotion.standard, value: model.messages)
+        // Not animated on `arrivingReply`: a curve on every word would be a
+        // hundred overlapping animations on one paragraph, and the reveal is
+        // the text arriving rather than anything moving. What is animated is
+        // the row appearing and going away, which `messages` and the row's own
+        // insertion already cover.
     }
 
     @ViewBuilder
@@ -222,10 +240,31 @@ struct MealChatSheet: View {
     }
 
     /// `axis: .vertical` so a long sentence wraps inside the pill rather than
-    /// scrolling sideways under the send mark. `lineLimit` keeps it from
+    /// scrolling sideways under the send mark. The height cap keeps it from
     /// growing over the transcript; the bound on what can be typed at all is
     /// `MealChatModel.message`'s own, and it is a bound on the user's own
     /// bill rather than on the layout.
+    ///
+    /// **A height in points rather than `lineLimit(1...4)`, because that
+    /// bounded the box and not the text.** SwiftUI sizes a line-limited field
+    /// by the font's line height alone, and `body` carries a 1.5 line-height
+    /// multiple that the layout then adds back between the lines — so the field
+    /// asked for four lines, was given a box the size of four line *boxes*, and
+    /// drew a fourth line eleven points past the bottom of it. Measured at
+    /// 390×844: 75.7 points where four lines of `body` need 86.3, and the last
+    /// line cut through the middle of its letters. One line, two and three were
+    /// all correct, which is why it only showed on a full field.
+    ///
+    /// `FuelTypography.Style.height(ofLines:)` answers with both numbers, so
+    /// this stays right at every Dynamic Type size. Past the cap the field
+    /// scrolls inside itself exactly as it did before.
+    ///
+    /// **`fixedSize` is load-bearing and not decoration.** A bare
+    /// `frame(maxHeight:)` makes the field flexible up to that height, and the
+    /// stack above it duly offers the whole of it — an empty field drew a pill
+    /// four lines tall. Fixing the vertical size asks the field for its own
+    /// height first and lets the frame clamp it, which is the "grows with what
+    /// is typed, stops here" behaviour the cap is for.
     ///
     /// An empty label with a `prompt`, which is the shape screen 12's field
     /// already uses, so the placeholder is a prompt and the accessible name is
@@ -241,7 +280,6 @@ struct MealChatSheet: View {
     /// would make the pill taller than the export's own.
     private var field: some View {
         TextField("", text: Bindable(model).message, prompt: Text(MealChatCopy.placeholder), axis: .vertical)
-        .lineLimit(1...4)
         .focused($isWriting)
         .submitLabel(.send)
         .onSubmit(send)
@@ -250,6 +288,8 @@ struct MealChatSheet: View {
         .fuelStyle(FuelTypography.body)
         .foregroundStyle(palette.ink)
         .tint(palette.accentColor)
+        .frame(maxHeight: FuelTypography.body.height(ofLines: Self.fieldLines))
+        .fixedSize(horizontal: false, vertical: true)
         .padding(.vertical, FuelMetrics.Space.s13)
         .padding(.horizontal, FuelMetrics.Space.s16)
         .background {
@@ -272,29 +312,150 @@ struct MealChatSheet: View {
     /// not ready, which is what an empty field already says. The opacity is
     /// `soft`'s own role, applied to the accent rather than invented as a
     /// number.
+    ///
+    /// **It becomes a stop mark while a reply is arriving**, in the same
+    /// circle rather than beside it, for the same reason it is dimmed rather
+    /// than hidden: a second control appearing next to the first would move
+    /// under the thumb about to press it. A stop has to be somewhere now that a
+    /// question is answered without the analysis states, which is where
+    /// `CANCEL` used to be the only way out of a wait.
     private var sendControl: some View {
-        Button(action: send) {
-            Image(systemName: "arrow.up")
-                .fuelStyle(FuelTypography.iconGlyph)
-                .foregroundStyle(palette.onAccent)
-                .frame(width: FuelMetrics.Control.circleButton, height: FuelMetrics.Control.circleButton)
-                .background {
-                    Circle().fill(model.canSend ? AnyShapeStyle(palette.accentColor) : AnyShapeStyle(palette.soft))
-                }
-                .frame(width: FuelMetrics.Control.minimumHitTarget, height: FuelMetrics.Control.minimumHitTarget)
-                .contentShape(Rectangle())
-                .padding(-FuelMetrics.Control.hitTargetOverhang(around: FuelMetrics.Control.circleButton))
+        Button {
+            if model.isAnswering {
+                stop()
+            } else {
+                send()
+            }
+        } label: {
+            sendMark
         }
         .buttonStyle(FuelPressButtonStyle())
-        .disabled(!model.canSend)
-        .accessibilityLabel(Text(MealChatCopy.send))
-        .fuelAnimation(FuelMotion.standard, value: model.canSend)
+        .disabled(!isReady)
+        .accessibilityLabel(Text(model.isAnswering ? MealChatCopy.stop : MealChatCopy.send))
+        .fuelAnimation(FuelMotion.standard, value: appearance)
+    }
+
+    /// The circle, in a box exactly as tall as one line of the field.
+    ///
+    /// **That box is the alignment.** The two sit in an `HStack` aligned on
+    /// `.bottom`, so what a bare 34-point circle lines up with is the bottom of
+    /// the pill — and the pill's bottom is the field's own 13 points of padding
+    /// below its last line. A circle taller than a line, hung from that edge,
+    /// comes to rest with its centre four and a half points under the text it
+    /// belongs to: at one line it reads as sagging inside the pill, and at two
+    /// it is sixteen points below the pill's middle with nothing to explain
+    /// why.
+    ///
+    /// Giving the circle the field's own line box and the field's own vertical
+    /// padding puts its centre exactly on the last line's centre, at one line
+    /// and at four. The height is measured off a hidden line of the same style
+    /// rather than written down, so it stays right when the user has asked for
+    /// larger text — a number here would be right at one Dynamic Type size and
+    /// wrong at the rest.
+    ///
+    /// The hit region needs no vertical overhang any more: a line of `body`
+    /// inside `s13` above and below is already past `minimumHitTarget` on its
+    /// own. The horizontal overhang stays, so the region is a fingertip wide
+    /// while the layout is only the circle wide and the field keeps the space.
+    private var sendMark: some View {
+        Text(verbatim: " ")
+            .fuelStyle(FuelTypography.body)
+            .frame(width: FuelMetrics.Control.circleButton)
+            .padding(.vertical, FuelMetrics.Space.s13)
+            .hidden()
+            .overlay {
+                Image(systemName: model.isAnswering ? "stop.fill" : "arrow.up")
+                    .fuelStyle(FuelTypography.iconGlyph)
+                    .foregroundStyle(palette.onAccent)
+                    .frame(width: FuelMetrics.Control.circleButton, height: FuelMetrics.Control.circleButton)
+                    .background {
+                        Circle().fill(isReady ? AnyShapeStyle(palette.accentColor) : AnyShapeStyle(palette.soft))
+                    }
+            }
+            .frame(width: FuelMetrics.Control.minimumHitTarget)
+            .contentShape(.rect)
+            .padding(.horizontal, -FuelMetrics.Control.hitTargetOverhang(around: FuelMetrics.Control.circleButton))
+    }
+
+    /// Whether the control has anything to do — send what has been typed, or
+    /// stop what is on its way back.
+    private var isReady: Bool {
+        model.isAnswering || model.canSend
+    }
+
+    /// The two things about the control that change under one curve: the fill
+    /// waking up as the field is typed into, and the mark swapping when a reply
+    /// starts arriving.
+    private var appearance: SendAppearance {
+        SendAppearance(isReady: isReady, isAnswering: model.isAnswering)
+    }
+
+    private struct SendAppearance: Equatable {
+
+        let isReady: Bool
+        let isAnswering: Bool
     }
 
     private func send() {
         guard model.canSend else { return }
         FuelHaptics.play(.selectionChanged)
         model.send()
+    }
+
+    private func stop() {
+        FuelHaptics.play(.selectionChanged)
+        model.cancel()
+    }
+}
+
+// MARK: - A reply on its way
+
+/// The row a reply occupies while it is being written.
+///
+/// **A view of its own rather than a branch inside the transcript**, because
+/// the Reduce Motion decision belongs to `FuelArrival` and a `@ViewBuilder`
+/// method cannot hold one. It is the reply turn's own drawing — `body` in
+/// `ink`, screen 12's type for prose that wraps — so the sentence does not
+/// change weight or colour when the turn lands and the row becomes an ordinary
+/// one.
+///
+/// The waiting line is drawn in `muted` and is Fuel's own words, not the
+/// model's. It stands alone before the first token arrives, and stands for the
+/// whole reply where the user has asked for less motion — see
+/// `FuelMotion.resolveProgressiveReveal`.
+private struct ArrivingTurn: View {
+
+    /// As much of the model's sentence as has been written. Empty until the
+    /// first word.
+    let sentence: String
+
+    @Environment(\.fuelPalette) private var palette
+
+    var body: some View {
+        Group {
+            if sentence.isEmpty {
+                writing
+            } else {
+                FuelArrival {
+                    // Model-written text, bounded at the parse boundary before
+                    // it ever reaches here. Plain `Text`, so there is no markup
+                    // path into the interface for anything a provider wrote.
+                    Text(verbatim: sentence)
+                        .fuelStyle(FuelTypography.body)
+                        .foregroundStyle(palette.ink)
+                } waiting: {
+                    writing
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var writing: some View {
+        Text(MealChatCopy.writing)
+            .fuelStyle(FuelTypography.body)
+            .foregroundStyle(palette.muted)
     }
 }
 
@@ -312,6 +473,11 @@ struct MealChatSheet: View {
 
 #Preview("Nothing said yet") {
     MealChatSheet(model: MealChatPreviewData.empty(), mealTitle: "Salmon with polenta", onClose: {})
+        .environment(\.fuelPalette, FuelPalette(theme: .dark, accent: .mono))
+}
+
+#Preview("A reply arriving") {
+    MealChatSheet(model: MealChatPreviewData.arriving(), mealTitle: "Salmon with polenta", onClose: {})
         .environment(\.fuelPalette, FuelPalette(theme: .dark, accent: .mono))
 }
 
@@ -347,6 +513,18 @@ private enum MealChatPreviewData {
 
     static func empty() -> MealChatModel {
         MealChatModel(subject: PreviewSubject(), client: PreviewAdjuster(), keys: PreviewKeys())
+    }
+
+    /// A question caught half-answered, which is the state that used to be four
+    /// analysis steps over the whole sheet.
+    static func arriving() -> MealChatModel {
+        MealChatModel(
+            subject: PreviewSubject(),
+            client: PreviewAdjuster(),
+            keys: PreviewKeys(),
+            messages: [MealChatMessage(author: .you, text: "Is that a lot of protein?")],
+            arriving: "Around a third of a typical day's protein, and most of it is"
+        )
     }
 }
 
@@ -396,7 +574,7 @@ private struct PreviewAdjuster: AIClient {
         _ meal: AdjustableMeal,
         history: [MealChatTurn],
         message: String
-    ) async throws -> MealAdjustmentOutcome {
-        throw AIError.cancelled
+    ) -> AsyncThrowingStream<MealChatEvent, any Error> {
+        AsyncThrowingStream { $0.finish(throwing: AIError.cancelled) }
     }
 }

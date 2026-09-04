@@ -12,7 +12,7 @@ import UIKit
 /// **Nothing in this file reaches a provider.** A suite that spends the
 /// runner's credit is not a suite anyone can run, and the point of these tests
 /// is what the shell makes of an answer, not that a provider gave one.
-private nonisolated struct StubTransport: HTTPTransport {
+private nonisolated struct StubTransport: StreamingHTTPTransport {
 
     let outcome: Result<HTTPResponse, TransportFailure>
 
@@ -38,6 +38,18 @@ private nonisolated struct StubTransport: HTTPTransport {
         case .failure(.offline): throw URLError(.notConnectedToInternet)
         case .failure(.cancelled): throw CancellationError()
         }
+    }
+
+    /// The shell opens no conversation, so nothing here ever streams. It
+    /// answers with the recorded head and an empty body rather than trapping,
+    /// so a future shell test that does reach a stream fails on what it
+    /// asserted instead of on a stub that refused to exist.
+    func stream(_ request: URLRequest) async throws -> HTTPStreamResponse {
+        let response = try await send(request)
+        return HTTPStreamResponse(
+            statusCode: response.statusCode,
+            lines: AsyncThrowingStream { $0.finish() }
+        )
     }
 }
 
@@ -74,8 +86,8 @@ private nonisolated struct FailingEstimator: AIClient {
         _ meal: AdjustableMeal,
         history: [MealChatTurn],
         message: String
-    ) async throws -> MealAdjustmentOutcome {
-        throw AIError.network
+    ) -> AsyncThrowingStream<MealChatEvent, any Error> {
+        AsyncThrowingStream { $0.finish(throwing: AIError.network) }
     }
 }
 

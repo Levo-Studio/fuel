@@ -44,6 +44,12 @@ nonisolated enum MealChatCopy {
         String(localized: "chat.send")
     }
 
+    /// What the same control says while a reply is arriving, when it stops the
+    /// message instead of sending one.
+    static var stop: String {
+        String(localized: "chat.stop")
+    }
+
     // MARK: - The transcript
 
     /// What a reply reads as when the model moved something but wrote no
@@ -71,6 +77,16 @@ nonisolated enum MealChatCopy {
     /// What the sheet says before anything has been said in it.
     static var empty: String {
         String(localized: "chat.empty")
+    }
+
+    /// The reply row before a word of it has arrived — and the whole of that
+    /// row for as long as it is arriving, where the user has asked for less
+    /// motion and the sentence is therefore drawn only once it is complete.
+    ///
+    /// **The one thing a question shows instead of the analysis states**, so it
+    /// carries the entire answer to "is anything happening" on its own.
+    static var writing: String {
+        String(localized: "chat.writing")
     }
 
     /// One changed row's new weight.

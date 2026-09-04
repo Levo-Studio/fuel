@@ -306,6 +306,24 @@ nonisolated enum FuelMotion {
         reduceMotion ? nil : hold
     }
 
+    /// Whether text that is still being written may be drawn as it is written.
+    ///
+    /// The third question `resolve` cannot answer, and the closest relative of
+    /// `resolvePacing`: a reply arriving word by word is not a transition with
+    /// a curve, it is text rewriting itself while someone is reading it — which
+    /// that function's own paragraph names as close to the centre of what
+    /// Reduce Motion is asked for.
+    ///
+    /// **`false` therefore means the reply is not drawn until it is whole**,
+    /// and the caller keeps saying that it is writing until then. That is not
+    /// the silent wait the progressive reveal exists to avoid: something is
+    /// still on screen answering "is anything happening", it simply does not
+    /// move. What is given up is watching the sentence appear, which is the
+    /// motion; what is kept is the sentence.
+    static func resolveProgressiveReveal(reduceMotion: Bool) -> Bool {
+        !reduceMotion
+    }
+
     /// What a control is drawn at while a finger is down on it.
     ///
     /// `1` under Reduce Motion rather than `Press.scale` held without a spring:
@@ -458,6 +476,36 @@ extension View {
     /// and does not write a bounce behaviour of its own.
     func fuelScrolling() -> some View {
         scrollBounceBehavior(.always)
+    }
+}
+
+// MARK: - Something still arriving
+
+/// Chooses between drawing something as it arrives and waiting for it whole.
+///
+/// **A view rather than a modifier, because the two branches are different
+/// content and not the same content animated differently.** It exists for the
+/// reason `FuelAnimationModifier` does: the accessibility flag is read here,
+/// once, and the call site asks for a decision rather than making one. A
+/// feature file that read the flag itself would be one `if` away from a reveal
+/// that keeps running under Reduce Motion.
+///
+/// `waiting` is what stands in until the whole thing has arrived, and it is the
+/// call site's — this type has no opinion about what a wait looks like, only
+/// about whether there is one.
+struct FuelArrival<Arriving: View, Waiting: View>: View {
+
+    @ViewBuilder let arriving: () -> Arriving
+    @ViewBuilder let waiting: () -> Waiting
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        if FuelMotion.resolveProgressiveReveal(reduceMotion: reduceMotion) {
+            arriving()
+        } else {
+            waiting()
+        }
     }
 }
 
