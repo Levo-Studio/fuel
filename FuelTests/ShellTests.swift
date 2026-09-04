@@ -1237,5 +1237,14 @@ struct MealDetailBackGestureTests {
         #expect(watch.cancelsTouchesInView == false)
         #expect(watch.delaysTouchesBegan == false)
         #expect(watch.delaysTouchesEnded == false)
+        // Nothing on the screen waits for it either — the tie is stated against
+        // the pops, and the watch is not one of them. A list made to wait for a
+        // recogniser that fails on `touchesBegan` would be harmless in practice
+        // and still wrong to have written.
+        #expect(waits(try scrollView(in: pushed).panGestureRecognizer, for: watch) == false)
+        // And it answers no delegate questions: it stands in front of nothing
+        // the screen was already asking, which is the other half of taking
+        // nothing from the list.
+        #expect(watch.delegate == nil)
     }
 }
