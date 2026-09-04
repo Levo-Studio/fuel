@@ -144,14 +144,22 @@ struct MealDetailView: View {
             .presentationDragIndicator(.visible)
             .environment(\.fuelPalette, palette)
         }
-        // No `fuelBackSwipe` here, unlike Settings. This screen is pushed on
-        // `RootShell`'s navigation stack rather than presented in a cover, so
-        // it already has a real edge-swipe — the system's own interactive pop
-        // — and a hand-built one beside it would be a second recogniser
-        // answering the same drag. The discard confirmation a custom gesture
-        // would have needed to route around is handled where the pop itself is
-        // caught: `RootShell.mealDetailPath`, the one place that can intercept
-        // it before the screen is gone.
+        // The system's own interactive pop, and not `fuelBackSwipe` — this
+        // screen is pushed on `RootShell`'s navigation stack rather than
+        // presented in a cover, so the platform already has the gesture and a
+        // hand-built one beside it would be a second recogniser answering the
+        // same drag. What it needed was not to be armed but to be let through:
+        // the breakdown below is a scroll view from edge to edge, and it and
+        // the edge pan had no failure requirement between them, so a drag at
+        // the edge became a scroll on a list with nowhere sideways to go.
+        // `FuelInteractivePop` states the requirement the two were missing and
+        // says at length why it is stated the way it is.
+        //
+        // The discard confirmation the gesture would otherwise walk straight
+        // through is handled where the pop is caught rather than here:
+        // `RootShell.mealDetailPath`, the one place that can intercept it
+        // before the screen is gone.
+        .fuelInteractivePop()
         .onChange(of: model.stage) { previous, current in
             reportOutcome(from: previous, to: current)
         }
