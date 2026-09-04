@@ -553,6 +553,60 @@ struct FuelBackSwipeTests {
                 == false
         )
     }
+
+    // MARK: - Without the edge
+
+    /// What the pushed meal screen asks, where the owner wants the gesture on
+    /// the whole screen and `startX` therefore has no part in the answer.
+    @Test("leaving is the same rule with the edge taken out of it")
+    func leavingIgnoresWhereItStarted() {
+        #expect(FuelBackSwipe.isLeaving(translation: CGSize(width: 200, height: 0)))
+        #expect(FuelBackSwipe.isLeaving(translation: CGSize(width: FuelBackSwipe.travel, height: 0)))
+        #expect(
+            FuelBackSwipe.isLeaving(translation: CGSize(width: FuelBackSwipe.travel - 1, height: 0))
+                == false
+        )
+        #expect(FuelBackSwipe.isLeaving(translation: CGSize(width: 80, height: 300)) == false)
+        #expect(FuelBackSwipe.isLeaving(translation: CGSize(width: -200, height: 0)) == false)
+    }
+
+    /// The same rule again with the distance taken out too, which is all a pan
+    /// has to go on when it is asked whether it may begin.
+    @Test("direction is the rule a drag that has barely started can answer")
+    func directionIgnoresHowFar() {
+        // Far short of `travel`, and already unambiguous.
+        #expect(FuelBackSwipe.isLeavingDirection(translation: CGSize(width: 6, height: 1)))
+        #expect(FuelBackSwipe.isLeavingDirection(translation: CGSize(width: -6, height: 1)) == false)
+        #expect(FuelBackSwipe.isLeavingDirection(translation: CGSize(width: 6, height: 20)) == false)
+        // A finger that has not moved is not going anywhere, which is what keeps
+        // a tap from arming the gesture.
+        #expect(FuelBackSwipe.isLeavingDirection(translation: .zero) == false)
+        // A perfect diagonal is a scroll, the way it is for the day swipe.
+        #expect(FuelBackSwipe.isLeavingDirection(translation: CGSize(width: 30, height: 30)) == false)
+    }
+
+    /// One rule in three tiers, rather than three rules that could come apart:
+    /// anything the edge version accepts, the other two accept as well.
+    @Test("the three tiers agree wherever they overlap")
+    func theTiersAgree() {
+        let drags = [
+            CGSize(width: 200, height: 0),
+            CGSize(width: 61, height: 60),
+            CGSize(width: 59, height: 0),
+            CGSize(width: 80, height: 300),
+            CGSize(width: -200, height: 0),
+            CGSize(width: 6, height: 1),
+            .zero,
+        ]
+        for drag in drags {
+            if FuelBackSwipe.isBackSwipe(startX: 0, translation: drag) {
+                #expect(FuelBackSwipe.isLeaving(translation: drag))
+            }
+            if FuelBackSwipe.isLeaving(translation: drag) {
+                #expect(FuelBackSwipe.isLeavingDirection(translation: drag))
+            }
+        }
+    }
 }
 
 // MARK: - Day swipe

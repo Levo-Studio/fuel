@@ -59,11 +59,39 @@ nonisolated enum FuelBackSwipe {
     /// downwards while a list scrolls — are held by tests rather than by a
     /// simulator someone has to drag on.
     static func isBackSwipe(startX: CGFloat, translation: CGSize) -> Bool {
-        guard startX <= edgeWidth, translation.width >= travel else { return false }
-        // Predominantly horizontal. A drag down the left edge of a scrolling
-        // list drifts sideways, and without this it would eventually close the
-        // screen underneath the person reading it.
-        return abs(translation.height) < translation.width
+        guard startX <= edgeWidth else { return false }
+        return isLeaving(translation: translation)
+    }
+
+    /// Whether a finished drag went far enough, and squarely enough sideways,
+    /// to mean *leave* — with no claim about where it started.
+    ///
+    /// Split out because the pushed meal screen asks the same question without
+    /// the edge half of it: the owner asked for the gesture across that whole
+    /// screen, so `startX` has no part in the answer there. Two copies of "far
+    /// enough, and mostly horizontal" would be two numbers a user could feel
+    /// coming apart, which is the argument `FuelDaySwipe` already makes for
+    /// borrowing `travel` rather than naming its own.
+    static func isLeaving(translation: CGSize) -> Bool {
+        guard translation.width >= travel else { return false }
+        return isLeavingDirection(translation: translation)
+    }
+
+    /// Whether a drag is *going* the way a drag that leaves goes, with no claim
+    /// about how far it has gone yet.
+    ///
+    /// Split off again because the pushed meal screen has to answer it twice at
+    /// two different moments. A `UIPanGestureRecognizer` is asked whether it may
+    /// begin as soon as a drag clears its slop — a few points in, long before
+    /// `travel` — and a gesture that waited for the full distance to claim the
+    /// touch would have lost it to the list underneath by then. So direction
+    /// decides whether the drag is taken, and `isLeaving` decides, at the end,
+    /// whether it counted.
+    static func isLeavingDirection(translation: CGSize) -> Bool {
+        // Rightward, and predominantly horizontal. A drag down the left edge of
+        // a scrolling list drifts sideways, and without the second half it would
+        // eventually close the screen underneath the person reading it.
+        translation.width > 0 && abs(translation.height) < translation.width
     }
 }
 
