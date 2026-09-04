@@ -25,7 +25,9 @@ import SwiftUI
 ///   see `MealResultDraft.canReanalyse` — so a screen where the only change was
 ///   a removal offers `Delete`, not `Re-analyse`, and if the removal were held
 ///   as a pending edit it would simply be lost on `‹ Back` with no way to keep
-///   it.
+///   it. What that write carries is the stored breakdown with one row taken out
+///   of it and nothing else, so it cannot smuggle the next bullet's pending
+///   rows into the database alongside it. See `removeItem`.
 /// - A rewritten or added row is written back by nothing. Its text is a
 ///   question only the model can answer, the figures above the list are still
 ///   the old estimate's, and that is exactly the state `Re-analyse` stands in
@@ -173,6 +175,23 @@ final class MealDetailModel {
     /// A refusal by the draft itself — the last remaining row, or an id that is
     /// not in the list — reaches the store as nothing at all, because there is
     /// nothing to write.
+    ///
+    /// **What is written is the stored breakdown with one row taken out of it,
+    /// and never the draft's own list.** The two are not the same list the
+    /// moment anything else on the screen is pending, and writing the draft's
+    /// broke the promise the paragraph above this file makes: a row the user
+    /// has rewritten carries their text beside the model's old figure, and a
+    /// row they added carries no figure at all, because neither has been
+    /// priced. `FoodEntry` has nowhere to record that — `userWrittenItems`
+    /// lives on the draft and this screen seeds it empty — so a row persisted
+    /// in that state would come back on the next open drawn as the model's own
+    /// work, with a number belonging to different words. Building the payload
+    /// out of `entry.items` makes that impossible rather than merely unlikely:
+    /// the rows in it are the rows the store already holds, whatever the screen
+    /// is showing over them.
+    ///
+    /// A row the user added is on the screen and nowhere else, so removing it
+    /// is not a change to the stored meal at all and makes no write.
     func removeItem(_ id: RecognisedItem.ID) {
         var updated = draft
         updated.removeItem(id)
@@ -184,14 +203,25 @@ final class MealDetailModel {
         // exists to do.
         updated.hasItemEdits = draft.hasItemEdits
 
+        guard entry.items.contains(where: { $0.id == id }) else {
+            draft = updated
+            return
+        }
+
         do {
             try store.update(
                 entry,
-                title: updated.title,
+                // The meal's own, read back rather than taken from the draft,
+                // for the reason the item list is: nothing on this path is
+                // meant to write any of them, and reading them from the row
+                // being written says so.
+                title: entry.title,
+                // The one figure this does change, and it is the draft's
+                // subtraction rather than a second copy of that rule here.
                 kilocalories: updated.kilocalories,
-                macros: updated.macros,
-                advice: updated.advice,
-                items: updated.items
+                macros: entry.macros,
+                advice: entry.advice,
+                items: entry.items.filter { $0.id != id }
             )
         } catch {
             return

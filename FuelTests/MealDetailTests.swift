@@ -246,6 +246,91 @@ struct MealDetailTests {
         #expect(try store.entry(withID: entry.entryID)?.items.count == 1)
     }
 
+    /// **The removal's write must not carry the pending edit beside it.** A
+    /// rewritten row holds the user's words next to the figure the model gave
+    /// for different words, and `FoodEntry` has nowhere to record that the
+    /// figure no longer belongs to the text — `userWrittenItems` is the draft's
+    /// and this screen seeds it empty — so a row persisted in that state comes
+    /// back drawn as the model's own work, priced, with a number that was never
+    /// about it.
+    @Test("removing a row does not store a rewritten row the model has not priced")
+    func removalDoesNotStorePendingEdits() throws {
+        let store = try makeStore()
+        let entry = try logMeal(in: store)
+        let model = try makeModel(entry: entry, store: store, client: ScriptedClient(answer: .success(Self.reestimate)))
+
+        let salmon = try #require(model.draft.items.first?.id)
+        model.editItem(salmon, to: "Salmon fillet, r180g")
+        #expect(model.draft.isPriced(salmon) == false)
+
+        // A different row goes, which is what reaches the store.
+        model.removeItem(try #require(model.draft.items.last?.id))
+
+        let stored = try #require(try store.entry(withID: entry.entryID))
+        #expect(stored.items.map(\.name) == ["Salmon fillet, fried"])
+        #expect(stored.kilocalories == 310)
+        // The screen keeps the words the user typed — they are still pending,
+        // and still unpriced.
+        #expect(model.draft.items.map(\.name) == ["Salmon fillet, r180g"])
+        #expect(model.draft.isPriced(salmon) == false)
+
+        // And the screen opened on that meal again is the meal, not the edit.
+        let reopened = try makeModel(entry: entry, store: store, client: ScriptedClient(answer: .success(Self.reestimate)))
+        let row = try #require(reopened.draft.items.first)
+        #expect(row.name == "Salmon fillet, fried")
+        #expect(row.kilocalories == 240)
+        // The figure and the words are the model's own pair, so the row is
+        // drawn with its price.
+        #expect(reopened.draft.isPriced(row.id))
+        #expect(reopened.draft.canReanalyse == false)
+    }
+
+    /// The same leak from the other end: an added row has no figure at all, so
+    /// storing one would put a zero into a meal beside rows the model priced.
+    @Test("removing a row does not store an added row the model has not priced")
+    func removalDoesNotStoreAddedRows() throws {
+        let store = try makeStore()
+        let entry = try logMeal(in: store)
+        let model = try makeModel(entry: entry, store: store, client: ScriptedClient(answer: .success(Self.reestimate)))
+
+        model.addItem("Olive oil, 1 tbsp")
+        model.removeItem(try #require(model.draft.items.first?.id))
+
+        #expect(model.draft.items.map(\.name) == ["Polenta", "Olive oil, 1 tbsp"])
+
+        let stored = try #require(try store.entry(withID: entry.entryID))
+        #expect(stored.items.map(\.name) == ["Polenta"])
+        #expect(stored.items.map(\.kilocalories) == [150])
+        #expect(stored.kilocalories == 220)
+    }
+
+    /// A row the user added is on the screen and nowhere else, so taking it off
+    /// the screen is the whole of the change and the store is not written at
+    /// all.
+    ///
+    /// A rewrite is left pending on another row to make that assertable: a
+    /// write on this path would carry it, and the state a write leaves behind
+    /// is otherwise identical to the state of not writing.
+    @Test("removing an added row leaves the stored meal untouched")
+    func removingAnAddedRowWritesNothing() throws {
+        let store = try makeStore()
+        let entry = try logMeal(in: store)
+        let model = try makeModel(entry: entry, store: store, client: ScriptedClient(answer: .success(Self.reestimate)))
+
+        let salmon = try #require(model.draft.items.first?.id)
+        model.editItem(salmon, to: "Salmon fillet, r180g")
+        model.addItem("Olive oil, 1 tbsp")
+        model.removeItem(try #require(model.draft.items.last?.id))
+
+        #expect(model.draft.items.map(\.name) == ["Salmon fillet, r180g", "Polenta"])
+        #expect(model.draft.kilocalories == 460)
+        #expect(model.draft.canReanalyse)
+
+        let stored = try #require(try store.entry(withID: entry.entryID))
+        #expect(stored.items.map(\.name) == ["Salmon fillet, fried", "Polenta"])
+        #expect(stored.kilocalories == 460)
+    }
+
     /// An edited list with the old figures over it is not a meal anybody
     /// estimated, so it does not reach the store until the re-analysis does.
     @Test("an item edit alone writes nothing")
