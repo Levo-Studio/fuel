@@ -279,7 +279,7 @@ struct MealChatSheet: View {
     /// already past a fingertip on one line, and a floor on top of the padding
     /// would make the pill taller than the export's own.
     private var field: some View {
-        TextField("", text: Bindable(model).message, prompt: Text(MealChatCopy.placeholder), axis: .vertical)
+        TextField("", text: typing, prompt: Text(MealChatCopy.placeholder), axis: .vertical)
         .focused($isWriting)
         .submitLabel(.send)
         .onSubmit(send)
@@ -300,6 +300,58 @@ struct MealChatSheet: View {
             RoundedRectangle(cornerRadius: FuelMetrics.Radius.pill)
                 .strokeBorder(palette.hair, lineWidth: FuelMetrics.Line.hairline)
         }
+    }
+
+    /// What the field writes back, and the one place the keyboard's own `Send`
+    /// key is answered.
+    ///
+    /// **`onSubmit` is never reached by the on-screen keyboard for a
+    /// `TextField(axis: .vertical)`, and that was the whole of the bug.** A
+    /// vertical field is backed by `SwiftUI.VerticalTextView`, a `UITextView`
+    /// subclass, and the software keyboard hands a text view its return key as
+    /// `insertText("\n")`. That subclass overrides `pressesBegan`, which is
+    /// where a hardware keyboard's return arrives and why `.onSubmit` above
+    /// stays wired — but nothing at all intercepts the text path. So the key
+    /// the user sees drawn as `Send` put a blank line in the field, sent
+    /// nothing, and left the sentence sitting there. Measured on a hosted
+    /// field: it turned `a second, smaller portion` into
+    /// `a second, smaller portion\n` with the transcript still empty.
+    ///
+    /// **A single added line break is that key, and nothing else is.** A paste
+    /// that carries line breaks is text the user is still composing rather than
+    /// an instruction to spend a request on it, so both counts have to move by
+    /// exactly one — which no paste and no ordinary keystroke does.
+    private var typing: Binding<String> {
+        Binding(get: { model.message }, set: { typed in write(typed) })
+    }
+
+    private func write(_ typed: String) {
+        let previous = model.message
+        model.message = typed
+
+        let breaks = typed.count(where: \.isNewline)
+        guard typed.count == previous.count + 1, breaks == previous.count(where: \.isNewline) + 1 else { return }
+
+        // **A turn of the main actor before anything is put back, and it is
+        // load-bearing.** This runs inside the text view's own change
+        // notification, and a `UITextView` does not take a write made from
+        // inside one: the field kept its blank line, and then reported that
+        // stale text straight back through this binding. Answering the key one
+        // turn later is the moment the send mark's own tap answers it, which is
+        // the path that was always right.
+        Task { submit(putting: previous) }
+    }
+
+    /// The keyboard's `Send`, once the field has finished with it.
+    ///
+    /// The line break goes whichever way this ends: a message that is sent
+    /// leaves an empty field, and one refused for being blank leaves the field
+    /// exactly as it stood before the key was pressed. Putting the earlier text
+    /// back rather than filtering the break out is what keeps a return pressed
+    /// in the middle of a sentence from leaving a gap in the middle of a word.
+    private func submit(putting previous: String) {
+        model.message = previous
+        send()
     }
 
     /// The send mark: the footer button's accent fill in the corner control's
