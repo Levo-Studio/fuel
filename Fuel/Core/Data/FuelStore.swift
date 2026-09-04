@@ -143,6 +143,7 @@ final class FuelStore {
         loggedAt: Date,
         source: EntrySource,
         isFavourite: Bool = false,
+        advice: String? = nil,
         items: [RecognisedItem] = [],
         capturedPhotoData: Data? = nil,
         typedSentence: String? = nil
@@ -154,6 +155,7 @@ final class FuelStore {
             loggedAt: loggedAt,
             source: source,
             isFavourite: isFavourite,
+            advice: advice,
             items: items,
             capturedPhotoData: capturedPhotoData,
             typedSentence: typedSentence
@@ -213,16 +215,24 @@ final class FuelStore {
     /// it belongs to and its `08:14 · Photo` line are the same as before. That
     /// is also why nothing is relabelled here — the label is derived from the
     /// time, and the time has not moved.
+    /// **`advice` is written rather than left alone, and it has no default.**
+    /// It is part of what the screen shows about a meal, so a caller that
+    /// re-priced one has to say what the line now reads — including saying it
+    /// is gone. A defaulted `nil` would erase it on every caller that forgot,
+    /// and a parameter left out of this signature would strand it on a meal
+    /// whose figures no longer match it.
     func update(
         _ entry: FoodEntry,
         title: String,
         kilocalories: Int,
         macros: MacroTotals,
+        advice: String?,
         items: [RecognisedItem]
     ) throws {
         entry.title = title
         entry.kilocalories = kilocalories
         entry.macros = macros
+        entry.advice = advice
         entry.items = items
         try context.save()
     }

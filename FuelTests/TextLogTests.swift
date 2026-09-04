@@ -51,14 +51,17 @@ struct TextLogTests {
         ]
     )
 
-    /// What the model comes back with once the user has corrected the list.
+    /// What the model comes back with once the user has corrected one line.
+    ///
+    /// **One row, because one row is what it was asked about.** A re-analysis
+    /// sends the rows the user rewrote and nothing else, so a reply naming the
+    /// eggs nobody touched would be a reply to a question that was never put.
     private static let reestimate = MealEstimate(
-        title: "Eggs with cottage cheese and polenta",
-        kilocalories: 520,
-        macros: MacroTotals(protein: 44, carbs: 41, fat: 23),
+        title: "Polenta, raw 50 g",
+        kilocalories: 180,
+        macros: MacroTotals(protein: 4, carbs: 39, fat: 1),
         items: [
-            RecognisedItem(name: "2 eggs", kilocalories: 158, note: .text(amount: .recognised)),
-            RecognisedItem(name: "Polenta, raw 50 g", kilocalories: 180, note: .text(amount: .recognised)),
+            RecognisedItem(name: "Polenta, raw 50 g", kilocalories: 180, note: .text(amount: .recognised))
         ]
     )
 
@@ -510,18 +513,29 @@ struct TextLogTests {
         model.typedText = Self.sentence
         await model.estimating()
 
+        let eggs = try #require(model.draft?.items.first)
         let polenta = try #require(model.draft?.items.last?.id)
         model.editItem(polenta, to: "Polenta r50g")
         await model.reanalysing()
 
         #expect(client.requests == 2)
-        #expect(client.lastText == "2 eggs, Polenta r50g")
+        // The corrected row alone. The eggs are not in the question, which is
+        // the only reliable way of keeping them out of the answer.
+        #expect(client.lastText == "Polenta r50g")
         // The sentence itself is untouched: screen 15 still quotes it back and
         // `‹ Back` still returns to the field holding it.
         #expect(model.typedText == Self.sentence)
 
         #expect(model.stage == .result)
-        #expect(model.draft?.kilocalories == 520)
+        // The row nobody touched, byte for byte and id included.
+        #expect(model.draft?.items.first == eggs)
+        #expect(model.draft?.items.map(\.name) == ["2 eggs", "Polenta, raw 50 g"])
+        // 158 for the eggs, 180 for the line the model was just asked about.
+        #expect(model.draft?.kilocalories == 338)
+        // The meal keeps its own name and its own macros: the reply named and
+        // priced one line, not the meal.
+        #expect(model.draft?.title == "Eggs with cottage cheese and polenta")
+        #expect(model.draft?.macros == MacroTotals(protein: 47, carbs: 63, fat: 25))
         #expect(model.draft?.hasItemEdits == false)
     }
 

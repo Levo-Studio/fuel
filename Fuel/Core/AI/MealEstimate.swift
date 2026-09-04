@@ -23,6 +23,22 @@ nonisolated struct MealEstimate: Sendable, Equatable {
 
     var macros: MacroTotals
 
+    /// One or two sentences on what is good about the meal or what it is light
+    /// on, in the model's own words. Drawn under the macros.
+    ///
+    /// **Optional end to end, and the absent case is the ordinary one.** A
+    /// model that left the field out, wrote nothing but whitespace, or ran past
+    /// the bound `EstimateContract.boundedAdvice` holds it to arrives here as
+    /// `nil`, and every screen that draws a meal has to be as correct without
+    /// it as with it — nothing about the estimate depends on it and nothing
+    /// waits for it.
+    ///
+    /// It is model-written text like `title` and an item's `name`, and carries
+    /// the same rules: bounded at the parse boundary, rendered as plain text
+    /// with no markup path, and never a provider's words about a failure. See
+    /// `EstimateContract.boundedAdvice`.
+    var advice: String?
+
     /// The breakdown under `Recognised` (photo) or `Broken down` (text).
     /// May be empty: a model that priced a meal without splitting it is a
     /// usable answer, and the result screen simply has no rows to draw.
@@ -32,11 +48,13 @@ nonisolated struct MealEstimate: Sendable, Equatable {
         title: String,
         kilocalories: Int,
         macros: MacroTotals,
+        advice: String? = nil,
         items: [RecognisedItem]
     ) {
         self.title = title
         self.kilocalories = kilocalories
         self.macros = macros
+        self.advice = advice
         self.items = items
     }
 }

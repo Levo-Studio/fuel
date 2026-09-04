@@ -24,6 +24,10 @@ enum CameraPreviewData {
         title: "Salmon with polenta",
         kilocalories: 460,
         macros: MacroTotals(protein: 34, carbs: 28, fat: 23),
+        // Not in the export, which draws nothing in this place — a sample of
+        // the kind of sentence a model returns, so the canvas shows the line at
+        // the length it will usually be.
+        advice: "Plenty of protein and healthy fats. The plate is light on carbohydrate for an evening meal.",
         items: [
             RecognisedItem(
                 name: "Salmon fillet, pan-fried",

@@ -61,6 +61,10 @@ nonisolated struct MealResultConfirmation {
 /// has removed it** — see `itemRow`. With it gone the two frames share the
 /// whole breakdown, not only its geometry.
 ///
+/// One thing the export does not draw at all has been added: the advisor line
+/// under the macros, on both frames, when the estimate came with one. See
+/// `adviceLine`.
+///
 /// Everything else from the pill down is the same drawing, down to each
 /// padding, so the screen is written once.
 ///
@@ -475,10 +479,17 @@ struct MealResultView<Lede: View>: View {
     // MARK: - Macros
 
     private var macroRow: some View {
-        HStack(alignment: .top, spacing: FuelMetrics.Space.s24) {
-            macro(MealResultCopy.macroProtein, draft.macros.protein)
-            macro(MealResultCopy.macroCarbs, draft.macros.carbs)
-            macro(MealResultCopy.macroFat, draft.macros.fat)
+        VStack(alignment: .leading, spacing: .zero) {
+            HStack(alignment: .top, spacing: FuelMetrics.Space.s24) {
+                macro(MealResultCopy.macroProtein, draft.macros.protein)
+                macro(MealResultCopy.macroCarbs, draft.macros.carbs)
+                macro(MealResultCopy.macroFat, draft.macros.fat)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let advice = draft.advice {
+                adviceLine(advice)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, FuelMetrics.Space.s20)
@@ -487,6 +498,46 @@ struct MealResultView<Lede: View>: View {
             palette.hair
                 .frame(height: FuelMetrics.Line.hairline)
         }
+        .fuelAnimation(FuelMotion.standard, value: draft.advice)
+    }
+
+    /// The advisor line: a sentence or two from the model on what is good about
+    /// the meal, or what it is light on.
+    ///
+    /// **Not in the export.** There is no frame with a line in this place, no
+    /// type style drawn for it and no spacing measured for it — the owner asked
+    /// for it after a build, and this is recomposed from what the export does
+    /// draw rather than invented beside it. `hintWrapping` is the drawn style
+    /// for a secondary sentence that wraps under something else — screens 07
+    /// and 12 and the analysis states all set one in it — and `muted` is this
+    /// screen's own colour for text that is not a figure, the one under every
+    /// macro label and on the `Add item` row. The pairing is the same one, said
+    /// on this surface: those screens sit on the camera ground and reach for
+    /// `FuelPalette.Camera.muted`, and screens 14 and 15 sit on `bg`.
+    ///
+    /// The `s14` above it is a gap from the screen's own scale rather than the
+    /// `s8` those hints take. `s8` is what a subtitle takes under its title,
+    /// and this is not a subtitle to the macro figures — it is the next thing
+    /// in the block, and it reads as a remark rather than as a caption on the
+    /// number above it. Nothing is added to the design layer, because nothing
+    /// here is a new value.
+    ///
+    /// **It sits inside the macro block rather than under the rule.** The rule
+    /// is what separates the meal's figures from the breakdown, and this is a
+    /// remark about the figures — the owner asked for it under the
+    /// protein/carbs/fat row, and above the rule is where "under that row"
+    /// falls. The block's own `s20` and its rule are untouched, so with no line
+    /// to draw the screen is the drawing the export gives, to the point.
+    ///
+    /// Model-written text, bounded at the parse boundary and drawn with
+    /// `Text(verbatim:)` like an item's name — a provider's words reach the
+    /// interface as words, never as markup.
+    private func adviceLine(_ advice: String) -> some View {
+        Text(verbatim: advice)
+            .fuelStyle(FuelTypography.hintWrapping)
+            .foregroundStyle(palette.muted)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, FuelMetrics.Space.s14)
     }
 
     private func macro(_ name: String, _ grams: Int) -> some View {
@@ -733,16 +784,18 @@ struct MealResultView<Lede: View>: View {
     /// What the filled button is right now.
     ///
     /// **Not in the export**, which draws `Hinzufügen` and nothing else in this
-    /// place. Once the user has changed the list, the figures above it describe
-    /// a breakdown that no longer exists, and logging them would write down a
-    /// meal nobody estimated. So the button asks the model again instead.
+    /// place. Once the user has rewritten a line or added one, the figure
+    /// beside it is missing and the figures above the list describe a breakdown
+    /// that no longer exists, and logging that would write down a meal nobody
+    /// estimated. So the button asks the model again instead.
     ///
-    /// **Unless the list is empty**, in which case there is nothing to ask
-    /// about and the caller's own action comes back. See
-    /// `MealResultDraft.canReanalyse`, which holds both halves of that rule so
-    /// this button and the request it fires cannot disagree — they used to, and
-    /// a footer reading `Re-analyse` over an emptied list did nothing at all
-    /// while hiding the action it had replaced.
+    /// **Unless the only change was a removal**, which the device has already
+    /// carried out in full — the row is gone and the total gave back what it
+    /// contributed — so there is nothing to ask about and the caller's own
+    /// action comes back. See `MealResultDraft.canReanalyse`, which is the one
+    /// statement of that rule, so this button and the request it fires cannot
+    /// disagree — they used to, and a footer reading `Re-analyse` over an
+    /// emptied list did nothing at all while hiding the action it had replaced.
     ///
     /// It is the one thing this screen decides rather than takes as a
     /// parameter, and deliberately: the rule is the same for every caller, and

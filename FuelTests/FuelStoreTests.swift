@@ -182,6 +182,7 @@ struct FuelStoreTests {
             macros: MacroTotals(protein: 34, carbs: 28, fat: 23),
             loggedAt: at(19, 20),
             source: .photo,
+            advice: "Plenty of protein.",
             items: [RecognisedItem(name: "Polenta", kilocalories: 150, note: .text(amount: .estimated))]
         )
         let identity = entry.entryID
@@ -191,6 +192,7 @@ struct FuelStoreTests {
             title: "Salmon with polenta, raw 50 g",
             kilocalories: 390,
             macros: MacroTotals(protein: 34, carbs: 15, fat: 21),
+            advice: "Plenty of protein, and now with the polenta weighed.",
             items: [RecognisedItem(name: "Polenta, raw 50 g", kilocalories: 80, note: .text(amount: .recognised))]
         )
 
@@ -202,6 +204,10 @@ struct FuelStoreTests {
         #expect(stored.kilocalories == 390)
         #expect(stored.macros == MacroTotals(protein: 34, carbs: 15, fat: 21))
         #expect(stored.items.map(\.name) == ["Polenta, raw 50 g"])
+        // The advisor line is part of what the screen shows about a meal, so a
+        // re-priced meal says what it now reads rather than keeping a sentence
+        // written about the figures it used to have.
+        #expect(stored.advice == "Plenty of protein, and now with the polenta weighed.")
         // The meal was eaten when it was eaten, and it is still the photo entry
         // the day list draws.
         #expect(stored.loggedAt == at(19, 20))

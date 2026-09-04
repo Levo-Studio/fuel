@@ -35,6 +35,9 @@ nonisolated enum EstimateContract {
           "protein_g": integer,
           "carbs_g": integer,
           "fat_g": integer,
+          "advice": string, optional, at most two short sentences on what is \
+        good about this meal or what it is light on. Plain sentences, no \
+        markdown, no lists. Leave it out rather than padding it,
           "items": [
             {
               "name": string,
@@ -213,6 +216,49 @@ nonisolated enum EstimateContract {
     /// entry is bounded too, not just the drawn one.
     static let maximumNameLength = 120
 
+    /// The longest the advisor line may be by the time it leaves this file.
+    ///
+    /// **A boundary invariant like `maximumNameLength`, and a stricter one,
+    /// because this string is drawn as a paragraph rather than as a row.** The
+    /// export draws nothing for it at all — the owner asked for a sentence
+    /// under the macros and there is no frame with one in it — so the screen
+    /// has no drawn height to grow into and no truncation the design specifies.
+    /// 200 characters is two full sentences with room to spare, which is the
+    /// most the prompt asks for.
+    ///
+    /// **Dropped rather than truncated, which is the opposite of what a name
+    /// gets, and the difference is what the two strings are.** A name cut short
+    /// is still a name — the row reads `Chicken and rice with…` and the user
+    /// knows what it means. A sentence cut short is a sentence that stops
+    /// mid-word, and there is nothing under it to make sense of it; a model
+    /// that ignored "at most two short sentences" has not answered this field,
+    /// and the honest drawing of an unanswered optional field is no line at
+    /// all. Nothing else is lost by dropping it: the calories and the macros
+    /// are what the user asked for, and they are parsed independently.
+    static let maximumAdviceLength = 200
+
+    /// Reads the model's advisor line, or `nil` where there is nothing to draw.
+    ///
+    /// Whitespace is collapsed as well as trimmed, so a model that answered in
+    /// two paragraphs, or indented its sentence, cannot decide the height of a
+    /// block on the result screen. What is left is one run of words.
+    ///
+    /// **It is model-authored text and nothing else ever reaches it.** This is
+    /// read from the `advice` key of the estimate object and from no other
+    /// source: no status, no error body, no provider message. The failure paths
+    /// in this file throw before an estimate exists, so there is no route by
+    /// which anything a provider said about a failure can arrive here.
+    static func boundedAdvice(_ raw: String?) -> String? {
+        guard let raw else {
+            return nil
+        }
+        let collapsed = raw.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        guard !collapsed.isEmpty, collapsed.count <= maximumAdviceLength else {
+            return nil
+        }
+        return collapsed
+    }
+
     /// Trims `raw`, and caps it at `maximumNameLength`.
     ///
     /// Returns `nil` for a name that is empty once trimmed, which is the
@@ -283,6 +329,10 @@ nonisolated enum EstimateContract {
                 carbs: max(0, carbs),
                 fat: max(0, fat)
             ),
+            // Optional at every step: a model that left it out, wrote nothing
+            // but spaces or ran on past the bound leaves the estimate exactly
+            // as usable as it was before this field existed.
+            advice: boundedAdvice(payload.advice?.value),
             // A row that cannot be read is dropped rather than taking the
             // whole estimate with it: the totals above are what the day is
             // built from, and a breakdown is a detail on one screen.
@@ -355,6 +405,7 @@ private nonisolated struct EstimatePayload: Decodable {
     var proteinGrams: LenientInt?
     var carbGrams: LenientInt?
     var fatGrams: LenientInt?
+    var advice: LenientString?
     var items: [ItemPayload]?
 
     enum CodingKeys: String, CodingKey {
@@ -363,6 +414,7 @@ private nonisolated struct EstimatePayload: Decodable {
         case proteinGrams = "protein_g"
         case carbGrams = "carbs_g"
         case fatGrams = "fat_g"
+        case advice
         case items
     }
 
@@ -460,6 +512,26 @@ private nonisolated struct EstimatePayload: Decodable {
                 return .estimated
             }
         }
+    }
+}
+
+// MARK: - Lenient string
+
+/// A `String` that reads as absent rather than as an error when the value is
+/// not one.
+///
+/// **A throw inside the decoder takes the whole object with it**, and the
+/// synthesised `decodeIfPresent(String.self, …)` throws on a type mismatch —
+/// so an optional field answered with a number, an object or an array would
+/// cost the user the estimate they paid for, over a field they may not even
+/// have noticed. Anything that is not a JSON string decodes as `nil` here, and
+/// `EstimateContract` treats that as the field having been left out.
+private nonisolated struct LenientString: Decodable {
+
+    let value: String?
+
+    init(from decoder: any Decoder) throws {
+        value = try? decoder.singleValueContainer().decode(String.self)
     }
 }
 
