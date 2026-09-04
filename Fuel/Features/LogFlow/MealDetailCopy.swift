@@ -39,8 +39,10 @@ nonisolated enum MealDetailCopy {
 
     // MARK: - Footer
 
-    /// The filled footer button, in the place and the shape `Add` occupies on
-    /// screens 14 and 15.
+    /// What VoiceOver calls the trash mark in the leading corner of the
+    /// footer. It is the only thing this word is used for — the control it
+    /// names draws a symbol and no label, and the question it raises carries
+    /// its own three words below.
     static var delete: String {
         String(localized: "detail.delete")
     }
