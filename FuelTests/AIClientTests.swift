@@ -2356,13 +2356,37 @@ struct MealAdjustmentClientTests {
         }
     }
 
-    @Test("prose instead of an object is a parse error and reaches no meal")
+    /// **The owner's second report, end to end.** A model that answered in
+    /// sentences is answering the person, and the turn carries what it said
+    /// with the meal exactly as it was — not a retry screen saying the response
+    /// could not be read.
+    @Test("prose instead of an object is the answer, and it moves no meal")
     func proseReply() async throws {
         let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
         defer { keys.tearDown(provider: .claude) }
 
+        let answer = "Olive oil is pure fat, so it adds up quickly even in small amounts."
         let client = AnthropicClient(
-            transport: RecordingTransport(streaming: Reply.anthropicStream("Sure, I have raised the rice!")),
+            transport: RecordingTransport(streaming: Reply.anthropicStream(answer, chunks: 6)),
+            keys: keys.source
+        )
+
+        let said = try await events(of: client.adjust(Self.meal(), history: [], message: "is olive oil a lot?"))
+
+        // No analysis states for a question: the model committed to nothing.
+        #expect(!said.contains(.adjusting))
+        #expect(said.last == .finished(MealAdjustmentOutcome(reply: answer, meal: nil)))
+    }
+
+    /// A reply with nothing readable in it is the case `malformedResponse` is
+    /// left for, and it stays that case.
+    @Test("a reply with nothing in it at all is still unreadable")
+    func emptyReply() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let client = AnthropicClient(
+            transport: RecordingTransport(streaming: Reply.anthropicStream("  \n ")),
             keys: keys.source
         )
 

@@ -58,13 +58,6 @@ struct MealChatContractTests {
         #expect(intent.changes == [MealAdjustmentIntent.Change(itemNumber: 2, grams: 120)])
     }
 
-    @Test("a reply with no object at all is malformed")
-    func noObject() {
-        #expect(throws: AIError.malformedResponse) {
-            _ = try MealChatContract.intent(from: "I am not sure what you mean.")
-        }
-    }
-
     /// A model that mapped nothing has answered the question, and the answer
     /// is "I could not". It is not a parse failure, and treating it as one
     /// would send the user to a retry screen for a request that worked.
@@ -119,6 +112,85 @@ struct MealChatContractTests {
     func additionWithoutName() throws {
         let intent = try MealChatContract.intent(from: #"{"additions":[{"grams":10}]}"#)
         #expect(intent.additions.isEmpty)
+    }
+
+    // MARK: - An answer written as prose
+
+    /// **The failure the owner saw nine times in ten.** A conversational answer
+    /// is an answer, and reading it as one is the difference between the sheet
+    /// saying what polenta is and the sheet saying "unreadable response" over a
+    /// sentence that was sitting right there.
+    @Test("a reply with no object at all is the sentence it plainly is")
+    func proseIsAnAnswer() throws {
+        let intent = try MealChatContract.intent(from: "Polenta is boiled maize meal.")
+
+        #expect(intent.reply == "Polenta is boiled maize meal.")
+        #expect(intent.changes.isEmpty)
+        #expect(intent.additions.isEmpty)
+    }
+
+    /// Prose is drawn and never read. A sentence with figures in it moves
+    /// nothing, because there is no branch that takes a number out of one and
+    /// no field on the intent that could hold it.
+    @Test("a number written into prose is text and reaches no amount")
+    func proseWithFiguresMovesNothing() throws {
+        let reply = "I raised the rice to about 300 g, which is roughly 470 kcal and 10 g of protein."
+
+        let intent = try MealChatContract.intent(from: reply)
+
+        #expect(intent.reply == reply)
+        #expect(intent.changes.isEmpty)
+        #expect(intent.additions.isEmpty)
+    }
+
+    @Test("prose is collapsed to one run of words like any other sentence")
+    func proseIsCollapsed() throws {
+        let intent = try MealChatContract.intent(from: "  Polenta is\n\n  boiled maize meal.  ")
+        #expect(intent.reply == "Polenta is boiled maize meal.")
+    }
+
+    /// The bound, and the reason it is not the sentence's: prose is the whole
+    /// answer rather than a caption beside one.
+    @Test("prose past its own bound is dropped rather than shown short")
+    func dropsOverlongProse() throws {
+        let long = String(repeating: "a", count: MealChatContract.maximumProseLength + 1)
+        #expect(throws: AIError.malformedResponse) {
+            _ = try MealChatContract.intent(from: long)
+        }
+        // A paragraph that would have been dropped as a caption is still an
+        // answer here.
+        let paragraph = String(repeating: "a", count: MealChatContract.maximumReplyLength + 1)
+        #expect(try MealChatContract.intent(from: paragraph).reply == paragraph)
+    }
+
+    /// A reply with nothing in it is the one thing this parse still refuses:
+    /// there is no object, no sentence, and nothing to show a user.
+    @Test(
+        "a reply with nothing in it at all is still malformed",
+        arguments: ["", "   ", "\n\t "]
+    )
+    func emptyReplyIsMalformed(raw: String) {
+        #expect(throws: AIError.malformedResponse) {
+            _ = try MealChatContract.intent(from: raw)
+        }
+    }
+
+    /// **A half-written object is not prose**, and must not be shown to anyone
+    /// as a sentence. It is the case `AIError.truncatedReply` is named for, and
+    /// it stays a failure here.
+    @Test(
+        "a reply cut off inside its own object is not read as a sentence",
+        arguments: [
+            #"{"changes":[{"item":1,"gra"#,
+            "Here is the adjustment: {\"changes\":[",
+            "```json\n{\"changes\":[",
+            "```",
+        ]
+    )
+    func fragmentsAreNotProse(raw: String) {
+        #expect(throws: AIError.malformedResponse) {
+            _ = try MealChatContract.intent(from: raw)
+        }
     }
 
     // MARK: - The sentence

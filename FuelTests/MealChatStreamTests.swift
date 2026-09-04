@@ -208,10 +208,36 @@ struct MealChatStreamAssemblerTests {
         }
     }
 
-    @Test("an unreadable reply that finished is a malformed one")
+    /// A model that answered in sentences has answered. The turn lands with
+    /// what it said and with the meal untouched, which is what a reply carrying
+    /// no change means however it was written.
+    @Test("a reply written as prose finishes as the answer it is")
+    func prose() throws {
+        var assembler = MealChatStreamAssembler()
+        _ = assembler.append("Polenta is boiled maize meal.")
+
+        let finished = try assembler.finish(over: Self.meal())
+
+        #expect(finished == .finished(MealAdjustmentOutcome(reply: "Polenta is boiled maize meal.", meal: nil)))
+    }
+
+    @Test("a reply with nothing readable in it at all is a malformed one")
     func malformed() {
         var assembler = MealChatStreamAssembler()
-        _ = assembler.append("Sure, I raised the rice!")
+        _ = assembler.append("   ")
+
+        #expect(throws: AIError.malformedResponse) {
+            _ = try assembler.finish(over: Self.meal())
+        }
+    }
+
+    /// A stream that ended inside the object it was writing, with nothing from
+    /// the provider to say it hit the ceiling. It is not prose and is not shown
+    /// as any.
+    @Test("a half-written object is a malformed reply rather than a sentence")
+    func fragment() {
+        var assembler = MealChatStreamAssembler()
+        _ = assembler.append(#"{"changes":[{"item":1,"gra"#)
 
         #expect(throws: AIError.malformedResponse) {
             _ = try assembler.finish(over: Self.meal())

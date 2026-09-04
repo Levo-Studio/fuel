@@ -3,7 +3,9 @@ import Foundation
 // MARK: - Contract
 
 /// The second JSON shape both providers are asked for: not "what is this
-/// meal" but "how much of it was there, given what the user has just said".
+/// meal" but "what is this person saying about a meal that is already
+/// recorded" — which is sometimes a correction to an amount, sometimes a
+/// question about the food, and often both in one sentence.
 ///
 /// **A sibling of `EstimateContract`, not a variant of it.** The two ask
 /// different questions and neither answer fits the other's shape — an estimate
@@ -12,6 +14,14 @@ import Foundation
 /// the same transport, the same key source, the same status mapping, the same
 /// lenient number reading and the same rule that the parser assumes nothing
 /// the prompt asked for was honoured.
+///
+/// **A reply that arrived as plain prose is an answer and not a failure**, and
+/// that is the one place this parser is more forgiving than its sibling. An
+/// estimate written as a paragraph is unusable: there is no total in it to put
+/// in a ring. A conversation written as a paragraph is the thing itself — the
+/// user asked something and the model answered — so it is read as a sentence
+/// with no changes under it rather than thrown away. See `intent(from:)` for
+/// the exact rule and for what still fails.
 ///
 /// **The model is never asked for a figure, and there is no field it could put
 /// one in.** The reply carries names and weights. Every kilocalorie and every
@@ -201,6 +211,28 @@ nonisolated enum MealChatContract {
     /// independently of it.
     static let maximumReplyLength = 240
 
+    /// The longest an answer that arrived as prose may be.
+    ///
+    /// **The same rule as `maximumReplyLength` and deliberately not the same
+    /// number**, because the two strings are not carrying the same weight. A
+    /// `reply` sits beside changes that were parsed independently of it, so
+    /// dropping one overlong sentence costs the sentence and leaves the answer
+    /// standing. Prose *is* the answer: there is no object behind it, and
+    /// dropping it costs the user the request. Holding it to a bound written
+    /// for a caption beside a row would put "Nothing changed" over a paragraph
+    /// that answered the question perfectly well.
+    ///
+    /// A thousand characters is a long paragraph and nothing like a page. It is
+    /// generous on purpose — the cap exists to have *a* bound on a string the
+    /// provider fully controls, not to make the model brief — and it is cheap
+    /// to be generous with: the transcript scrolls, holds this only for as long
+    /// as the screen is open, and is written to no store and no log.
+    ///
+    /// **Dropped rather than truncated**, exactly as the sentence is, and for
+    /// the reason given there: a paragraph cut short stops mid-word with
+    /// nothing under it to make sense of it.
+    static let maximumProseLength = 1000
+
     /// How many past exchanges travel with a request.
     ///
     /// **A conversation re-sends everything said so far on every turn**, so
@@ -221,13 +253,34 @@ nonisolated enum MealChatContract {
     /// **It is model-authored text and nothing else ever reaches it.** It is
     /// read from the `reply` key of the adjustment object and from no other
     /// source: no status, no error body, no provider message. Every failure
-    /// path in this file throws before an adjustment exists.
+    /// path in this file throws before an adjustment exists. The one other
+    /// string that reaches the transcript is `boundedProse(_:)`'s, which is the
+    /// model's own words as well and arrives under the same rule.
     static func boundedReply(_ raw: String?) -> String? {
+        bounded(raw, to: maximumReplyLength)
+    }
+
+    /// Reads an answer that arrived as prose, or `nil` where there is nothing
+    /// to draw.
+    ///
+    /// The same collapsing and the same drop as `boundedReply(_:)` — one run of
+    /// words, and no answer at all past the bound rather than half of one — at
+    /// `maximumProseLength`, which says why the two numbers differ.
+    ///
+    /// **It is model-authored text and it stays text.** Nothing is read out of
+    /// it, matched in it, or converted from it: the one thing this function
+    /// does is decide whether a string is fit to be drawn.
+    static func boundedProse(_ raw: String?) -> String? {
+        bounded(raw, to: maximumProseLength)
+    }
+
+    /// Trimmed to one run of words, and dropped rather than cut at `limit`.
+    private static func bounded(_ raw: String?, to limit: Int) -> String? {
         guard let raw else {
             return nil
         }
         let collapsed = raw.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        guard !collapsed.isEmpty, collapsed.count <= maximumReplyLength else {
+        guard !collapsed.isEmpty, collapsed.count <= limit else {
             return nil
         }
         return collapsed
@@ -235,38 +288,93 @@ nonisolated enum MealChatContract {
 
     // MARK: - Parsing
 
-    /// Reads the model's reply into the changes it is asking for.
+    /// Reads the model's reply into the changes it is asking for, or into the
+    /// sentence it answered with.
     ///
     /// Defensive in the same two directions `EstimateContract.estimate(from:
     /// mode:)` is: prose or a code fence around the object is tolerated, and
     /// nothing inside it is repaired blindly.
     ///
-    /// **Nothing here is fatal except an object that cannot be found at all.**
-    /// An estimate throws on a missing total because a zeroed meal would look
-    /// like a real one in the day's ring; this has no such field. A reply with
-    /// no `reply` and no changes is a legitimate answer — the model could not
-    /// map the message onto an amount — and it is `MealAdjuster`, not this,
-    /// that decides an empty answer changes nothing.
+    /// **Nothing here is fatal except a reply with no readable content in it
+    /// at all.** An estimate throws on a missing total because a zeroed meal
+    /// would look like a real one in the day's ring; this has no such field. A
+    /// reply with no `reply` and no changes is a legitimate answer — the model
+    /// could not map the message onto an amount — and it is `MealAdjuster`, not
+    /// this, that decides an empty answer changes nothing.
+    ///
+    /// **A reply that never opened an object is read as what it plainly is: a
+    /// sentence.** This sheet is a conversation, and a conversation's answer to
+    /// "what is polenta" is prose. Throwing it away cost the user a request they
+    /// had already paid for and put "unreadable response" on the screen over an
+    /// answer that was sitting right there, which is how this parse spent most
+    /// of its failures.
+    ///
+    /// Two things keep that from becoming a hole in the architecture, and both
+    /// are structural rather than intended:
+    ///
+    /// - **Prose produces a `reply` and nothing else.** The value returned
+    ///   below carries the default empty `changes` and `additions`; there is no
+    ///   branch here that reads a number out of a sentence, and
+    ///   `MealAdjustmentIntent` has no field a figure could reach even if one
+    ///   were read. A model that writes "that is about 620 kcal" in prose has
+    ///   written a string that is drawn and nothing more.
+    /// - **A half-written object is not prose.** `readsAsProse(_:)` refuses
+    ///   anything with a brace or a fence in it, so a reply cut off inside its
+    ///   own JSON still fails here rather than being shown to the user as a
+    ///   sentence of punctuation. That case is the one `AIError.truncatedReply`
+    ///   exists for.
     ///
     /// Throws `AIError.malformedResponse`. Never crashes, including on a
     /// number too large to be an `Int`.
     static func intent(from reply: String) throws -> MealAdjustmentIntent {
-        guard
+        if
             let object = EstimateContract.firstJSONObject(in: reply),
             let payload = try? JSONDecoder().decode(AdjustmentPayload.self, from: Data(object.utf8))
-        else {
-            throw AIError.malformedResponse
+        {
+            return MealAdjustmentIntent(
+                reply: boundedReply(payload.reply),
+                // A row that cannot be read is dropped rather than taking the
+                // whole answer with it — the same rule an estimate's breakdown
+                // follows, and for the same reason: the other rows are still a
+                // usable answer to what was asked.
+                changes: payload.changes.compactMap(\.change),
+                additions: payload.additions.compactMap(\.addition)
+            )
         }
 
-        return MealAdjustmentIntent(
-            reply: boundedReply(payload.reply),
-            // A row that cannot be read is dropped rather than taking the
-            // whole answer with it — the same rule an estimate's breakdown
-            // follows, and for the same reason: the other rows are still a
-            // usable answer to what was asked.
-            changes: payload.changes.compactMap(\.change),
-            additions: payload.additions.compactMap(\.addition)
-        )
+        guard readsAsProse(reply), let sentence = boundedProse(reply) else {
+            throw AIError.malformedResponse
+        }
+        return MealAdjustmentIntent(reply: sentence)
+    }
+
+    /// Whether `reply` is prose rather than an object that has not finished
+    /// arriving.
+    ///
+    /// **A brace or a backtick anywhere is enough to say it is not.** Both are
+    /// a model answering in the shape it was asked for, however far it got: the
+    /// object itself, or the fence it was about to wrap around one. Neither is
+    /// a character that turns up in a sentence about food, so the test can be
+    /// this blunt and still never mistake an answer for a fragment. The
+    /// backtick is checked singly rather than as a whole fence because a stream
+    /// stops wherever it stops, and one backtick already says what is coming.
+    ///
+    /// Deliberately not "does this parse": a *complete* object is found by
+    /// `EstimateContract.firstJSONObject(in:)` and read as one long before this
+    /// is asked. What this answers is what to do with everything else.
+    static func readsAsProse(_ reply: String) -> Bool {
+        !reply.contains("{") && !reply.contains("`")
+    }
+
+    /// Whether `reply` holds a finished object at all.
+    ///
+    /// Visible past this file because a streamed turn has to ask it about a
+    /// reply nothing has parsed yet: a model stopped at the request's token
+    /// ceiling either finished its object and was cut off after it, or was cut
+    /// off inside its answer, and this is what tells those two apart. See
+    /// `MealChatStreamAssembler.finish(over:)`.
+    static func carriesAnObject(_ reply: String) -> Bool {
+        EstimateContract.firstJSONObject(in: reply) != nil
     }
 }
 
