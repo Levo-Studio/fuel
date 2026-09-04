@@ -428,23 +428,15 @@ private enum MealDetailPreviewData {
                 loggedAt: Date(),
                 source: .photo,
                 advice: "Plenty of protein and healthy fats. The plate is light on carbohydrate for an evening meal.",
-                items: [
-                    RecognisedItem(
-                        name: "Salmon fillet, fried",
-                        kilocalories: 240,
-                        note: .photo(confidence: .confident, approximateGrams: 150)
-                    ),
-                    RecognisedItem(
-                        name: "Polenta",
-                        kilocalories: 150,
-                        note: .photo(confidence: .confident, approximateGrams: 180)
-                    ),
-                    RecognisedItem(
-                        name: "Leaf spinach",
-                        kilocalories: 70,
-                        note: .photo(confidence: .unsure, approximateGrams: 90)
-                    ),
-                ]
+                // Derived rather than written down, so the canvas cannot show a
+                // score the rows under it do not add up to. The percentages are
+                // `CameraPreviewData`'s, which is where the reasoning for them
+                // is: screen 14's own three rows, chosen to sit either side of
+                // the two words the export draws on them.
+                estimateConfidencePercent: EstimateConfidence.percent(
+                    of: CameraPreviewData.items.map(\.confidence)
+                ),
+                items: CameraPreviewData.items
             )
         else {
             return nil

@@ -382,10 +382,38 @@ struct MealResultView<Lede: View>: View {
 
     // MARK: - Label and favourite
 
+    /// The meal pill, the accuracy score and the favourite mark.
+    ///
+    /// **This row is where the score goes, and the export's own structure is
+    /// what puts it here.** Screens 14 and 15 draw exactly one row of standing
+    /// facts about the meal — which meal it is, and whether the user has
+    /// starred it — between the thing at the top of the screen and the
+    /// kilocalorie figure. A score is a third fact of that kind, so it joins
+    /// the row that already holds them rather than displacing something on a
+    /// row that holds figures.
+    ///
+    /// **It leads, beside the meal pill, and not at the trailing end.** The two
+    /// drawn ends are not interchangeable: the meal label is derived from the
+    /// estimate and the favourite mark is the user's own, so the score belongs
+    /// with the first. That also leaves both drawn pills where the export puts
+    /// them — the row is `space-between` with a short pill at each end and
+    /// roughly a hundred and sixty points of nothing in the middle, which is
+    /// where this stands. Nothing on the row moves, which is the whole
+    /// difference between this position and the one it came from.
+    ///
+    /// The `s14` between the pill and the score is this row's own spacing,
+    /// already its `HStack` spacing and its `Spacer`'s minimum before the score
+    /// existed.
     private var labelRow: some View {
         HStack(alignment: .center, spacing: FuelMetrics.Space.s14) {
             mealLabelPill
+
+            if let percent = draft.estimateConfidencePercent {
+                FuelAccuracyLabel(percent: percent)
+            }
+
             Spacer(minLength: FuelMetrics.Space.s14)
+
             favouritePill
         }
         .padding(.top, FuelMetrics.Space.s24)
@@ -467,25 +495,16 @@ struct MealResultView<Lede: View>: View {
     /// The figure still animates, because it still changes — a re-analysis
     /// replaces it.
     ///
-    /// **The accuracy figure leads the row**, to the left of the number as the
-    /// owner asked, sharing the row's own baseline and its own `s8` gap — the
-    /// gap the export puts between the figure and its `kcal` on screen 14, line
-    /// 322. The consequence is worth naming rather than burying: the 58pt
-    /// figure no longer begins at the screen's 28pt margin on a meal that has
-    /// one. The alternative was the trailing end of the row, which the owner
-    /// ruled out in as many words. `FuelAccuracyLabel` carries the type, the
-    /// colour and the argument for both.
-    ///
-    /// A meal with no figure draws the row exactly as it was drawn before this
-    /// existed: the number back at the margin, and nothing in front of it. That
-    /// is every meal repeated from the Recent list and every meal logged before
-    /// the model was asked.
+    /// **The accuracy figure stood here for one round and does not any more.**
+    /// To the left of the number, it pushed the 58pt figure sixty-odd points
+    /// off the screen's drawn 28pt margin — and by a different sixty-odd per
+    /// meal, because a mono element's width follows its digit count, so `9%`
+    /// and `100%` put the hero number in two different places. Seven stacked
+    /// elements share that margin on screen 14 and this broke the largest of
+    /// them, in the middle of the stack. The owner moved the score up to
+    /// `labelRow`; this row is the export's again, unchanged.
     private var caloriesRow: some View {
         HStack(alignment: .lastTextBaseline, spacing: FuelMetrics.Space.s8) {
-            if let percent = draft.estimateConfidencePercent {
-                FuelAccuracyLabel(percent: percent)
-            }
-
             Text(LogFlowFormat.figure(draft.kilocalories))
                 .fuelStyle(FuelTypography.resultCalories)
                 .foregroundStyle(palette.ink)
@@ -498,22 +517,8 @@ struct MealResultView<Lede: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(MealResultCopy.kilocaloriesValue(draft.kilocalories)))
-        // Spoken after the calories rather than before them, which is the
-        // reverse of the drawn order and right for speech: the figure the user
-        // asked for comes first, and how sure the model is of it qualifies it.
-        // `children: .ignore` above means the label's own spoken form does not
-        // reach VoiceOver from here, so it is named again.
-        .accessibilityValue(accuracyValue)
         .padding(.top, FuelMetrics.Space.s22)
         .fuelAnimation(FuelMotion.value, value: draft.kilocalories)
-    }
-
-    /// The spoken accuracy, or nothing at all for a meal that has no figure.
-    private var accuracyValue: Text {
-        guard let percent = draft.estimateConfidencePercent else {
-            return Text(verbatim: "")
-        }
-        return Text(FuelAccuracyCopy.spoken(percent))
     }
 
     // MARK: - Macros

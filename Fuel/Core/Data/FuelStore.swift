@@ -319,11 +319,10 @@ extension FoodEntry {
     /// nutrition core has no use for either, and what it cannot see it cannot
     /// come to depend on.
     ///
-    /// The accuracy figure travels, for the same reason `title` and `source`
-    /// do: the day list draws it on the row, and a row is built from this value
-    /// and nothing else. It travels as the stored percentage rather than as the
-    /// items it was averaged from, so nothing downstream can re-derive a figure
-    /// for a meal that never had an estimate.
+    /// The accuracy figure stays behind with them. It was carried here while
+    /// the score stood on a day-list row; the owner has since put it on the
+    /// meal detail screen alone, which reads the entry itself, so the nutrition
+    /// core would be holding a field nothing asks it for.
     var nutritionValue: NutritionEntry {
         NutritionEntry(
             id: entryID,
@@ -333,8 +332,7 @@ extension FoodEntry {
             loggedAt: loggedAt,
             source: source,
             label: label,
-            isLabelUserSet: isLabelUserSet,
-            estimateConfidencePercent: estimateConfidencePercent
+            isLabelUserSet: isLabelUserSet
         )
     }
 

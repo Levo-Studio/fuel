@@ -70,16 +70,6 @@ nonisolated struct NutritionEntry: Hashable, Sendable, Identifiable {
     /// control on the result screen a lie.
     var isLabelUserSet: Bool
 
-    /// How sure the model was of the estimate this meal was logged from, as a
-    /// whole percent, or `nil` where no estimate produced one.
-    ///
-    /// It is carried and never computed here. `EstimateConfidence` derives the
-    /// figure from an estimate's rows once, at the point the meal is written
-    /// down; this is the answer travelling out to the row that draws it. A
-    /// meal repeated from the Recent list has none, because nothing was
-    /// estimated for it — see `FoodEntry.estimateConfidencePercent`.
-    var estimateConfidencePercent: Int?
-
     init(
         id: UUID = UUID(),
         title: String,
@@ -88,8 +78,7 @@ nonisolated struct NutritionEntry: Hashable, Sendable, Identifiable {
         loggedAt: Date,
         source: EntrySource,
         label: MealLabel,
-        isLabelUserSet: Bool = false,
-        estimateConfidencePercent: Int? = nil
+        isLabelUserSet: Bool = false
     ) {
         self.id = id
         self.title = title
@@ -99,7 +88,6 @@ nonisolated struct NutritionEntry: Hashable, Sendable, Identifiable {
         self.source = source
         self.label = label
         self.isLabelUserSet = isLabelUserSet
-        self.estimateConfidencePercent = estimateConfidencePercent
     }
 
     func withLabel(_ label: MealLabel, userSet: Bool) -> NutritionEntry {

@@ -22,10 +22,10 @@ struct AccuracyStorageTests {
         )
     }
 
-    @Test("a logged figure reaches the row that draws it")
-    func figureTravelsToTheDayList() throws {
+    @Test("a logged figure is read back off the entry the detail screen opens")
+    func figureIsStored() throws {
         let store = try makeStore()
-        try store.log(
+        let entry = try store.log(
             title: "Salmon with polenta",
             kilocalories: 460,
             macros: .zero,
@@ -35,9 +35,7 @@ struct AccuracyStorageTests {
             items: [scannedItem("Salmon", kilocalories: 240, percent: 90)]
         )
 
-        let day = try store.nutritionEntries(on: at(19, 20))
-
-        #expect(day.first?.estimateConfidencePercent == 73)
+        #expect(try store.entry(withID: entry.entryID)?.estimateConfidencePercent == 73)
     }
 
     /// A meal logged before the model was ever asked. The property is new and
@@ -46,7 +44,7 @@ struct AccuracyStorageTests {
     @Test("an entry from before the field existed has no figure")
     func olderEntryHasNoFigure() throws {
         let store = try makeStore()
-        try store.log(
+        let entry = try store.log(
             title: "Porridge",
             kilocalories: 420,
             macros: .zero,
@@ -54,9 +52,7 @@ struct AccuracyStorageTests {
             source: .photo
         )
 
-        let day = try store.nutritionEntries(on: at(8, 14))
-
-        #expect(day.first?.estimateConfidencePercent == nil)
+        #expect(try store.entry(withID: entry.entryID)?.estimateConfidencePercent == nil)
     }
 
     /// The case the figure is stored rather than derived for. A repeat carries
@@ -90,7 +86,7 @@ struct AccuracyStorageTests {
         let model = LogFlowModel(store: store, now: { at(15, 5) })
         #expect(model.log(recent))
 
-        let repeated = try #require(try store.nutritionEntries(on: at(15, 5)).first { $0.source == .recent })
+        let repeated = try #require(try store.entries(on: at(15, 5)).first { $0.source == .recent })
         #expect(repeated.estimateConfidencePercent == nil)
     }
 
