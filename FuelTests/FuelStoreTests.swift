@@ -138,6 +138,27 @@ struct FuelStoreTests {
         #expect(try store.hasAnyEntry())
     }
 
+    // MARK: - The far end of the history
+
+    @Test("an empty store has no earliest entry")
+    func earliestOfAnEmptyStore() throws {
+        let store = try makeStore()
+        #expect(try store.earliestEntryDate() == nil)
+    }
+
+    /// The oldest, not the first written. Entries arrive in whatever order the
+    /// user logs them, and a meal backdated behind everything already stored
+    /// moves the far end of the history rather than joining behind it.
+    @Test("the earliest entry is the oldest one, whenever it was written")
+    func earliestIsTheOldestNotTheFirstWritten() throws {
+        let store = try makeStore()
+        try store.log(title: "Bowl", kilocalories: 680, macros: .zero, loggedAt: at(12, 40, day: 4), source: .text)
+        try store.log(title: "Porridge", kilocalories: 420, macros: .zero, loggedAt: at(8, 14, day: 1), source: .photo)
+        try store.log(title: "Salmon", kilocalories: 430, macros: .zero, loggedAt: at(19, 20, day: 7), source: .photo)
+
+        #expect(try store.earliestEntryDate() == at(8, 14, day: 1))
+    }
+
     // MARK: - A meal already in the store
 
     @Test("an entry comes back by the identity the hand-off carries")

@@ -68,6 +68,27 @@ final class FuelStore {
         return try !context.fetch(descriptor).isEmpty
     }
 
+    /// When the oldest stored meal was logged, or `nil` when nothing has ever
+    /// been logged.
+    ///
+    /// It is the far end of what Today can be browsed back to. Days older than
+    /// this are not days the user forgot to log — they are days before Fuel had
+    /// anything to say about them, and paging into them would be a walk with no
+    /// end and nothing in it.
+    ///
+    /// The instant rather than the day, because the day depends on a calendar
+    /// and this file already holds one that a caller may not share. Whoever
+    /// asks decides which day this instant falls in.
+    ///
+    /// One row answers it, so the fetch is limited to one rather than sorting a
+    /// store that grows for the life of the app — the same shape `hasAnyEntry`
+    /// uses, for the same reason.
+    func earliestEntryDate() throws -> Date? {
+        var descriptor = FetchDescriptor<FoodEntry>(sortBy: [SortDescriptor(\.loggedAt)])
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first?.loggedAt
+    }
+
     /// The most recently logged entries, newest first, for the Recent tab.
     func recentEntries(limit: Int) throws -> [FoodEntry] {
         var descriptor = FetchDescriptor<FoodEntry>(
