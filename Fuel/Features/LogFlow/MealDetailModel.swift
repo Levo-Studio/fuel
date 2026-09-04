@@ -144,6 +144,7 @@ final class MealDetailModel {
             title: entry.title,
             kilocalories: entry.kilocalories,
             macros: entry.macros,
+            advice: entry.advice,
             items: entry.items,
             label: entry.label,
             isLabelUserSet: entry.isLabelUserSet,
@@ -189,6 +190,7 @@ final class MealDetailModel {
                 title: updated.title,
                 kilocalories: updated.kilocalories,
                 macros: updated.macros,
+                advice: updated.advice,
                 items: updated.items
             )
         } catch {
@@ -388,6 +390,7 @@ final class MealDetailModel {
                 title: merged.title,
                 kilocalories: merged.kilocalories,
                 macros: merged.macros,
+                advice: merged.advice,
                 items: merged.items
             )
         } catch {

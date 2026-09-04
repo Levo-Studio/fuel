@@ -50,6 +50,7 @@ struct CameraLogTests {
         title: "Salmon with polenta",
         kilocalories: 460,
         macros: MacroTotals(protein: 34, carbs: 28, fat: 23),
+        advice: "Plenty of protein and healthy fats.",
         items: [
             RecognisedItem(
                 name: "Salmon fillet, pan-fried",
@@ -75,6 +76,7 @@ struct CameraLogTests {
         title: "Polenta",
         kilocalories: 150,
         macros: MacroTotals(protein: 3, carbs: 33, fat: 1),
+        advice: "Mostly carbohydrate.",
         items: [
             RecognisedItem(name: "Polenta", kilocalories: 150, note: .text(amount: .recognised))
         ]
@@ -136,6 +138,49 @@ struct CameraLogTests {
             .photo(confidence: .confident, approximateGrams: 150),
             .photo(confidence: .unsure, approximateGrams: 90),
         ])
+        #expect(draft.advice == "Plenty of protein and healthy fats.")
+    }
+
+    /// The absent case is the one every screen has to draw as it drew before
+    /// the line existed, so it is pinned rather than assumed.
+    @Test("an estimate with no advisor line leaves the draft without one")
+    func adviceIsOptional() async throws {
+        let client = ScriptedClient(answer: .success(MealEstimate(
+            title: "Salmon with polenta",
+            kilocalories: 460,
+            macros: MacroTotals(protein: 34, carbs: 28, fat: 23),
+            items: []
+        )))
+        let model = makeModel(store: try makeStore(), client: client)
+
+        await model.scanning(pixel())
+
+        #expect(model.draft?.advice == nil)
+        #expect(model.draft?.kilocalories == 460)
+    }
+
+    /// The advisor line follows the same rule as the meal's title: a reply
+    /// about one corrected row is not a remark about the meal, and a reply
+    /// about every row is.
+    @Test("a partial re-analysis keeps the meal's advisor line and a full one replaces it")
+    func adviceFollowsTheScopeOfTheReply() async throws {
+        let client = ScriptedClient(answers: [.success(Self.estimate), .success(Self.reestimate)])
+        let model = makeModel(store: try makeStore(), client: client)
+        await model.scanning(pixel())
+
+        model.editItem(try #require(model.draft?.items.last?.id), to: "Polenta r50g")
+        await model.reanalysing()
+
+        #expect(model.draft?.advice == "Plenty of protein and healthy fats.")
+
+        // Now every row is the user's, so the next reply is about the whole
+        // meal and its line is the meal's.
+        let items = try #require(model.draft?.items)
+        model.editItem(items[0].id, to: "Salmon fillet, r180g")
+        model.editItem(items[1].id, to: "Polenta, 200 g")
+        await model.reanalysing()
+
+        #expect(model.draft?.advice == "Mostly carbohydrate.")
     }
 
     @Test("the scan walks all four analysis steps in the drawn order")
@@ -705,6 +750,9 @@ struct CameraLogTests {
             .photo(confidence: .confident, approximateGrams: 150),
             .photo(confidence: .unsure, approximateGrams: 90),
         ])
+        // Kept with the meal, so opening it again shows the sentence it was
+        // logged with rather than a request to write it a second time.
+        #expect(entry.advice == "Plenty of protein and healthy fats.")
     }
 
     @Test("committing writes the compressed frame behind the entry, not the raw one")

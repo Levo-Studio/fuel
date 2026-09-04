@@ -38,6 +38,7 @@ struct MealDetailTests {
             macros: MacroTotals(protein: 34, carbs: 28, fat: 23),
             loggedAt: moment,
             source: source,
+            advice: "Plenty of protein and healthy fats.",
             items: items,
             capturedPhotoData: capturedPhotoData,
             typedSentence: typedSentence
@@ -121,6 +122,10 @@ struct MealDetailTests {
         #expect(model.stage == .detail)
         #expect(model.draft.title == "Salmon with polenta")
         #expect(model.draft.kilocalories == 460)
+        // The advisor line the meal was logged with, drawn again rather than
+        // asked for again — a second request would spend the user's credit to
+        // be told what they have already read.
+        #expect(model.draft.advice == "Plenty of protein and healthy fats.")
         #expect(model.draft.macros == MacroTotals(protein: 34, carbs: 28, fat: 23))
         #expect(model.draft.items.map(\.name) == ["Salmon fillet, fried", "Polenta"])
         #expect(model.draft.label == .dinner)

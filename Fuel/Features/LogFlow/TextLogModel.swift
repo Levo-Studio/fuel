@@ -360,6 +360,7 @@ final class TextLogModel {
             title: estimate.title,
             kilocalories: estimate.kilocalories,
             macros: estimate.macros,
+            advice: estimate.advice,
             items: estimate.items,
             label: store.provisionalLabel(at: enteredAt),
             isLabelUserSet: false,
@@ -482,6 +483,7 @@ final class TextLogModel {
                 loggedAt: enteredAt,
                 source: .text,
                 isFavourite: draft.isFavourite,
+                advice: draft.advice,
                 items: draft.items,
                 typedSentence: typedText
             )

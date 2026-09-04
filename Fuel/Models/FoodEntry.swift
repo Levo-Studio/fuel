@@ -69,6 +69,21 @@ final class FoodEntry {
     /// `capturedPhotoData` is.
     var typedSentence: String?
 
+    /// The advisor line the estimate came with, so the meal detail screen draws
+    /// the same sentence the result screen did.
+    ///
+    /// **Kept for the same reason the photo and the sentence are**, and the
+    /// argument is the owner's own: what the screen showed when the meal was
+    /// logged is what it should show when the meal is opened again. Deriving it
+    /// a second time is not an option — it would mean a request, and a request
+    /// spends the user's credit to be told something they have already read.
+    ///
+    /// `nil` for a meal repeated from the Recent list, for an estimate whose
+    /// model left the field out, and for any entry logged before this property
+    /// existed — optional and new, so SwiftData opens an older row with nothing
+    /// here rather than failing to open it, exactly as `typedSentence` did.
+    var advice: String?
+
     init(
         entryID: UUID = UUID(),
         title: String,
@@ -79,6 +94,7 @@ final class FoodEntry {
         label: MealLabel = .snack,
         isLabelUserSet: Bool = false,
         isFavourite: Bool = false,
+        advice: String? = nil,
         items: [RecognisedItem] = [],
         capturedPhotoData: Data? = nil,
         typedSentence: String? = nil
@@ -94,6 +110,7 @@ final class FoodEntry {
         self.labelRawValue = label.rawValue
         self.isLabelUserSet = isLabelUserSet
         self.isFavourite = isFavourite
+        self.advice = advice
         self.items = items
         self.capturedPhotoData = capturedPhotoData
         self.typedSentence = typedSentence

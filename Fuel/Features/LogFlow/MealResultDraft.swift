@@ -31,6 +31,12 @@ nonisolated struct MealResultDraft: Equatable, Sendable {
 
     var kilocalories: Int
     var macros: MacroTotals
+
+    /// The advisor line under the macros, in the model's own words, or `nil`
+    /// where there is none — which is a state every screen has to draw as it
+    /// drew before the line existed. See `MealEstimate.advice`.
+    var advice: String?
+
     var items: [RecognisedItem]
 
     /// What the meal-label rule gives this moment, until the user says
@@ -171,6 +177,7 @@ nonisolated struct MealResultDraft: Equatable, Sendable {
         title = estimate.title
         kilocalories = estimate.kilocalories
         macros = estimate.macros
+        advice = estimate.advice
         items = estimate.items
         userWrittenItems = []
         hasItemEdits = false
@@ -189,11 +196,17 @@ nonisolated struct MealResultDraft: Equatable, Sendable {
     /// its `macros` and its `note` byte for byte, so a figure CIQUAL grounded
     /// stays grounded and a photo row keeps the weight the photograph gave it.
     ///
-    /// **Two things about the meal deliberately do not move on a splice: the
-    /// title and the macros.** The reply's title names the handful of items it
-    /// was asked about — `Rice` after a correction to one line — and writing it
-    /// over the meal would rename `Salmon with polenta` after an edit to the
-    /// spinach. The macros are the harder case and the answer is
+    /// **Three things about the meal deliberately do not move on a splice: the
+    /// title, the advisor line and the macros.** The reply's title names the
+    /// handful of items it was asked about — `Rice` after a correction to one
+    /// line — and writing it over the meal would rename `Salmon with polenta`
+    /// after an edit to the spinach. Its advisor line is the same story said in
+    /// a sentence: advice written about one corrected row, drawn under the
+    /// whole meal's macros, would be advice about a meal nobody described. The
+    /// standing line describes the meal before one row changed, which is a
+    /// closer description of what is on the screen than a remark about the row
+    /// on its own, and closer than nothing. The macros are the harder case and
+    /// the answer is
     /// `FoodTableGrounding`'s again: the model is asked for macros once, for
     /// the whole meal, and never per row, so the meal's macro figure has no
     /// part in it attributable to the rows that changed and nothing that can

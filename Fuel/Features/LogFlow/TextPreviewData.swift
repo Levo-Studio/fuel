@@ -22,6 +22,10 @@ enum TextPreviewData {
         title: "Eggs with cottage cheese and polenta",
         kilocalories: 628,
         macros: MacroTotals(protein: 47, carbs: 63, fat: 25),
+        // Not in the export, which draws nothing in this place — a sample of
+        // the kind of sentence a model returns, so the canvas shows the line at
+        // the length it will usually be.
+        advice: "Good protein for a breakfast. Light on fibre — a piece of fruit would round it out.",
         items: [
             RecognisedItem(name: "2 eggs", kilocalories: 158, note: .text(amount: .recognised)),
             RecognisedItem(name: "200g cottage cheese", kilocalories: 320, note: .text(amount: .recognised)),

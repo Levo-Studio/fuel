@@ -330,6 +330,7 @@ private enum MealDetailPreviewData {
                 macros: MacroTotals(protein: 34, carbs: 28, fat: 23),
                 loggedAt: Date(),
                 source: .photo,
+                advice: "Plenty of protein and healthy fats. The plate is light on carbohydrate for an evening meal.",
                 items: [
                     RecognisedItem(
                         name: "Salmon fillet, fried",
