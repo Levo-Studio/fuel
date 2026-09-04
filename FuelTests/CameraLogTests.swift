@@ -64,22 +64,19 @@ struct CameraLogTests {
         ]
     )
 
-    /// What the model comes back with once the user has corrected the list.
+    /// What the model comes back with once the user has corrected one line.
+    ///
+    /// **One row, because one row is what it was asked about.** A re-analysis
+    /// sends the rows the user rewrote and nothing else, so a reply naming the
+    /// salmon nobody touched would be a reply to a question that was never put.
+    /// The note is a text note for the same reason: the request goes through
+    /// the typed-estimate path, and there is no photograph in it to weigh.
     private static let reestimate = MealEstimate(
-        title: "Salmon with polenta",
-        kilocalories: 390,
-        macros: MacroTotals(protein: 33, carbs: 21, fat: 19),
+        title: "Polenta",
+        kilocalories: 150,
+        macros: MacroTotals(protein: 3, carbs: 33, fat: 1),
         items: [
-            RecognisedItem(
-                name: "Salmon fillet, pan-fried",
-                kilocalories: 240,
-                note: .photo(confidence: .confident, approximateGrams: 150)
-            ),
-            RecognisedItem(
-                name: "Polenta",
-                kilocalories: 150,
-                note: .photo(confidence: .confident, approximateGrams: 50)
-            ),
+            RecognisedItem(name: "Polenta", kilocalories: 150, note: .text(amount: .recognised))
         ]
     )
 
@@ -249,9 +246,10 @@ struct CameraLogTests {
 
     // MARK: - Editing the result
 
-    @Test("removing an item takes it out of the list and marks the estimate stale")
+    @Test("removing an item takes its calories with it and asks the model nothing")
     func removingAnItem() async throws {
-        let model = makeModel(store: try makeStore(), client: ScriptedClient(answer: .success(Self.estimate)))
+        let client = ScriptedClient(answer: .success(Self.estimate))
+        let model = makeModel(store: try makeStore(), client: client)
         await model.scanning(pixel())
 
         let spinach = try #require(model.draft?.items.last?.id)
@@ -261,10 +259,43 @@ struct CameraLogTests {
 
         #expect(model.draft?.items.map(\.name) == ["Salmon fillet, pan-fried"])
         #expect(model.draft?.hasItemEdits == true)
-        // Nothing is recalculated on the device: the figures above the list are
-        // still the ones the model gave for the meal it was shown.
-        #expect(model.draft?.kilocalories == 460)
+        // The row's own figure comes back out of the total, which is arithmetic
+        // on two numbers the model wrote — 460 for the meal, 70 for the leaf
+        // spinach it has just been told does not belong.
+        #expect(model.draft?.kilocalories == 390)
+        // The macros stand. The model is asked for them once for the whole meal
+        // and never per row, so there is nothing in that figure attributable to
+        // the row that left, and taking a share of it out would be a number
+        // nobody produced.
         #expect(model.draft?.macros == MacroTotals(protein: 34, carbs: 28, fat: 23))
+        // And there is nothing left to ask about: no row here holds text the
+        // model has not read.
+        #expect(model.draft?.canReanalyse == false)
+
+        await model.reanalysing()
+        #expect(client.requests == 1)
+    }
+
+    @Test("a removed row's calories cannot take the total below zero")
+    func removingCannotDriveTheTotalNegative() async throws {
+        // A model that priced the meal below the sum of its own rows is a reply
+        // Fuel has no way to refuse — the two figures are asked for separately
+        // — so the subtraction has to hold for it too.
+        let client = ScriptedClient(answer: .success(MealEstimate(
+            title: "Salmon with polenta",
+            kilocalories: 40,
+            macros: MacroTotals(protein: 34, carbs: 28, fat: 23),
+            items: [
+                RecognisedItem(name: "Salmon fillet, pan-fried", kilocalories: 240, note: .text(amount: .estimated)),
+                RecognisedItem(name: "Leaf spinach", kilocalories: 70, note: .text(amount: .estimated)),
+            ]
+        )))
+        let model = makeModel(store: try makeStore(), client: client)
+        await model.scanning(pixel())
+
+        model.removeItem(try #require(model.draft?.items.last?.id))
+
+        #expect(model.draft?.kilocalories == 0)
     }
 
     @Test("removing a line that is not in the list changes nothing")
@@ -374,17 +405,144 @@ struct CameraLogTests {
         model.editItem(spinach, to: "Polenta r50g")
         await model.reanalysing()
 
-        // The text estimate, which is what carries the list. A second photo
-        // request would ask the model to re-derive what the user overruled.
+        // The text estimate, which is what carries the corrected row. A second
+        // photo request would ask the model to re-derive what the user
+        // overruled.
         #expect(client.requests == 2)
-        #expect(client.lastText == "Salmon fillet, pan-fried, Polenta r50g")
+        // And it carries the corrected row alone. The salmon is not in the
+        // question, which is the only reliable way of keeping it out of the
+        // answer.
+        #expect(client.lastText == "Polenta r50g")
 
         #expect(model.stage == .result)
+        // 240 for the row nobody touched, 150 for the one the model was just
+        // asked about.
         #expect(model.draft?.kilocalories == 390)
         #expect(model.draft?.items.map(\.name) == ["Salmon fillet, pan-fried", "Polenta"])
-        // The new estimate is the model's throughout, so the figures are back.
+        // The reply is the model's, so the figure beside the corrected row is
+        // back.
         #expect(model.draft?.hasItemEdits == false)
         #expect(model.draft?.isPriced(try #require(model.draft?.items.last?.id)) == true)
+    }
+
+    /// **The owner's report, and the property the whole splice exists for.**
+    /// They corrected one line and a different line — 300 kcal of pasta, right
+    /// for its amount — came back at 150, because the re-analysis sent the
+    /// whole list and took the whole reply, and a model asked twice about the
+    /// same food answers twice.
+    ///
+    /// The row is compared whole rather than field by field: its id, its name,
+    /// its kilocalories, the macros a table gave it and the weight the
+    /// photograph gave it all have to survive, and a test naming three of the
+    /// five would pass a fix that dropped the other two.
+    @Test("a row the user did not touch comes back out of a re-analysis identical")
+    func reanalysingLeavesUntouchedRowsAlone() async throws {
+        let client = ScriptedClient(answers: [
+            .success(MealEstimate(
+                title: "Pasta with chicken",
+                kilocalories: 500,
+                macros: MacroTotals(protein: 40, carbs: 60, fat: 12),
+                items: [
+                    // Grounded against the food table on the way in: a real
+                    // CIQUAL figure with real macros behind it, which is
+                    // exactly the kind of number a second guess would throw
+                    // away.
+                    RecognisedItem(
+                        name: "Pasta, cooked",
+                        kilocalories: 300,
+                        macros: MacroTotals(protein: 11, carbs: 58, fat: 2),
+                        note: .photo(confidence: .confident, approximateGrams: 240)
+                    ),
+                    RecognisedItem(
+                        name: "Chicken breast",
+                        kilocalories: 200,
+                        note: .photo(confidence: .unsure, approximateGrams: 120)
+                    ),
+                ]
+            )),
+            // What the model says about the corrected line, and — the bug —
+            // what it would say about the pasta if it were asked again.
+            .success(MealEstimate(
+                title: "Chicken breast",
+                kilocalories: 330,
+                macros: MacroTotals(protein: 62, carbs: 0, fat: 8),
+                items: [
+                    RecognisedItem(name: "Chicken breast, 200 g", kilocalories: 330, note: .text(amount: .recognised))
+                ]
+            )),
+        ])
+        let model = makeModel(store: try makeStore(), client: client)
+        await model.scanning(pixel())
+
+        let pasta = try #require(model.draft?.items.first)
+        let chicken = try #require(model.draft?.items.last?.id)
+        model.editItem(chicken, to: "Chicken breast, 200 g")
+        await model.reanalysing()
+
+        #expect(client.lastText == "Chicken breast, 200 g")
+        // Byte for byte, id included.
+        #expect(model.draft?.items.first == pasta)
+        #expect(model.draft?.items.map(\.name) == ["Pasta, cooked", "Chicken breast, 200 g"])
+        #expect(model.draft?.kilocalories == 630)
+        // The meal's name is the meal's. The reply named what it was asked
+        // about, which was one line.
+        #expect(model.draft?.title == "Pasta with chicken")
+        // And the macros stand: the model was never asked what the chicken's
+        // share of them was, so there is nothing to take out and nothing to
+        // put back.
+        #expect(model.draft?.macros == MacroTotals(protein: 40, carbs: 60, fat: 12))
+    }
+
+    /// The other half of the same rule: with every row rewritten there is
+    /// nothing left to protect, the reply is about the whole meal, and it
+    /// replaces the whole meal — title and macros included.
+    @Test("a breakdown the user rewrote entirely is replaced entirely")
+    func reanalysingEveryRowReplacesTheMeal() async throws {
+        let client = ScriptedClient(answers: [.success(Self.estimate), .success(Self.reestimate)])
+        let model = makeModel(store: try makeStore(), client: client)
+        await model.scanning(pixel())
+
+        let items = try #require(model.draft?.items)
+        model.editItem(items[0].id, to: "Polenta r50g")
+        model.editItem(items[1].id, to: "Polenta")
+        await model.reanalysing()
+
+        #expect(client.lastText == "Polenta r50g, Polenta")
+        #expect(model.draft?.title == "Polenta")
+        #expect(model.draft?.kilocalories == 150)
+        #expect(model.draft?.macros == MacroTotals(protein: 3, carbs: 33, fat: 1))
+        #expect(model.draft?.items.map(\.name) == ["Polenta"])
+    }
+
+    /// A reply that prices a meal without splitting it is a usable answer to
+    /// "what is this meal" and no answer at all to "what are these rows" — the
+    /// rows the user rewrote would simply vanish, corrections and all. The
+    /// request was still made and paid for, so the screen says so.
+    @Test("a re-analysis that comes back without a breakdown is a retry, not a silent no-op")
+    func reanalysingWithoutABreakdownFails() async throws {
+        let client = ScriptedClient(answers: [
+            .success(Self.estimate),
+            .success(MealEstimate(
+                title: "Polenta",
+                kilocalories: 150,
+                macros: MacroTotals(protein: 3, carbs: 33, fat: 1),
+                items: []
+            )),
+        ])
+        let model = makeModel(store: try makeStore(), client: client)
+        await model.scanning(pixel())
+
+        let spinach = try #require(model.draft?.items.last?.id)
+        model.editItem(spinach, to: "Polenta r50g")
+        await model.reanalysing()
+
+        #expect(model.stage == .failed(.retry(.reply)))
+
+        model.dismissFailure()
+        #expect(model.stage == .result)
+        #expect(model.draft?.items.map(\.name) == ["Salmon fillet, pan-fried", "Polenta r50g"])
+        #expect(model.draft?.kilocalories == 460)
+        #expect(model.draft?.canReanalyse == true)
     }
 
     @Test("an unchanged breakdown makes no request")
@@ -497,7 +655,7 @@ struct CameraLogTests {
         #expect(model.draft?.hasItemEdits == true)
     }
 
-    @Test("trying a failed re-analysis again sends the list, not the frame")
+    @Test("trying a failed re-analysis again sends the corrected rows, not the frame")
     func retryingAReanalysis() async throws {
         let client = ScriptedClient(answers: [
             .success(Self.estimate),
@@ -507,7 +665,7 @@ struct CameraLogTests {
         let model = makeModel(store: try makeStore(), client: client)
         await model.scanning(pixel())
 
-        model.removeItem(try #require(model.draft?.items.last?.id))
+        model.editItem(try #require(model.draft?.items.last?.id), to: "Polenta r50g")
         await model.reanalysing()
         #expect(model.stage == .failed(.retry(.transport)))
 
@@ -517,7 +675,7 @@ struct CameraLogTests {
         }
 
         #expect(client.requests == 3)
-        #expect(client.lastText == "Salmon fillet, pan-fried")
+        #expect(client.lastText == "Polenta r50g")
         #expect(model.stage == .result)
         #expect(model.draft?.hasItemEdits == false)
     }

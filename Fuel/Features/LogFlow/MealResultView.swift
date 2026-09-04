@@ -733,16 +733,18 @@ struct MealResultView<Lede: View>: View {
     /// What the filled button is right now.
     ///
     /// **Not in the export**, which draws `Hinzufügen` and nothing else in this
-    /// place. Once the user has changed the list, the figures above it describe
-    /// a breakdown that no longer exists, and logging them would write down a
-    /// meal nobody estimated. So the button asks the model again instead.
+    /// place. Once the user has rewritten a line or added one, the figure
+    /// beside it is missing and the figures above the list describe a breakdown
+    /// that no longer exists, and logging that would write down a meal nobody
+    /// estimated. So the button asks the model again instead.
     ///
-    /// **Unless the list is empty**, in which case there is nothing to ask
-    /// about and the caller's own action comes back. See
-    /// `MealResultDraft.canReanalyse`, which holds both halves of that rule so
-    /// this button and the request it fires cannot disagree — they used to, and
-    /// a footer reading `Re-analyse` over an emptied list did nothing at all
-    /// while hiding the action it had replaced.
+    /// **Unless the only change was a removal**, which the device has already
+    /// carried out in full — the row is gone and the total gave back what it
+    /// contributed — so there is nothing to ask about and the caller's own
+    /// action comes back. See `MealResultDraft.canReanalyse`, which is the one
+    /// statement of that rule, so this button and the request it fires cannot
+    /// disagree — they used to, and a footer reading `Re-analyse` over an
+    /// emptied list did nothing at all while hiding the action it had replaced.
     ///
     /// It is the one thing this screen decides rather than takes as a
     /// parameter, and deliberately: the rule is the same for every caller, and

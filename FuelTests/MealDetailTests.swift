@@ -96,14 +96,17 @@ struct MealDetailTests {
         case noStoredMeal
     }
 
-    /// What the model comes back with once the user has corrected the list.
+    /// What the model comes back with once the user has corrected one line.
+    ///
+    /// **One row, because one row is what it was asked about.** A re-analysis
+    /// sends the rows the user rewrote and nothing else, so a reply naming the
+    /// salmon nobody touched would be a reply to a question that was never put.
     private static let reestimate = MealEstimate(
-        title: "Salmon with polenta, raw 50 g",
-        kilocalories: 390,
-        macros: MacroTotals(protein: 34, carbs: 15, fat: 21),
+        title: "Polenta, raw 50 g",
+        kilocalories: 80,
+        macros: MacroTotals(protein: 2, carbs: 17, fat: 1),
         items: [
-            RecognisedItem(name: "Salmon fillet, fried", kilocalories: 240, note: .text(amount: .recognised)),
-            RecognisedItem(name: "Polenta, raw 50 g", kilocalories: 80, note: .text(amount: .recognised)),
+            RecognisedItem(name: "Polenta, raw 50 g", kilocalories: 80, note: .text(amount: .recognised))
         ]
     )
 
@@ -211,8 +214,8 @@ struct MealDetailTests {
         #expect(MealDetailCopy.delete != MealResultCopy.reanalyse)
     }
 
-    @Test("removing and adding an item both stale the estimate")
-    func removingAndAddingStaleTheEstimate() throws {
+    @Test("a removed row is stored at once and an added one waits for the model")
+    func removingIsWrittenThroughAndAddingIsNot() throws {
         let store = try makeStore()
         let entry = try logMeal(in: store)
         let model = try makeModel(entry: entry, store: store, client: ScriptedClient(answer: .success(Self.reestimate)))
@@ -220,10 +223,22 @@ struct MealDetailTests {
         let polenta = try #require(model.draft.items.last?.id)
         model.removeItem(polenta)
         #expect(model.draft.items.count == 1)
-        #expect(model.draft.hasItemEdits)
+        // Nothing is pending: the row is out of the database already, so
+        // `‹ Back` has nothing to warn about and the footer has nothing to ask
+        // the model.
+        #expect(model.draft.hasItemEdits == false)
+        #expect(model.draft.canReanalyse == false)
+        let stored = try #require(try store.entry(withID: entry.entryID))
+        #expect(stored.items.map(\.name) == ["Salmon fillet, fried"])
+        #expect(stored.kilocalories == 310)
 
+        // An added row is the other case: it is text nobody has priced, so it
+        // stays on the screen until a re-analysis answers for it.
         model.addItem("Olive oil, 1 tbsp")
         #expect(model.draft.items.count == 2)
+        #expect(model.draft.hasItemEdits)
+        #expect(model.draft.canReanalyse)
+        #expect(try store.entry(withID: entry.entryID)?.items.count == 1)
     }
 
     /// An edited list with the old figures over it is not a meal anybody
@@ -291,18 +306,26 @@ struct MealDetailTests {
         await model.reanalysing()
 
         #expect(client.requests == 1)
-        #expect(client.lastText == "Salmon fillet, fried, Polenta, raw 50 g")
+        #expect(client.lastText == "Polenta, raw 50 g")
         #expect(model.stage == .detail)
-        #expect(model.draft.kilocalories == 390)
+        // 240 for the row nobody touched, 80 for the one the model was asked
+        // about.
+        #expect(model.draft.kilocalories == 320)
         #expect(model.draft.hasItemEdits == false)
 
         let day = try store.entries(on: at(19, 20))
         #expect(day.count == 1)
         let stored = try #require(day.first)
         #expect(stored.entryID == entry.entryID)
-        #expect(stored.kilocalories == 390)
-        #expect(stored.macros == MacroTotals(protein: 34, carbs: 15, fat: 21))
+        #expect(stored.kilocalories == 320)
+        // **What reaches the database is the composed meal, not the reply.**
+        // The reply answered for one line, so the meal keeps its own name and
+        // its own macros, and the untouched row keeps the weight the
+        // photograph gave it.
+        #expect(stored.title == "Salmon with polenta")
+        #expect(stored.macros == MacroTotals(protein: 34, carbs: 28, fat: 23))
         #expect(stored.items.map(\.name) == ["Salmon fillet, fried", "Polenta, raw 50 g"])
+        #expect(stored.items.first?.note == .photo(confidence: .confident, approximateGrams: 150))
         // The meal was eaten when it was eaten, and it is still the photo entry
         // the day list draws.
         #expect(stored.loggedAt == at(19, 20))
@@ -409,9 +432,9 @@ struct MealDetailTests {
         }
 
         #expect(client.requests == 2)
-        #expect(client.lastText == "Salmon fillet, fried, Polenta, raw 50 g")
+        #expect(client.lastText == "Polenta, raw 50 g")
         #expect(model.stage == .detail)
-        #expect(try store.entry(withID: entry.entryID)?.kilocalories == 390)
+        #expect(try store.entry(withID: entry.entryID)?.kilocalories == 320)
     }
 
     /// The bug this pins, same shape as its counterpart in `CameraLogTests`
@@ -521,7 +544,6 @@ struct MealDetailTests {
         model.removeItem(polenta)
 
         #expect(model.draft.items.count == 1)
-        #expect(model.draft.hasItemEdits)
         // One row left, so the mark is gone and the list cannot go to nothing.
         #expect(model.draft.canRemoveItems == false)
     }

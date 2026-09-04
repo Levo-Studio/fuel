@@ -18,14 +18,24 @@ import SwiftUI
 ///   tapped. They are decisions about the meal that stand on their own, and a
 ///   store that refused one leaves the draft alone, so what is drawn is always
 ///   what is stored.
-/// - An item edit is written back by nothing. The figures above the list are
-///   the estimate's, and an edited list with the old figures over it is exactly
-///   the state `MealResultDraft.hasItemEdits` exists to put `Re-analyse` in
-///   front of. Leaving on `‹ Back` with edits pending therefore leaves the
-///   stored meal as it was, which is the honest reading of a correction the
-///   user never asked to be priced.
-/// - The re-analysis writes the whole estimate, in place. See
-///   `FuelStore.update` for why in place and not a new row.
+/// - **A removed row goes with them, and for the same reason.** Taking a line
+///   out is a change the device can carry out completely: the row goes and the
+///   meal's total gives back exactly the figure that row contributed, with
+///   nothing left over for a model to answer. It asks the provider nothing —
+///   see `MealResultDraft.canReanalyse` — so a screen where the only change was
+///   a removal offers `Delete`, not `Re-analyse`, and if the removal were held
+///   as a pending edit it would simply be lost on `‹ Back` with no way to keep
+///   it.
+/// - A rewritten or added row is written back by nothing. Its text is a
+///   question only the model can answer, the figures above the list are still
+///   the old estimate's, and that is exactly the state `Re-analyse` stands in
+///   front of. Leaving on `‹ Back` with one pending therefore leaves the stored
+///   meal as it was, which is the honest reading of a correction the user never
+///   asked to be priced.
+/// - The re-analysis writes the meal the reply composes with the rows the user
+///   left alone, in place. See `FuelStore.update` for why in place and not a
+///   new row, and `MealResultDraft.applying(_:)` for why it is composed rather
+///   than taken as it came.
 ///
 /// **Nothing here re-analyses on its own.** `reanalyse()` runs from a tap,
 /// refuses an unchanged list, and asks the Keychain whether a key exists before
@@ -147,11 +157,44 @@ final class MealDetailModel {
 
     /// The `✕` on a row, the row itself, and the `Add item` row under the list.
     ///
-    /// All three are the draft's operations, so the rule they share — the list
-    /// has changed, so the estimate above it is stale — is the one written on
-    /// `MealResultDraft` and not a second copy of it here.
+    /// All three are the draft's operations, so the rules they share — what a
+    /// removal takes with it, and which changes leave the estimate above the
+    /// list stale — are the ones written on `MealResultDraft` and not a second
+    /// copy of them here.
+    ///
+    /// The removal is the one of the three that is written through, and the
+    /// paragraph above `MealDetailModel` says why. It follows the store rather
+    /// than leading it, exactly as the label pill does: a write the store
+    /// refused leaves the row on the screen, because a row drawn as gone and
+    /// still in the database is the one outcome worse than a control that did
+    /// nothing.
+    ///
+    /// A refusal by the draft itself — the last remaining row, or an id that is
+    /// not in the list — reaches the store as nothing at all, because there is
+    /// nothing to write.
     func removeItem(_ id: RecognisedItem.ID) {
-        draft.removeItem(id)
+        var updated = draft
+        updated.removeItem(id)
+        guard updated.items.count != draft.items.count else { return }
+
+        // A removal on this screen is not a pending edit — it is already
+        // stored by the time this returns — so it must not put the discard
+        // confirmation in front of `‹ Back`, which is what `hasItemEdits`
+        // exists to do.
+        updated.hasItemEdits = draft.hasItemEdits
+
+        do {
+            try store.update(
+                entry,
+                title: updated.title,
+                kilocalories: updated.kilocalories,
+                macros: updated.macros,
+                items: updated.items
+            )
+        } catch {
+            return
+        }
+        draft = updated
     }
 
     func editItem(_ id: RecognisedItem.ID, to text: String) {
@@ -199,11 +242,13 @@ final class MealDetailModel {
     /// The footer's `Re-analyse`, which is what `Delete` becomes once the user
     /// has changed the breakdown.
     ///
-    /// The edited list is what is sent — the same sentence the log modes send,
-    /// assembled by `MealResultDraft.itemSentence`. There is no original
-    /// sentence to fall back on: the meal it was made from was a photograph, a
-    /// sentence the flow no longer holds, or a meal repeated from the Recent
-    /// list.
+    /// The rows the user changed are what is sent — the same sentence the log
+    /// modes send, assembled by `MealResultDraft.itemSentence`, which is
+    /// deliberately not the whole list: a row nobody touched must come back out
+    /// of a re-analysis with the figures it went in with. There is no original
+    /// sentence to fall back on either way: the meal it was made from was a
+    /// photograph, a sentence the flow no longer holds, or a meal repeated from
+    /// the Recent list.
     ///
     /// **It only ever runs from a tap**, it refuses a list that is unchanged
     /// or empty rather than charging for a request about nothing, and with no
@@ -315,6 +360,14 @@ final class MealDetailModel {
     /// Puts the fresh estimate over the stored meal and over the draft, in that
     /// order.
     ///
+    /// **The estimate is spliced into the draft before either is written.** The
+    /// request was about the rows the user changed, so the reply is an answer
+    /// about those rows and not a new reading of the meal — writing it to the
+    /// store as it stands would put the model's second guess at every untouched
+    /// row into the database, which is the one place this app writes anything
+    /// down. `MealResultDraft.applying(_:)` composes what the meal now is, and
+    /// that is what both the row and the screen get.
+    ///
     /// **The store goes first, and the draft only follows a write that
     /// succeeded.** The alternative is a screen showing figures the store does
     /// not hold, which the user would find out about the next time they opened
@@ -323,13 +376,19 @@ final class MealDetailModel {
     /// — at the cost of a second request if they take it.
     private func writeBack(_ estimate: MealEstimate, as run: Int) {
         guard isCurrent(run) else { return }
+        guard let merged = draft.applying(estimate) else {
+            // A reply with no breakdown cannot answer a question about
+            // particular rows, and nothing is written for one.
+            fail(with: AIError.malformedResponse, as: run)
+            return
+        }
         do {
             try store.update(
                 entry,
-                title: estimate.title,
-                kilocalories: estimate.kilocalories,
-                macros: estimate.macros,
-                items: estimate.items
+                title: merged.title,
+                kilocalories: merged.kilocalories,
+                macros: merged.macros,
+                items: merged.items
             )
         } catch {
             // `.device`: the estimate arrived and it is the store that
@@ -338,7 +397,7 @@ final class MealDetailModel {
             return
         }
         // Keeps the label, whether the user set it, and the favourite mark.
-        draft.replaceEstimate(with: estimate)
+        draft = merged
         stage = .detail
     }
 

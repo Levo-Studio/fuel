@@ -249,10 +249,13 @@ final class TextLogModel {
     /// The footer's `Re-analyse`, which is what `Add` becomes once the user has
     /// changed the breakdown.
     ///
-    /// **The edited list is sent, not the sentence.** The list is what the user
-    /// has just corrected, and the sentence is what produced the version they
-    /// corrected. The sentence itself is untouched — screen 15 still quotes
-    /// back what they wrote, and `‹ Back` still returns them to it.
+    /// **The rows the user changed are sent, not the sentence and not the whole
+    /// list.** The sentence is what produced the version they corrected, and
+    /// the rows they left alone already carry an answer — see
+    /// `MealResultDraft.itemSentence` for why asking about them again is how an
+    /// untouched figure used to change. The sentence itself is untouched —
+    /// screen 15 still quotes back what they wrote, and `‹ Back` still returns
+    /// them to it.
     ///
     /// **It only ever runs from a tap.** Nothing here is called when a draft
     /// changes, and the guard on `canReanalyse` means a second press after a
@@ -365,13 +368,23 @@ final class TextLogModel {
         stage = .result
     }
 
-    /// Puts a re-estimate over the draft, keeping the label and the favourite
-    /// mark the user set on it.
+    /// Splices a re-estimate into the draft, keeping the label and the
+    /// favourite mark the user set on it — and keeping every row they did not
+    /// change exactly as it was. `MealResultDraft.applying(_:)` holds that rule
+    /// for all three screens that draw a draft.
+    ///
+    /// A reply the draft cannot use is the retry state rather than a silent
+    /// no-op: the request was made, the user paid for it, and a screen that
+    /// came back from the analysis states unchanged would read as a button that
+    /// does nothing.
     private func represent(_ estimate: MealEstimate, as run: Int) {
         guard isCurrent(run) else { return }
-        guard var draft else { return present(estimate, as: run) }
-        draft.replaceEstimate(with: estimate)
-        self.draft = draft
+        guard let draft else { return present(estimate, as: run) }
+        guard let merged = draft.applying(estimate) else {
+            fail(with: AIError.malformedResponse, as: run)
+            return
+        }
+        self.draft = merged
         isReanalysing = false
         stage = .result
     }
