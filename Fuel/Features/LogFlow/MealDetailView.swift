@@ -90,7 +90,7 @@ struct MealDetailView: View {
                 // opening on a gap — see `MealDetailModel.photo`.
                 lede: { lede }
             )
-            .safeAreaInset(edge: .bottom, spacing: .zero) { footer }
+            .mealResultFooter { footer }
 
             switch model.stage {
             case .analysing(let step):
@@ -201,6 +201,10 @@ struct MealDetailView: View {
     /// **Both go when the pill comes**, which is the same rule stated once:
     /// while the breakdown carries edits nobody has priced, the only thing
     /// this footer offers is the request that prices them.
+    ///
+    /// Where it stands is not this screen's to decide: the inset from the sides
+    /// and from the bottom edge is `mealResultFooter`'s, the same ground the
+    /// scan screens' footer rests on.
     @ViewBuilder
     private var footer: some View {
         Group {
@@ -216,8 +220,6 @@ struct MealDetailView: View {
                 }
             }
         }
-        .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
-        .padding(.bottom, FuelMetrics.Space.s34)
         .fuelAnimation(FuelMotion.standard, value: model.draft.hasItemEdits)
     }
 

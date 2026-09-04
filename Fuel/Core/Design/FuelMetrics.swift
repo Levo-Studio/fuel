@@ -80,9 +80,18 @@ nonisolated enum FuelMetrics {
         /// area, which is why the same number lands lower on a device: a real
         /// status bar is taller than the drawn one.
         ///
-        /// The same reading in reverse governs every bottom edge — a drawn
-        /// bottom distance is measured above the safe-area boundary, because
-        /// the mock frame omits the home indicator a device has.
+        /// **The bottom edge does not read the same way round, and the two
+        /// screens that were measured on a device say so.** The mock frame
+        /// draws no home indicator, but it does leave 34 empty under the
+        /// footers of screens 01 to 04 and 14 and 15 — exactly the bottom inset
+        /// an iPhone of that size has. On the result screens that strip is the
+        /// stand-in for the indicator, and adding it above the safe area spent
+        /// it twice: the pills came to rest 68 from the bottom of a hosted
+        /// render. They now take the drawn distance from the frame's own bottom
+        /// edge — see `MealResultFooter`. The onboarding footers still add
+        /// theirs above the safe area; nobody has measured those against a
+        /// device, and which reading they should take is the owner's call
+        /// rather than something to change on the way past.
         static let onboardingTopPadding = Space.s88
 
         /// The same drop on the two key-test screens, which sit lower. Also
