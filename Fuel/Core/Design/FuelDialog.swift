@@ -387,6 +387,44 @@ struct FuelDialog: View {
     }
 }
 
+// MARK: - Which answer was taken
+
+/// Which of a dialog's two answers it was left with.
+///
+/// **A value with a rule of its own, rather than three lines inside the
+/// modifier**, for the reason the nutrition core is not allowed to know about
+/// SwiftData: what decides whether an irreversible action goes ahead is worth
+/// being able to run without a screen. It could not be run at all where it
+/// lived — a sheet's dismissal never completes in a test host, so both branches
+/// of it executed zero times and every assertion about them passed by never
+/// being reached.
+nonisolated enum FuelDialogAnswer {
+
+    /// The confirm button was pressed.
+    case wentAhead
+
+    /// Everything else: the way out, the swipe down, the tap outside, and a
+    /// screen that went away underneath the question.
+    case changedNothing
+
+    /// Reads the answer out of the flag the confirm button sets, and puts the
+    /// flag down on the way past.
+    ///
+    /// **The reset is the part worth testing, not the branch.** `guard` on a
+    /// `Bool` is not where a bug would hide; a flag left standing is. Left set,
+    /// the next dismissal of the next dialog raised from the same modifier —
+    /// the same screen, the meal after this one — would answer `wentAhead`
+    /// without anyone having pressed anything, and what that runs is a delete.
+    /// It goes down *before* the answer is handed back rather than after, so
+    /// there is no window in which the caller's own work could see it still
+    /// set.
+    static func taken(from confirmed: inout Bool) -> FuelDialogAnswer {
+        guard confirmed else { return .changedNothing }
+        confirmed = false
+        return .wentAhead
+    }
+}
+
 // MARK: - The screen underneath
 
 /// What a dialog needs to know about the screen it is raised over before it has
@@ -510,13 +548,14 @@ private struct FuelDialogModifier: ViewModifier {
         }
     }
 
+    /// Which answer the dialog was left with, carried out once it has gone.
     private func answer() {
-        guard wasConfirmed else {
+        switch FuelDialogAnswer.taken(from: &wasConfirmed) {
+        case .wentAhead:
+            onConfirm()
+        case .changedNothing:
             onCancel()
-            return
         }
-        wasConfirmed = false
-        onConfirm()
     }
 }
 

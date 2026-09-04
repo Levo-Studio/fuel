@@ -213,6 +213,51 @@ struct FuelDialogSweepTests {
     }
 }
 
+// MARK: - Which answer was taken
+
+/// The decision behind the app's only irreversible action, run without a
+/// screen.
+///
+/// **A thin test of a `guard`, and deliberately so.** What is worth pinning is
+/// not the branch — a `Bool` read is not where a bug hides — but the order:
+/// the flag goes down *before* the answer is handed back, so a question
+/// answered once cannot answer again. Left standing, it would make the next
+/// dismissal of the next question raised from the same screen report a press
+/// nobody made, and on the meal screen what that runs is a delete.
+///
+/// It is here rather than inside the modifier because inside the modifier it
+/// could not be run at all: a sheet's dismissal transition never completes in a
+/// test host — driven four ways, every route reported the sheet still up and
+/// neither branch reached — so assertions about it passed by never happening.
+@Suite("Dialog · which answer was taken")
+struct FuelDialogAnswerTests {
+
+    @Test("the confirm button's flag is the only thing that goes ahead")
+    func confirmGoesAhead() {
+        var confirmed = true
+
+        #expect(FuelDialogAnswer.taken(from: &confirmed) == .wentAhead)
+    }
+
+    @Test("every other way out changes nothing")
+    func everythingElseCancels() {
+        var confirmed = false
+
+        #expect(FuelDialogAnswer.taken(from: &confirmed) == .changedNothing)
+        #expect(confirmed == false)
+    }
+
+    /// The one that matters: a question answered once does not answer again.
+    @Test("a question that went ahead does not go ahead a second time")
+    func theFlagGoesDownOnTheWayPast() {
+        var confirmed = true
+
+        #expect(FuelDialogAnswer.taken(from: &confirmed) == .wentAhead)
+        #expect(confirmed == false, "the flag was left standing")
+        #expect(FuelDialogAnswer.taken(from: &confirmed) == .changedNothing)
+    }
+}
+
 // MARK: - What a dialog draws
 
 /// The dialog Fuel asks its questions on: the words it puts on the screen and
@@ -548,7 +593,8 @@ struct FuelDialogDrawingTests {
 /// ways.** Its dismissal transition never finishes in a test host: a sheet put
 /// away by the binding it was raised with stalls mid-animation with the spring
 /// still attached after three seconds of run loop. What runs when the user
-/// swipes it down is therefore not something this harness can watch at all.
+/// swipes it down is therefore pinned in `FuelDialogAnswerTests`, on the value
+/// the decision was moved into, rather than here.
 @Suite("Dialog · coming up over a screen", .serialized)
 @MainActor
 struct FuelDialogPresentationTests {
