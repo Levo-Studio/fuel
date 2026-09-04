@@ -490,6 +490,55 @@ struct FuelBackSwipeTests {
     }
 }
 
+// MARK: - Day swipe
+
+@Suite("Day swipe")
+struct FuelDaySwipeTests {
+
+    /// Named by the day and not by the finger: a drag to the right moves back,
+    /// the way a page turns.
+    @Test("a drag to the right asks for the earlier day, and to the left the later one")
+    func directionFollowsTheDayNotTheFinger() {
+        #expect(
+            FuelDaySwipe.direction(of: CGSize(width: FuelDaySwipe.travel, height: 0)) == .earlier
+        )
+        #expect(
+            FuelDaySwipe.direction(of: CGSize(width: -FuelDaySwipe.travel, height: 0)) == .later
+        )
+    }
+
+    @Test("a drag that stops short of the travel is nothing")
+    func shortDragIsNotASwipe() {
+        #expect(FuelDaySwipe.direction(of: CGSize(width: FuelDaySwipe.travel - 1, height: 0)) == nil)
+        #expect(FuelDaySwipe.direction(of: .zero) == nil)
+    }
+
+    /// The one that keeps this off the day list underneath it. A thumb
+    /// scrolling a long day drifts sideways, and without the guard it would
+    /// eventually change the day under the person reading it.
+    @Test("a drag down the screen is a scroll, however far it drifts sideways")
+    func verticalDragIsAScroll() {
+        #expect(FuelDaySwipe.direction(of: CGSize(width: 80, height: 300)) == nil)
+        #expect(FuelDaySwipe.direction(of: CGSize(width: -80, height: -300)) == nil)
+    }
+
+    /// Strict, so the ambiguous case falls to the scroll rather than to the
+    /// day: the list is what the finger is usually on.
+    @Test("a perfect diagonal is a scroll")
+    func diagonalIsAScroll() {
+        #expect(FuelDaySwipe.direction(of: CGSize(width: 100, height: 100)) == nil)
+        #expect(FuelDaySwipe.direction(of: CGSize(width: 100, height: 99)) == .earlier)
+    }
+
+    /// One distance for every horizontal drag in the app. Two would mean a
+    /// swipe had to be longer on one screen than on another for no reason a
+    /// user could see.
+    @Test("a day swipe travels as far as a back swipe")
+    func travelIsTheBackSwipesOwn() {
+        #expect(FuelDaySwipe.travel == FuelBackSwipe.travel)
+    }
+}
+
 // MARK: - Haptics
 
 @Suite("Haptics")
