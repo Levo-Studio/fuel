@@ -51,6 +51,14 @@ struct MealDetailView: View {
     /// be answered with the haptic for one that succeeded.
     @State private var isReanalysing = false
 
+    /// Whether the conversation sheet is up.
+    ///
+    /// It lives here for the reason the delete confirmation does: what is
+    /// presented is a thing the interface is showing, not a thing the meal is
+    /// doing. The conversation itself is on the model, so closing the sheet
+    /// keeps it.
+    @State private var isTalking = false
+
     var body: some View {
         ZStack {
             MealResultView(
@@ -116,6 +124,26 @@ struct MealDetailView: View {
 
             Button(MealDetailCopy.deleteCancel, role: .cancel) {}
         }
+        // **The platform's own presentation, at the platform's own large
+        // detent.** The owner asked for a sheet that rises to near the top of
+        // the screen and named iOS's standard behaviour for it; the export
+        // draws no sheet of any kind, so the honest answer to "what does it
+        // look like coming up" is the one the system already has. Nothing
+        // about the rise, the corner, the dimming or the swipe is Fuel's.
+        //
+        // The grabber is asked for explicitly: at `.large` the system does not
+        // draw one by default, and the sheet's own `Done` should not be the
+        // only thing that says this can be put away.
+        .sheet(isPresented: $isTalking) {
+            MealChatSheet(
+                model: model.chat,
+                mealTitle: model.draft.title,
+                onClose: { isTalking = false }
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .environment(\.fuelPalette, palette)
+        }
         // No `fuelBackSwipe` here, unlike Settings. This screen is pushed on
         // `RootShell`'s navigation stack rather than presented in a cover, so
         // it already has a real edge-swipe — the system's own interactive pop
@@ -161,13 +189,18 @@ struct MealDetailView: View {
     /// reading it again here is the one small price of drawing this outside
     /// that view rather than forking it.
     ///
-    /// Otherwise the footer is `Delete`. **Deliberately not that pill** —
-    /// there is no drawing for this screen at all, so nothing here is a
-    /// deviation from a frame the export draws, only from the seam the two
-    /// scan screens happen to share. A meal already sits in the store; the
-    /// owner does not want the one control that removes it sitting where a
-    /// scroll gone a fingerwidth too far, or a tap meant for the last
-    /// breakdown row, can catch it. See `deleteCorner`.
+    /// Otherwise the footer is two small corner controls: `Delete` leading and
+    /// the conversation trailing. **Deliberately not that pill** — there is no
+    /// drawing for this screen at all, so nothing here is a deviation from a
+    /// frame the export draws, only from the seam the two scan screens happen
+    /// to share. A meal already sits in the store; the owner does not want the
+    /// one control that removes it sitting where a scroll gone a fingerwidth
+    /// too far, or a tap meant for the last breakdown row, can catch it. See
+    /// `deleteCorner`, and `chatCorner` for the one opposite it.
+    ///
+    /// **Both go when the pill comes**, which is the same rule stated once:
+    /// while the breakdown carries edits nobody has priced, the only thing
+    /// this footer offers is the request that prices them.
     @ViewBuilder
     private var footer: some View {
         Group {
@@ -176,8 +209,11 @@ struct MealDetailView: View {
                     action: MealResultAction(title: MealResultCopy.reanalyse, perform: model.reanalyse)
                 )
             } else {
-                deleteCorner
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(alignment: .center, spacing: FuelMetrics.Space.s10) {
+                    deleteCorner
+                    Spacer(minLength: FuelMetrics.Space.s10)
+                    chatCorner
+                }
             }
         }
         .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
@@ -194,6 +230,11 @@ struct MealDetailView: View {
     /// edge, where every breakdown row's own remove mark already sits above
     /// it — a column a scroll that overshoots would otherwise carry a thumb
     /// straight through.
+    ///
+    /// **That second argument is why `chatCorner` may stand in the column this
+    /// one avoids.** What it protects against is a destructive tap arriving by
+    /// accident; the control opposite opens a sheet, which an accidental tap
+    /// puts away again, and which spends nothing until a message is sent.
     ///
     /// **Sized at `Control.circleButton`, the 34pt circle Today's gear is
     /// already drawn at, floored at the same `Control.minimumHitTarget` every
@@ -231,6 +272,50 @@ struct MealDetailView: View {
         }
         .buttonStyle(FuelPressButtonStyle())
         .accessibilityLabel(Text(MealDetailCopy.delete))
+    }
+
+    /// The control that opens the conversation, in the trailing corner.
+    ///
+    /// **Not in the export**, which draws no second corner control and no chat
+    /// to put behind one. The owner asked for it here, mirroring the delete
+    /// mark opposite, and it is the same drawing as that mark down to the
+    /// circle, the fill, the hairline and the hit region — only the glyph and
+    /// the corner differ. A second recipe for one small circular control would
+    /// be a second place its size could drift from the first.
+    ///
+    /// **Trailing, which is the column `deleteCorner` argues for staying out
+    /// of**, and the argument does not carry across: that one is about a
+    /// destructive tap arriving by accident from an overshot scroll. This tap
+    /// opens a sheet. Dismissing it costs nothing, and nothing is sent until
+    /// something has been typed and the send mark pressed.
+    ///
+    /// **It is drawn only where `Delete` is**, which is to say only when the
+    /// footer is not the `Re-analyse` pill, and that is a rule rather than a
+    /// convenience: while the breakdown carries edits nobody has priced, the
+    /// figures on the screen belong to a meal that no longer exists, and a
+    /// conversation about how much of it there was would be a conversation
+    /// about the wrong plate. The user prices their edits first, and then the
+    /// meal is a meal again.
+    private var chatCorner: some View {
+        Button {
+            isTalking = true
+        } label: {
+            Image(systemName: "bubble.left")
+                .fuelStyle(FuelTypography.iconGlyph)
+                .foregroundStyle(palette.ink)
+                .frame(width: FuelMetrics.Control.circleButton, height: FuelMetrics.Control.circleButton)
+                .background {
+                    Circle().fill(palette.surface)
+                }
+                .overlay {
+                    Circle().strokeBorder(palette.hair, lineWidth: FuelMetrics.Line.hairline)
+                }
+                .frame(width: FuelMetrics.Control.minimumHitTarget, height: FuelMetrics.Control.minimumHitTarget)
+                .contentShape(Rectangle())
+                .padding(-FuelMetrics.Control.hitTargetOverhang(around: FuelMetrics.Control.circleButton))
+        }
+        .buttonStyle(FuelPressButtonStyle())
+        .accessibilityLabel(Text(MealChatCopy.open))
     }
 
     // MARK: - Editing

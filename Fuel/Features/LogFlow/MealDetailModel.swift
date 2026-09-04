@@ -88,6 +88,18 @@ final class MealDetailModel {
     /// same reasons `photo` is.
     let typedSentence: String?
 
+    /// The conversation about this meal.
+    ///
+    /// **Owned by the screen, so the transcript lives exactly as long as the
+    /// screen does** — a user who closes the sheet to look at the breakdown
+    /// and opens it again has not started a new conversation, and one who
+    /// leaves for Today has. Nothing about it is written down; see
+    /// `MealChatModel` for why not.
+    ///
+    /// Assigned after `init` rather than in it, because it takes `self`: it is
+    /// a `let` in everything but the compiler's reading of the initialiser.
+    private(set) var chat: MealChatModel!
+
     // MARK: - Dependencies
 
     /// The row this screen was opened on. Held rather than re-fetched, so every
@@ -154,6 +166,13 @@ final class MealDetailModel {
         )
         self.photo = entry.capturedPhotoData.flatMap(UIImage.init(data:))
         self.typedSentence = entry.typedSentence
+        self.chat = MealChatModel(
+            subject: self,
+            client: client,
+            keys: keys,
+            provider: provider,
+            pace: pace
+        )
     }
 
     // MARK: - Editing the breakdown
@@ -470,15 +489,80 @@ final class MealDetailModel {
     /// meal had been thrown away.
     @discardableResult
     func delete() -> Bool {
-        // A re-analysis in flight is about to be about a meal that is gone.
+        // A re-analysis in flight is about to be about a meal that is gone,
+        // and so is a message about its amounts.
         estimation?.cancel()
         currentRun += 1
         estimation = nil
+        chat.stopListening()
         do {
             try store.delete(entry)
             return true
         } catch {
             return false
         }
+    }
+}
+
+// MARK: - Talking about the meal
+
+/// The two things the conversation is allowed to do to a meal, and no others.
+///
+/// **The title does not travel and cannot be written back.** `adjustableMeal`
+/// carries it because a model asked about amounts still has to know what the
+/// meal is; `apply(_:)` passes the entry's own title straight back through the
+/// store, so a conversation about how much rice there was cannot rename
+/// `Salmon with polenta`. That is the same rule a spliced re-analysis holds
+/// to, and here it is enforced by the signature rather than by care.
+extension MealDetailModel: MealChatSubject {
+
+    var adjustableMeal: AdjustableMeal {
+        AdjustableMeal(
+            title: draft.title,
+            kilocalories: draft.kilocalories,
+            macros: draft.macros,
+            items: draft.items
+        )
+    }
+
+    /// Puts an adjustment over the stored meal and over the draft, in that
+    /// order, and reports whether the store took it.
+    ///
+    /// **The store goes first for the reason `writeBack` states**: a screen
+    /// showing figures the store does not hold is a lie the user finds out
+    /// about the next time they open Today. The `Bool` is what lets the sheet
+    /// refuse to claim a change that did not land.
+    ///
+    /// Nothing here touches the label, whether the user set it, or the
+    /// favourite mark. They were decisions about the meal rather than about
+    /// its amounts.
+    ///
+    /// **The advisor line is handed straight back rather than cleared**, which
+    /// is the same answer a spliced re-analysis gives and for the same reason:
+    /// the standing line describes the meal before its amounts moved, which is
+    /// a closer description of what is on the screen than nothing at all, and
+    /// the alternative is a line that vanishes for a reason the user cannot
+    /// connect to what they said. It can go stale — a line calling a meal light
+    /// on fat is less true once a tablespoon of oil has been added to it — and
+    /// the honest fix for that is a re-analysis, which is a request the user
+    /// asks for rather than one this path spends on their behalf.
+    func apply(_ adjusted: AdjustedMeal) -> Bool {
+        do {
+            try store.update(
+                entry,
+                title: entry.title,
+                kilocalories: adjusted.kilocalories,
+                macros: adjusted.macros,
+                advice: entry.advice,
+                items: adjusted.items
+            )
+        } catch {
+            return false
+        }
+
+        draft.kilocalories = adjusted.kilocalories
+        draft.macros = adjusted.macros
+        draft.items = adjusted.items
+        return true
     }
 }
