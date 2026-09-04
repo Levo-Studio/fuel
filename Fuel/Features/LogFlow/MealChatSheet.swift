@@ -48,6 +48,15 @@ struct MealChatSheet: View {
 
     @FocusState private var isWriting: Bool
 
+    /// How far the field grows before it scrolls inside itself.
+    ///
+    /// **Not a drawn value** — the export has no chat — and not a metric
+    /// either: it is a count of lines rather than a measurement, and what it
+    /// becomes in points is `FuelTypography.body`'s to say. Four is what the
+    /// field has always allowed; it is roughly what fits above a keyboard
+    /// without the transcript disappearing behind the composer.
+    private static let fieldLines = 4
+
     var body: some View {
         ZStack {
             palette.background
@@ -231,10 +240,31 @@ struct MealChatSheet: View {
     }
 
     /// `axis: .vertical` so a long sentence wraps inside the pill rather than
-    /// scrolling sideways under the send mark. `lineLimit` keeps it from
+    /// scrolling sideways under the send mark. The height cap keeps it from
     /// growing over the transcript; the bound on what can be typed at all is
     /// `MealChatModel.message`'s own, and it is a bound on the user's own
     /// bill rather than on the layout.
+    ///
+    /// **A height in points rather than `lineLimit(1...4)`, because that
+    /// bounded the box and not the text.** SwiftUI sizes a line-limited field
+    /// by the font's line height alone, and `body` carries a 1.5 line-height
+    /// multiple that the layout then adds back between the lines — so the field
+    /// asked for four lines, was given a box the size of four line *boxes*, and
+    /// drew a fourth line eleven points past the bottom of it. Measured at
+    /// 390×844: 75.7 points where four lines of `body` need 86.3, and the last
+    /// line cut through the middle of its letters. One line, two and three were
+    /// all correct, which is why it only showed on a full field.
+    ///
+    /// `FuelTypography.Style.height(ofLines:)` answers with both numbers, so
+    /// this stays right at every Dynamic Type size. Past the cap the field
+    /// scrolls inside itself exactly as it did before.
+    ///
+    /// **`fixedSize` is load-bearing and not decoration.** A bare
+    /// `frame(maxHeight:)` makes the field flexible up to that height, and the
+    /// stack above it duly offers the whole of it — an empty field drew a pill
+    /// four lines tall. Fixing the vertical size asks the field for its own
+    /// height first and lets the frame clamp it, which is the "grows with what
+    /// is typed, stops here" behaviour the cap is for.
     ///
     /// An empty label with a `prompt`, which is the shape screen 12's field
     /// already uses, so the placeholder is a prompt and the accessible name is
@@ -250,7 +280,6 @@ struct MealChatSheet: View {
     /// would make the pill taller than the export's own.
     private var field: some View {
         TextField("", text: Bindable(model).message, prompt: Text(MealChatCopy.placeholder), axis: .vertical)
-        .lineLimit(1...4)
         .focused($isWriting)
         .submitLabel(.send)
         .onSubmit(send)
@@ -259,6 +288,8 @@ struct MealChatSheet: View {
         .fuelStyle(FuelTypography.body)
         .foregroundStyle(palette.ink)
         .tint(palette.accentColor)
+        .frame(maxHeight: FuelTypography.body.height(ofLines: Self.fieldLines))
+        .fixedSize(horizontal: false, vertical: true)
         .padding(.vertical, FuelMetrics.Space.s13)
         .padding(.horizontal, FuelMetrics.Space.s16)
         .background {

@@ -141,6 +141,24 @@ nonisolated enum FuelTypography {
             let font = uiFont
             return max(0, multiple * font.pointSize - font.lineHeight)
         }
+
+        /// How tall `lines` lines set in this style are.
+        ///
+        /// The font's own line box for each of them, plus this style's
+        /// `lineSpacing` in each of the gaps between — which is one fewer than
+        /// the lines, and the reason a caller cannot get this right by
+        /// multiplying.
+        ///
+        /// **It exists because `lineLimit` does not answer the same
+        /// question.** SwiftUI sizes a line-limited field by the font's line
+        /// height alone and lays the text out with the spacing added, so a
+        /// style with a `lineHeightMultiple` gets a box short of what it then
+        /// draws into. A caller that needs a height for a fixed number of lines
+        /// asks here, where the two numbers that decide it already live.
+        func height(ofLines lines: Int) -> CGFloat {
+            let count = CGFloat(max(1, lines))
+            return count * uiFont.lineHeight + (count - 1) * lineSpacing
+        }
     }
 
     // MARK: - Dynamic Type
