@@ -590,7 +590,7 @@ struct MealDetailTests {
     /// pointed at `discardEditsConfirmation` instead, or the other way round.
     @Test("the delete confirmation is one sentence, with Delete and Keep as the two answers")
     func deleteConfirmationCopy() {
-        #expect(MealDetailCopy.deleteTitle == "Delete this meal?")
+        #expect(MealDetailCopy.deleteTitle == "Do you really want to delete this entry?")
         #expect(MealDetailCopy.deleteConfirm == "Delete")
         #expect(MealDetailCopy.deleteCancel == "Keep")
         #expect(MealDetailCopy.deleteTitle != MealDetailCopy.discardEditsConfirmation.title)

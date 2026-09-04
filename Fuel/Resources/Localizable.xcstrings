@@ -350,13 +350,13 @@
       }
     },
     "detail.delete.title" : {
-      "comment" : "The delete confirmation's own title. Not in the export.",
+      "comment" : "The delete question's own sentence, which is the whole of what it says. The owner's words, and their noun — entry, not meal. Not in the export.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Delete this meal?"
+            "value" : "Do you really want to delete this entry?"
           }
         }
       }
