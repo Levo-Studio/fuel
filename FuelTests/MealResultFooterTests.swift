@@ -33,13 +33,13 @@ struct MealResultFooterTests {
 
     private static let palette = FuelPalette(theme: .light, accent: .blue)
 
-    /// Draws the view in a window the size of the device's own screen, so the
-    /// safe area under the footer is a real one rather than a number a test
-    /// made up.
-    private func render(_ view: some View) -> (image: UIImage, size: CGSize) {
-        let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene
-        let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow()
-        window.frame = UIScreen.main.bounds
+    /// Draws the view in a window on the test host's own scene, at the size and
+    /// with the safe area the device actually has.
+    private func render(_ view: some View) throws -> (image: UIImage, size: CGSize) {
+        // The test host's own scene, so the window comes up at the device's
+        // size with the device's safe area rather than a frame a test made up.
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let window = UIWindow(windowScene: scene)
         window.rootViewController = UIHostingController(
             rootView: view.environment(\.fuelPalette, Self.palette)
         )
@@ -164,7 +164,7 @@ struct MealResultFooterTests {
             commit: MealResultAction(title: MealResultCopy.add, perform: {})
         )
 
-        let drawn = render(view)
+        let drawn = try render(view)
         let box = try #require(accentBox(in: drawn.image, size: drawn.size))
 
         expect(box.left, isTheDrawn: FuelMetrics.Screen.horizontalPadding)
@@ -199,7 +199,7 @@ struct MealResultFooterTests {
         )
         model.addItem("A row the model has not read")
 
-        let drawn = render(MealDetailView(model: model, onClose: {}))
+        let drawn = try render(MealDetailView(model: model, onClose: {}))
         let box = try #require(accentBox(in: drawn.image, size: drawn.size))
 
         expect(box.left, isTheDrawn: FuelMetrics.Screen.horizontalPadding)
