@@ -229,6 +229,12 @@ nonisolated struct MistralClient: AIClient {
             throw AIError.transportFailure(error)
         }
 
+        // A turn the user called off stops here, before it can buy anything.
+        // The Anthropic client's own note says why a cancelled read loop exits
+        // normally and therefore reaches the guard below looking exactly like a
+        // stream that delivered nothing.
+        try Task.checkCancellation()
+
         // The Anthropic client's own note says why a stream that delivered
         // nothing is asked again without streaming, and what the second request
         // costs.

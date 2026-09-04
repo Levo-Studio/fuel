@@ -43,6 +43,10 @@ private final class RecordingTransport: StreamingHTTPTransport, @unchecked Senda
     /// body that stops in the middle after the head said `200`.
     private var transcript: (statusCode: Int, lines: [String], interruption: (any Error)?)?
 
+    /// Whether `stream` answers with a body that stays open instead of with a
+    /// transcript. See `init(holdingTheBodyOpen:status:)`.
+    private var holdsTheBodyOpen = false
+
     init(_ responses: [Result<HTTPResponse, any Error>]) {
         queued = responses
     }
@@ -86,6 +90,25 @@ private final class RecordingTransport: StreamingHTTPTransport, @unchecked Senda
         transcript = (status, lines, nil)
     }
 
+    /// Answers `stream` with a `200` whose body never delivers a line and never
+    /// ends, and `send` with a collected response.
+    ///
+    /// **The one shape a cancelled turn has, and the only way to build it.**
+    /// Every other streaming double here hands over lines the test wrote, which
+    /// are already in the buffer before the client iterates — so there is no
+    /// moment at which a test can cancel a conversation that has not yet been
+    /// answered. Holding the body open puts the client exactly where a real one
+    /// waits for the model's first token, which is where people press CANCEL.
+    ///
+    /// `send` still answers, so a client that goes on to make the second
+    /// request gets a valid reply for it and the count says so. A double that
+    /// refused would hide the bug behind a failure.
+    convenience init(holdingTheBodyOpen thenAnswering: String, status: Int = 200) {
+        self.init([.success(HTTPResponse(statusCode: status, body: Data(thenAnswering.utf8)))])
+        transcript = (status, [], nil)
+        holdsTheBodyOpen = true
+    }
+
     /// Answers every request with the same recorded response.
     convenience init(status: Int, body: String) {
         self.init([.success(HTTPResponse(statusCode: status, body: Data(body.utf8)))])
@@ -116,13 +139,24 @@ private final class RecordingTransport: StreamingHTTPTransport, @unchecked Senda
     }
 
     func stream(_ request: URLRequest) async throws -> HTTPStreamResponse {
-        let recording: (statusCode: Int, lines: [String], interruption: (any Error)?)? = lock.withLock {
+        let (recording, held): ((statusCode: Int, lines: [String], interruption: (any Error)?)?, Bool) = lock.withLock {
             recorded.append(request)
-            return transcript
+            return (transcript, holdsTheBodyOpen)
         }
 
         guard let recording else {
             throw URLError(.badServerResponse)
+        }
+
+        guard !held else {
+            // Nothing yielded and nothing finished: the continuation is dropped
+            // here and the stream stays open, so the client suspends on its
+            // first line exactly as it does waiting for a model to begin. The
+            // only thing that ends it is the read task being cancelled.
+            return HTTPStreamResponse(
+                statusCode: recording.statusCode,
+                lines: AsyncThrowingStream { _ in }
+            )
         }
 
         return HTTPStreamResponse(
@@ -2699,6 +2733,87 @@ struct MealAdjustmentClientTests {
         await #expect(throws: AIError.malformedResponse) {
             _ = try await outcome(of: client.adjust(Self.meal(), history: [], message: "more"))
         }
+        #expect(transport.requests.count == 1)
+    }
+
+    // MARK: - A turn the user called off
+
+    /// Waits until the conversation has actually opened its stream, so what
+    /// follows is a cancellation of a request in flight rather than of a turn
+    /// that never started.
+    private func waitForTheStream(on transport: RecordingTransport) async throws {
+        for _ in 0..<200 {
+            guard transport.requests.isEmpty else { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(transport.requests.count == 1)
+    }
+
+    /// Gives the client every chance to make a second request, and returns the
+    /// moment one arrives.
+    ///
+    /// A bound that must not be crossed can only be tested by waiting, so this
+    /// waits — but it stops early on the request it is looking for, which is
+    /// what makes the counter-check fail in milliseconds rather than sitting out
+    /// the whole budget.
+    private func settle(_ transport: RecordingTransport) async throws {
+        for _ in 0..<100 {
+            guard transport.requests.count == 1 else { return }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+    }
+
+    /// **A cancelled turn must not spend the user's money, and it could.**
+    ///
+    /// Cancelling the task that iterates an `AsyncThrowingStream` terminates the
+    /// stream and hands the iterator `nil`, so the client's read loop exits
+    /// *normally* — no `CancellationError` is thrown and nothing is caught. A
+    /// message called off before its first token therefore looked exactly like a
+    /// stream that framed perfectly and delivered no answer, which is the one
+    /// case that is asked again as a single document. The user paid for a second
+    /// request on a run the sheet had already retired, so the answer was
+    /// discarded and nothing on screen ever said it happened.
+    ///
+    /// Cancelling is not only `CANCEL`: sending a second message while the first
+    /// is still thinking, and dismissing the sheet mid-turn, take the same path.
+    @Test("a turn cancelled before its first token buys no second request")
+    func cancelledTurnBuysNothing() async throws {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let transport = RecordingTransport(holdingTheBodyOpen: Reply.anthropic(Self.raisesTheRice))
+        let client = AnthropicClient(transport: transport, keys: keys.source)
+
+        let turn = Task {
+            for try await _ in client.adjust(Self.meal(), history: [], message: "a second portion") {}
+        }
+
+        try await waitForTheStream(on: transport)
+        turn.cancel()
+        _ = await turn.result
+        try await settle(transport)
+
+        // The stream that was called off, and nothing behind it.
+        #expect(transport.requests.count == 1)
+    }
+
+    @Test("the other provider buys nothing either")
+    func mistralCancelledTurnBuysNothing() async throws {
+        let keys = try KeyFixture(provider: .mistral, secret: "0123456789abcdefghij")
+        defer { keys.tearDown(provider: .mistral) }
+
+        let transport = RecordingTransport(holdingTheBodyOpen: Reply.mistral(Self.raisesTheRice))
+        let client = MistralClient(transport: transport, keys: keys.source)
+
+        let turn = Task {
+            for try await _ in client.adjust(Self.meal(), history: [], message: "a second portion") {}
+        }
+
+        try await waitForTheStream(on: transport)
+        turn.cancel()
+        _ = await turn.result
+        try await settle(transport)
+
         #expect(transport.requests.count == 1)
     }
 
