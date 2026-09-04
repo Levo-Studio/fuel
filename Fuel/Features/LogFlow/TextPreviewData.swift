@@ -18,6 +18,30 @@ enum TextPreviewData {
     /// on screen 15.
     nonisolated static let typedText = "2 eggs with 200g cottage cheese and polenta"
 
+    /// Screen 15's three rows. The two stated amounts read as more certain
+    /// than the one the model had to estimate, which is the distinction the
+    /// export draws in words on the same rows.
+    nonisolated static let items = [
+        RecognisedItem(
+            name: "2 eggs",
+            kilocalories: 158,
+            confidence: ItemConfidence(estimatePercent: 95),
+            note: .text(amount: .recognised)
+        ),
+        RecognisedItem(
+            name: "200g cottage cheese",
+            kilocalories: 320,
+            confidence: ItemConfidence(estimatePercent: 90),
+            note: .text(amount: .recognised)
+        ),
+        RecognisedItem(
+            name: "Polenta",
+            kilocalories: 150,
+            confidence: ItemConfidence(estimatePercent: 55),
+            note: .text(amount: .estimated)
+        ),
+    ]
+
     nonisolated static let draft = MealResultDraft(
         title: "Eggs with cottage cheese and polenta",
         kilocalories: 628,
@@ -26,11 +50,10 @@ enum TextPreviewData {
         // the kind of sentence a model returns, so the canvas shows the line at
         // the length it will usually be.
         advice: "Good protein for a breakfast. Light on fibre — a piece of fruit would round it out.",
-        items: [
-            RecognisedItem(name: "2 eggs", kilocalories: 158, note: .text(amount: .recognised)),
-            RecognisedItem(name: "200g cottage cheese", kilocalories: 320, note: .text(amount: .recognised)),
-            RecognisedItem(name: "Polenta", kilocalories: 150, note: .text(amount: .estimated)),
-        ],
+        // Derived rather than written down, so the canvas cannot show a
+        // percentage the rows under it do not add up to.
+        estimateConfidencePercent: EstimateConfidence.percent(of: items.map(\.confidence)),
+        items: items,
         label: .breakfast,
         isLabelUserSet: false,
         isFavourite: true

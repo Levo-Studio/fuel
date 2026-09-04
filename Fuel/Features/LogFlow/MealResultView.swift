@@ -466,8 +466,26 @@ struct MealResultView<Lede: View>: View {
     ///
     /// The figure still animates, because it still changes — a re-analysis
     /// replaces it.
+    ///
+    /// **The accuracy figure leads the row**, to the left of the number as the
+    /// owner asked, sharing the row's own baseline and its own `s8` gap — the
+    /// gap the export puts between the figure and its `kcal` on screen 14, line
+    /// 322. The consequence is worth naming rather than burying: the 58pt
+    /// figure no longer begins at the screen's 28pt margin on a meal that has
+    /// one. The alternative was the trailing end of the row, which the owner
+    /// ruled out in as many words. `FuelAccuracyLabel` carries the type, the
+    /// colour and the argument for both.
+    ///
+    /// A meal with no figure draws the row exactly as it was drawn before this
+    /// existed: the number back at the margin, and nothing in front of it. That
+    /// is every meal repeated from the Recent list and every meal logged before
+    /// the model was asked.
     private var caloriesRow: some View {
         HStack(alignment: .lastTextBaseline, spacing: FuelMetrics.Space.s8) {
+            if let percent = draft.estimateConfidencePercent {
+                FuelAccuracyLabel(percent: percent)
+            }
+
             Text(LogFlowFormat.figure(draft.kilocalories))
                 .fuelStyle(FuelTypography.resultCalories)
                 .foregroundStyle(palette.ink)
@@ -480,8 +498,22 @@ struct MealResultView<Lede: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(MealResultCopy.kilocaloriesValue(draft.kilocalories)))
+        // Spoken after the calories rather than before them, which is the
+        // reverse of the drawn order and right for speech: the figure the user
+        // asked for comes first, and how sure the model is of it qualifies it.
+        // `children: .ignore` above means the label's own spoken form does not
+        // reach VoiceOver from here, so it is named again.
+        .accessibilityValue(accuracyValue)
         .padding(.top, FuelMetrics.Space.s22)
         .fuelAnimation(FuelMotion.value, value: draft.kilocalories)
+    }
+
+    /// The spoken accuracy, or nothing at all for a meal that has no figure.
+    private var accuracyValue: Text {
+        guard let percent = draft.estimateConfidencePercent else {
+            return Text(verbatim: "")
+        }
+        return Text(FuelAccuracyCopy.spoken(percent))
     }
 
     // MARK: - Macros

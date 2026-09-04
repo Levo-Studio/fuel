@@ -115,9 +115,27 @@ private struct TodayEntryRow: View {
 
             Spacer(minLength: .zero)
 
-            Text(TodayFormat.figure(entry.kilocalories))
-                .fuelStyle(FuelTypography.listValue)
-                .foregroundStyle(palette.ink)
+            // The accuracy figure and the calories, as one trailing group. The
+            // export draws exactly this shape on screen 13 — a value and a
+            // second, quieter thing beside it in a `gap:14px` flex at the
+            // trailing edge of a row, `Screens2c.dc.html` line 291 — which is
+            // where the `s14` comes from. The figure leads it, to the left of
+            // the number, as the owner asked.
+            //
+            // The group sits behind a `Spacer`, so it takes width from the
+            // meal name rather than pushing it: a long name wraps a little
+            // sooner on a row that has a figure, and `FuelAccuracyLabel` is
+            // pinned against Dynamic Type, so how much sooner does not change
+            // as the user's text size grows.
+            HStack(alignment: .center, spacing: FuelMetrics.Space.s14) {
+                if let percent = entry.estimateConfidencePercent {
+                    FuelAccuracyLabel(percent: percent)
+                }
+
+                Text(TodayFormat.figure(entry.kilocalories))
+                    .fuelStyle(FuelTypography.listValue)
+                    .foregroundStyle(palette.ink)
+            }
         }
         .padding(.vertical, FuelMetrics.Space.s14)
         .contentShape(.rect)
