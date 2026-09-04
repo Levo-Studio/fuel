@@ -2390,7 +2390,11 @@ struct MealAdjustmentClientTests {
         let said = try await events(of: client.adjust(Self.meal(), history: [], message: "what is in polenta?"))
 
         #expect(!said.contains(.adjusting))
-        #expect(said.last == .finished(MealAdjustmentOutcome(reply: "Polenta is boiled maize meal.", meal: nil)))
+        #expect(
+            said.last == .finished(
+                MealAdjustmentOutcome(reply: "Polenta is boiled maize meal.", askedForAChange: false, meal: nil)
+            )
+        )
     }
 
     /// The sentence grows rather than repeating itself, and every value is the
@@ -2573,7 +2577,7 @@ struct MealAdjustmentClientTests {
 
         // No analysis states for a question: the model committed to nothing.
         #expect(!said.contains(.adjusting))
-        #expect(said.last == .finished(MealAdjustmentOutcome(reply: answer, meal: nil)))
+        #expect(said.last == .finished(MealAdjustmentOutcome(reply: answer, askedForAChange: false, meal: nil)))
         // And it was drawn on the way rather than appearing whole at the end:
         // prose has no `reply` key to read, so the words themselves are read.
         let sentences = said.compactMap { event -> String? in

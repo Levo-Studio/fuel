@@ -401,11 +401,12 @@ nonisolated enum MealChatContract {
     /// are structural rather than intended:
     ///
     /// - **Prose produces a `reply` and nothing else.** The value returned
-    ///   below carries the default empty `changes` and `additions`; there is no
-    ///   branch here that reads a number out of a sentence, and
-    ///   `MealAdjustmentIntent` has no field a figure could reach even if one
-    ///   were read. A model that writes "that is about 620 kcal" in prose has
-    ///   written a string that is drawn and nothing more.
+    ///   below carries the default empty `changes` and `additions`, and so asks
+    ///   for no change — which is what a sentence with no object behind it
+    ///   plainly is. There is no branch here that reads a number out of a
+    ///   sentence, and `MealAdjustmentIntent` has no field a figure could reach
+    ///   even if one were read. A model that writes "that is about 620 kcal" in
+    ///   prose has written a string that is drawn and nothing more.
     /// - **A half-written object is not prose.** `readsAsProse(_:)` refuses
     ///   anything with a brace or a fence in it, so a reply cut off inside its
     ///   own JSON still fails here rather than being shown to the user as a
@@ -426,7 +427,14 @@ nonisolated enum MealChatContract {
                 // follows, and for the same reason: the other rows are still a
                 // usable answer to what was asked.
                 changes: payload.changes.compactMap(\.change),
-                additions: payload.additions.compactMap(\.addition)
+                additions: payload.additions.compactMap(\.addition),
+                // Read from the rows as they arrived rather than from the two
+                // lists above, because a row that was just dropped is still a
+                // model that set out to move something — and the screen owes a
+                // different answer to a turn that tried and failed than to a
+                // question that never tried. See
+                // `MealAdjustmentIntent.askedForAChange`.
+                askedForAChange: !payload.changes.isEmpty || !payload.additions.isEmpty
             )
         }
 

@@ -205,8 +205,20 @@
         }
       }
     },
+    "chat.noAnswer" : {
+      "comment" : "What a reply reads as when a question came back with no usable words in it and nothing was being adjusted. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No answer came back."
+          }
+        }
+      }
+    },
     "chat.nothingChanged" : {
-      "comment" : "The note under a reply that changed nothing at all, so a sentence with no change under it cannot read as a change that happened. Not in the export.",
+      "comment" : "The note under a reply that asked to change something and changed nothing, so a sentence claiming a change cannot stand unanswered. Not in the export.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {

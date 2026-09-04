@@ -31,8 +31,9 @@ nonisolated struct AdjustableMeal: Sendable, Equatable {
 /// be made.
 ///
 /// **It carries no figure of any kind and there is no field it could carry one
-/// in.** Names and weights are the whole of it. See `MealChatContract` for why
-/// that is the architecture rather than a simplification.
+/// in.** Names and weights are the whole of what it says about food. See
+/// `MealChatContract` for why that is the architecture rather than a
+/// simplification.
 nonisolated struct MealAdjustmentIntent: Sendable, Equatable {
 
     /// The model's own sentence, already bounded. `nil` where it wrote nothing
@@ -42,10 +43,40 @@ nonisolated struct MealAdjustmentIntent: Sendable, Equatable {
     var changes: [Change]
     var additions: [Addition]
 
-    init(reply: String? = nil, changes: [Change] = [], additions: [Addition] = []) {
+    /// Whether the reply asked for anything at all to move.
+    ///
+    /// **What tells a question apart from a change that moved nothing**, which
+    /// are otherwise the same thing by the time they reach the screen: a
+    /// sentence over a meal that did not budge. One of them is an answer and
+    /// wants nothing said under it; the other is a model claiming something
+    /// happened that did not, and has to be contradicted. Neither is readable
+    /// from the words, and neither has to be — the model wrote which it was
+    /// when it opened or did not open its two arrays.
+    ///
+    /// **Stored rather than `!changes.isEmpty || !additions.isEmpty`, and the
+    /// difference is the reason it exists.** A row the parse could not read —
+    /// an item with no weight on it, an addition with no name — is dropped from
+    /// the arrays above and is still a model that committed to moving
+    /// something. `MealChatStreamReader.hasAnElement` counts a half-written
+    /// object for exactly the same reason and in the same direction, so the
+    /// early warning and the finished turn cannot disagree about what kind of
+    /// turn this was.
+    var askedForAChange: Bool
+
+    /// `askedForAChange` follows from the rows unless it is stated, so the only
+    /// caller that has to think about it is the one that has seen rows this
+    /// initialiser never will: `MealChatContract.intent(from:)`, which reads
+    /// the two arrays as they arrived rather than after they were filtered.
+    init(
+        reply: String? = nil,
+        changes: [Change] = [],
+        additions: [Addition] = [],
+        askedForAChange: Bool? = nil
+    ) {
         self.reply = reply
         self.changes = changes
         self.additions = additions
+        self.askedForAChange = askedForAChange ?? (!changes.isEmpty || !additions.isEmpty)
     }
 
     /// One existing row, at a new weight.
@@ -102,23 +133,41 @@ nonisolated struct AdjustedMeal: Sendable, Equatable {
 
 // MARK: - What came back
 
-/// One turn's answer: what the model said, and what — if anything — actually
-/// moved.
+/// One turn's answer: what the model said, what it asked to move, and what —
+/// if anything — actually moved.
 ///
-/// **The two are separate on purpose, and `meal` being `nil` is the case worth
-/// building for.** A model that could not map "it was quite oily" onto a
+/// **The three are separate on purpose, and `meal` being `nil` is the case
+/// worth building for.** A model that could not map "it was quite oily" onto a
 /// weight, a model that named an item number the list does not have, a model
 /// that asked for a food the table cannot price — all of them produce a
 /// sentence and no change. The screen has to be able to say that, rather than
 /// showing a reply over figures that did not move and letting the user infer
 /// that they did.
+///
+/// **And a question produces a sentence and no change as well, which is why
+/// there are three of these and not two.** "How filling is this" was never
+/// about the amounts, so a note saying they did not move is Fuel answering a
+/// question nobody asked; the same note under a model that claimed to have
+/// raised the rice is the only thing on screen telling the truth.
 nonisolated struct MealAdjustmentOutcome: Sendable, Equatable {
 
     var reply: String?
+
+    /// Whether the reply asked for anything to move, whatever came of it.
+    ///
+    /// It travels beside the sentence because `meal` cannot answer it: a `nil`
+    /// meal is both a question that never asked for a change and a change that
+    /// asked and did not survive, and the screen says something different about
+    /// each. `MealAdjustmentIntent.askedForAChange` is where it is read, and
+    /// says why it is read from the model's own two arrays rather than from
+    /// anything the model wrote about itself.
+    var askedForAChange: Bool
+
     var meal: AdjustedMeal?
 
-    init(reply: String?, meal: AdjustedMeal?) {
+    init(reply: String?, askedForAChange: Bool, meal: AdjustedMeal?) {
         self.reply = reply
+        self.askedForAChange = askedForAChange
         self.meal = meal
     }
 
