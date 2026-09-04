@@ -445,6 +445,30 @@
         }
       }
     },
+    "logFlow.favourites.empty" : {
+      "comment" : "The one line an empty Favourites list shows in place of its rows, naming the control on a result screen that makes a favourite. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meals marked as a favourite on the result screen wait here."
+          }
+        }
+      }
+    },
+    "logFlow.favourites.title" : {
+      "comment" : "The Recent tab's heading while it shows the starred meals. Screen 13 draws Zuletzt gegessen for the one list it has, and no second one. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favourites"
+          }
+        }
+      }
+    },
     "logFlow.recent.add.glyph" : {
       "comment" : "Screen 13, the + at the end of a Recent row.",
       "extractionState" : "manual",
@@ -501,6 +525,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "P %1$lld · C %2$lld · F %3$lld"
+          }
+        }
+      }
+    },
+    "logFlow.recent.segment.favourites" : {
+      "comment" : "The second segment of the Recent tab's switch. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favourites"
+          }
+        }
+      }
+    },
+    "logFlow.recent.segment.recent" : {
+      "comment" : "The first segment of the Recent tab's switch. The same word the third log tab carries, and a separate entry: they are two controls, and a translator may not name them alike. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recent"
           }
         }
       }

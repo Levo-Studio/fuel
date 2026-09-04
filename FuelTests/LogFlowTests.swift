@@ -82,6 +82,97 @@ struct LogFlowTests {
         #expect(RecentMeals.list(from: entries).count == RecentMeals.maximumRows)
     }
 
+    // MARK: - Favourites
+
+    @Test("the switch offers exactly two lists, Recent first")
+    func twoLists() {
+        #expect(RecentList.allCases == [.recent, .favourites])
+    }
+
+    @Test("the favourites list holds the starred meals and nothing else")
+    func favouritesAreStarredOnly() throws {
+        let store = try makeStore()
+        try store.log(title: "Oats with skyr", kilocalories: 420, macros: .zero, loggedAt: at(8, 10), source: .photo)
+        try store.log(
+            title: "Chicken bowl, rice",
+            kilocalories: 680,
+            macros: .zero,
+            loggedAt: at(12, 30),
+            source: .text,
+            isFavourite: true
+        )
+
+        let model = LogFlowModel(store: store)
+        model.reload()
+
+        #expect(model.recentMeals.count == 2)
+        #expect(model.favouriteMeals.map(\.title) == ["Chicken bowl, rice"])
+    }
+
+    @Test("a favourite older than the recent window is still in the list")
+    func favouritesReachPastTheRecentWindow() throws {
+        // The whole reason the favourites list is a fetch of its own rather
+        // than a filter over the recent one. A meal the user asked to keep must
+        // not fall out of the list because they logged enough other meals on
+        // top of it.
+        let store = try makeStore()
+        try store.log(
+            title: "Salmon with polenta",
+            kilocalories: 430,
+            macros: .zero,
+            loggedAt: at(19, 0, day: 0),
+            source: .photo,
+            isFavourite: true
+        )
+        for index in 0..<RecentMeals.entriesRead {
+            try store.log(
+                title: "Meal \(index)",
+                kilocalories: 100,
+                macros: .zero,
+                loggedAt: at(12, 0, day: index + 1),
+                source: .text
+            )
+        }
+
+        let model = LogFlowModel(store: store)
+        model.reload()
+
+        #expect(!model.recentMeals.contains { $0.title == "Salmon with polenta" })
+        #expect(model.favouriteMeals.map(\.title) == ["Salmon with polenta"])
+    }
+
+    @Test("logging from the favourites list writes the meal, breakdown included")
+    func loggingAFavourite() throws {
+        let store = try makeStore()
+        let items = [
+            RecognisedItem(name: "Rye bread", kilocalories: 180, note: .text(amount: .recognised)),
+            RecognisedItem(name: "Avocado", kilocalories: 160, note: .text(amount: .estimated))
+        ]
+        try store.log(
+            title: "Wholegrain bread, avocado",
+            kilocalories: 340,
+            macros: MacroTotals(protein: 11, carbs: 34, fat: 18),
+            loggedAt: at(8, 15, day: 0),
+            source: .text,
+            isFavourite: true,
+            items: items
+        )
+
+        let model = LogFlowModel(store: store, selectedTab: .recent, now: { at(8, 20, day: 1) })
+        model.reload()
+        let meal = try #require(model.favouriteMeals.first)
+
+        #expect(model.log(meal))
+
+        let repeated = try #require(try store.recentEntries(limit: 1).first)
+        #expect(repeated.title == "Wholegrain bread, avocado")
+        #expect(repeated.items == items)
+        // The repeat is a meal of its own and is not starred by having been
+        // logged from the starred list. The original still holds the mark.
+        #expect(!repeated.isFavourite)
+        #expect(try store.favouriteEntries(limit: RecentMeals.entriesRead).count == 1)
+    }
+
     // MARK: - Logging
 
     @Test("tapping a meal writes an entry with the source's macros")

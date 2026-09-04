@@ -159,7 +159,11 @@ struct LogFlowView: View {
                         onAnalyse: text.analyse
                     )
                 case .recent:
-                    RecentMealsView(meals: model.recentMeals, onLog: log)
+                    RecentMealsView(
+                        meals: model.recentMeals,
+                        favourites: model.favouriteMeals,
+                        onLog: log
+                    )
                 }
             }
         )

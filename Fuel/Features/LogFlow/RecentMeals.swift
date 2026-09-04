@@ -1,5 +1,27 @@
 import Foundation
 
+// MARK: - Which list
+
+/// The two lists the Recent tab offers, in the order the switch draws them.
+///
+/// **Not in the export.** Screen 13 draws one list under one heading, with no
+/// switch above it — the favourite is drawn on the result screens, as the
+/// `☆ Favourite` / `★ Favourite` control, and nothing in the seventeen screens
+/// reads it back. The owner asked for the second list and for the switch, so
+/// this is an instructed deviation from a screen that is otherwise reproduced
+/// as drawn.
+///
+/// Recent stays first, and is what the tab opens on: it is the drawn screen,
+/// and it is the wider of the two lists, so it is the one that always has
+/// something in it.
+nonisolated enum RecentList: String, CaseIterable, Identifiable, Hashable, Sendable {
+
+    case recent
+    case favourites
+
+    var id: String { rawValue }
+}
+
 // MARK: - Boundary
 
 /// A stored meal as the Recent list needs to read it.

@@ -18,6 +18,11 @@ enum LogFlowPreviewData {
         RecentMeal(id: UUID(), title: "Wholegrain bread, avocado", kilocalories: 340, macros: MacroTotals(protein: 11, carbs: 34, fat: 18)),
     ]
 
+    /// The two of them the seeded store stars, so the Favourites list has
+    /// something in it. Which two is arbitrary — the export names no favourite
+    /// among the five.
+    static let favourites = Array(meals.prefix(2))
+
     /// A flow backed by an in-memory store holding the meals above.
     ///
     /// `nil` only if SwiftData cannot open a container at all, which is a
@@ -44,7 +49,8 @@ enum LogFlowPreviewData {
                 kilocalories: meal.kilocalories,
                 macros: meal.macros,
                 loggedAt: base.addingTimeInterval(TimeInterval(index) * -3_600),
-                source: .recent
+                source: .recent,
+                isFavourite: favourites.contains(meal)
             )
         }
 

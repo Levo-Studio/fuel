@@ -77,6 +77,23 @@ final class FuelStore {
         return try context.fetch(descriptor)
     }
 
+    /// The most recently logged entries the user marked as a favourite, newest
+    /// first, for the Recent tab's second list.
+    ///
+    /// A fetch of its own rather than a filter over `recentEntries(limit:)`. A
+    /// favourite is a meal the user asked to keep, so one starred before the
+    /// last `limit` meals were logged has to still be in the list; filtering
+    /// that window would quietly drop it the moment enough other meals were
+    /// logged on top of it.
+    func favouriteEntries(limit: Int) throws -> [FoodEntry] {
+        var descriptor = FetchDescriptor<FoodEntry>(
+            predicate: #Predicate { $0.isFavourite },
+            sortBy: [SortDescriptor(\.loggedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = limit
+        return try context.fetch(descriptor)
+    }
+
     /// One stored meal, by the identity that survives the boundary.
     ///
     /// `entryID` rather than `persistentModelID`, because the identity a screen
