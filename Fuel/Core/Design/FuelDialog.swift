@@ -216,6 +216,21 @@ struct FuelDialog: View {
     /// The footer pair screens 14 and 15 draw, with this dialog's two words in
     /// it: the outlined pill hugging on the leading side, the accent-filled one
     /// taking the rest.
+    ///
+    /// **One deviation from that pair, and it is the label size on the way
+    /// out.** The export sets its hugging secondary at `600 14px` and this sets
+    /// it at `buttonLabel`, the `600 15px` it draws on every other labelled
+    /// button — including the one full-width secondary it draws, screen 02's
+    /// `Cancel`. The 14 belongs to `chipLabel`, which is pinned against Dynamic
+    /// Type: right for the `New` chip and for a trash mark, wrong for a word a
+    /// user has to read before deciding something irreversible. Everything else
+    /// about the pair is the drawn one — the `s17`/`s20` padding, the hairline,
+    /// the `Radius.pill`, the `s10` between them.
+    ///
+    /// Drawn here rather than reached for: the two pills this recomposes live
+    /// in feature files — `MealResultPrimaryButton` in the log flow and
+    /// `OnboardingButton` in onboarding — and the design layer does not reach
+    /// upwards into a feature for a shape.
     private var answers: some View {
         HStack(alignment: .center, spacing: FuelMetrics.Space.s10) {
             Button(action: onCancel) {
