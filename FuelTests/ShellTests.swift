@@ -909,11 +909,17 @@ private struct PushedMealProbe: View {
 /// **What these cannot reach, and it is worth being plain about.** They pin the
 /// requirement — that the breakdown's scroll view waits for both of the
 /// navigation controller's back gestures, that the tie stops at the screen it
-/// was applied to. They do not pin whether a real finger now wins the race, or
-/// what waiting for the mid-content pop costs a scroll, because touch
-/// delivery is not something a unit test can synthesise: there is no UI-test
-/// target, and a gesture driven by hand through UIKit's own action is not the
-/// event a thumb sends. That last step is checked on a build, not here.
+/// was applied to. They do not pin whether either pop then begins, or what
+/// waiting for the mid-content pop costs a scroll, because both of those are
+/// decided inside private UIKit objects a test cannot drive.
+///
+/// **That gap is why the screen has a gesture of Fuel's as well, and why these
+/// tests are no longer the last word on it.** Everything here passed on the real
+/// screen while the back swipe was being reported dead, three times over —
+/// which is the whole case for not settling for structural evidence.
+/// `MealDetailOwnedBackGestureTests`, at the end of this file, asserts what
+/// these cannot: that a drag shrinks the navigation stack and leaves the shell
+/// holding no meal.
 @Suite("Shell · the pushed meal screen's back gesture", .serialized)
 @MainActor
 struct MealDetailBackGestureTests {
@@ -1246,5 +1252,455 @@ struct MealDetailBackGestureTests {
         // the screen was already asking, which is the other half of taking
         // nothing from the list.
         #expect(watch.delegate == nil)
+    }
+}
+
+// MARK: - The gesture Fuel owns
+
+/// `RootShell.todayStack`, reproduced down to the path binding and the discard
+/// confirmation hanging off it, with a real `RootShellModel` behind it.
+///
+/// **The binding is the point of building it this way.** What the suite below
+/// asks is not only whether the navigation stack shrinks but whether the shell
+/// let go of the meal, and that answer lives in `RootShellModel` on the far side
+/// of a `Binding` SwiftUI writes when the controller pops. A probe holding a
+/// `MealDetailModel` directly — `PushedMealProbe` above — cannot be asked it.
+///
+/// `RootShell` itself is not hosted because its model is `@State` and private,
+/// so nothing outside it can push a meal onto it; everything from the stack
+/// downwards is the same code.
+private struct BackPopShellProbe: View {
+
+    let model: RootShellModel
+
+    @State private var isConfirmingPop = false
+
+    private var mealDetailPath: Binding<[UUID]> {
+        Binding(
+            get: { model.pushedMeal.map { [$0] } ?? [] },
+            set: { path in
+                guard path.isEmpty, model.pushedMeal != nil else { return }
+                if model.mealDetailDiscardsEdits {
+                    isConfirmingPop = true
+                } else {
+                    model.dismissMealDetail()
+                }
+            }
+        )
+    }
+
+    var body: some View {
+        NavigationStack(path: mealDetailPath) {
+            TodayView(
+                presentation: model.today,
+                navigation: model.dayNavigation,
+                isTravellingBackward: model.dayTravelIsBackward,
+                gettingStarted: model.gettingStarted,
+                onOpenSettings: model.openSettings,
+                onAddEntry: model.openLogFlow,
+                onOpenMeal: model.openMealDetail,
+                onShowPreviousDay: model.showPreviousDay,
+                onShowNextDay: model.showNextDay,
+                onShowDay: model.showDay
+            )
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(for: UUID.self) { _ in
+                if let detail = model.mealDetail {
+                    MealDetailView(model: detail, onClose: model.dismissMealDetail)
+                        .toolbar(.hidden, for: .navigationBar)
+                }
+            }
+        }
+        .confirmationDialog(
+            MealDetailCopy.discardEditsConfirmation.title,
+            isPresented: $isConfirmingPop,
+            titleVisibility: .visible
+        ) {
+            Button(MealDetailCopy.discardEditsConfirmation.confirm, role: .destructive) {
+                model.dismissMealDetail()
+            }
+
+            Button(MealDetailCopy.discardEditsConfirmation.cancel, role: .cancel) {}
+        }
+        .environment(\.fuelPalette, FuelPalette(theme: .dark, accent: .mono))
+    }
+}
+
+/// **The assertion three rounds of this went without: that a drag pops the
+/// screen.**
+///
+/// The suite above pins that the system's back gestures have been given
+/// priority, which is a fact about a data structure. It was true on the real
+/// screen — measured, hosted, with the meal pushed — while the gesture was
+/// being reported dead, which is exactly how a structural test can pass and a
+/// screen still not work. What could not be pinned there is whether either pop
+/// then *begins*, because that is decided inside private UIKit objects.
+///
+/// Fuel's own gesture is testable end to end because every step of it is Fuel's:
+/// these drive the drag through `popIfDragMeansBack`, the one call the
+/// recogniser's action makes, on the recogniser's own view taken off the real
+/// pushed screen — and then ask the navigation stack and the shell's model what
+/// happened. A drag that does not pop fails here.
+///
+/// **What is still not pinned, precisely.** Two lines of UIKit boilerplate
+/// between a finger and that call: `state == .ended`, and `translation(in:)`.
+/// Synthesising a touch needs either private API or a UI-test target, and Fuel
+/// has neither. What sat in that gap before was the whole arbitration; what
+/// sits in it now is a state check.
+@Suite("Shell · the back gesture Fuel owns", .serialized)
+@MainActor
+struct MealDetailOwnedBackGestureTests {
+
+    // MARK: - Fixtures
+
+    private enum MissingFixture: Error {
+        case noNavigationController
+        case noBackGesture
+    }
+
+    private static let mealDetail: RootShellModel.MealDetailFactory = { store, provider, entryID in
+        MealDetailModel(
+            entryID: entryID,
+            store: store,
+            client: UnusedEstimator(),
+            keys: StoredKey(),
+            provider: provider,
+            pace: {}
+        )
+    }
+
+    private static let cameraLog: RootShellModel.CameraLogFactory = { store, provider in
+        CameraLogModel(
+            store: store,
+            client: UnusedEstimator(),
+            camera: CountingCamera(),
+            keys: StoredKey(),
+            provider: provider
+        )
+    }
+
+    private static let textLog: RootShellModel.TextLogFactory = { store, provider in
+        TextLogModel(
+            store: store,
+            client: UnusedEstimator(),
+            keys: StoredKey(),
+            provider: provider,
+            pace: {}
+        )
+    }
+
+    /// A day with one meal on it, a shell pointed at it, and the whole thing
+    /// standing on the test host's own scene.
+    private func hostToday() throws -> (model: RootShellModel, entry: FoodEntry, window: UIWindow) {
+        let store = try FuelStore(inMemory: true)
+        try store.goalSettingsCreatingIfNeeded()
+        let entry = try store.log(
+            title: "Salmon with polenta",
+            kilocalories: 460,
+            macros: MacroTotals(protein: 34, carbs: 28, fat: 23),
+            loggedAt: Date(),
+            source: .photo
+        )
+        let suite = "apps.levo-studio.Fuel.tests.backpop.\(UUID().uuidString)"
+        let model = RootShellModel(
+            store: store,
+            validator: UnusedValidator(),
+            preferences: SettingsPreferences(defaults: UserDefaults(suiteName: suite) ?? .standard),
+            makeCameraLog: Self.cameraLog,
+            makeTextLog: Self.textLog,
+            makeMealDetail: Self.mealDetail
+        )
+
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = UIHostingController(rootView: BackPopShellProbe(model: model))
+        window.makeKeyAndVisible()
+        settle()
+        window.layoutIfNeeded()
+        return (model, entry, window)
+    }
+
+    private func settle(for seconds: TimeInterval = 1.0) {
+        RunLoop.current.run(until: Date().addingTimeInterval(seconds))
+    }
+
+    private func navigationController(in controller: UIViewController?) -> UINavigationController? {
+        guard let controller else { return nil }
+        if let found = controller as? UINavigationController { return found }
+        for child in controller.children {
+            if let found = navigationController(in: child) { return found }
+        }
+        return navigationController(in: controller.presentedViewController)
+    }
+
+    /// The recogniser as it stands on the screen, not one a test built: a
+    /// gesture assembled in a test would prove the handler compiles and nothing
+    /// about the screen it is supposed to be on.
+    private func backGesture(on controller: UIViewController) throws -> FuelBackPopGesture {
+        guard
+            let content = controller.viewIfLoaded,
+            let gesture = (content.gestureRecognizers ?? []).compactMap({ $0 as? FuelBackPopGesture }).first
+        else {
+            throw MissingFixture.noBackGesture
+        }
+        return gesture
+    }
+
+    private func backPopGestures(in view: UIView) -> [FuelBackPopGesture] {
+        var found = (view.gestureRecognizers ?? []).compactMap { $0 as? FuelBackPopGesture }
+        for subview in view.subviews {
+            found.append(contentsOf: backPopGestures(in: subview))
+        }
+        return found
+    }
+
+    /// A meal open on its own screen, with everything a drag needs to hand.
+    private func pushMeal() throws -> (
+        model: RootShellModel,
+        navigation: UINavigationController,
+        gesture: FuelBackPopGesture,
+        window: UIWindow
+    ) {
+        let hosted = try hostToday()
+        hosted.model.openMealDetail(hosted.entry.entryID)
+        settle(for: 1.2)
+        hosted.window.layoutIfNeeded()
+
+        guard let navigation = navigationController(in: hosted.window.rootViewController) else {
+            throw MissingFixture.noNavigationController
+        }
+        let pushed = try #require(navigation.viewControllers.last)
+        return (hosted.model, navigation, try backGesture(on: pushed), hosted.window)
+    }
+
+    /// A finished drag, fed in where the recogniser's action feeds it.
+    @discardableResult
+    private func drag(_ translation: CGSize, _ gesture: FuelBackPopGesture) throws -> Bool {
+        let view = try #require(gesture.view)
+        return FuelInteractivePop.popIfDragMeansBack(translation: translation, from: view)
+    }
+
+    // MARK: - A drag that goes back
+
+    /// **The test that was missing.** Not that a requirement exists — that the
+    /// stack shrinks and the shell lets go of the meal, because a finger went
+    /// sideways across the screen.
+    @Test("A drag across the meal screen pops it and releases the meal")
+    func aDragPopsTheScreen() throws {
+        let open = try pushMeal()
+        #expect(open.navigation.viewControllers.count == 2)
+        #expect(open.model.pushedMeal != nil)
+        #expect(open.model.mealDetail != nil)
+
+        #expect(try drag(CGSize(width: 140, height: 12), open.gesture))
+        settle(for: 1.2)
+
+        #expect(open.navigation.viewControllers.count == 1)
+        #expect(open.model.pushedMeal == nil)
+        #expect(open.model.mealDetail == nil)
+    }
+
+    /// The gesture is on the whole screen and not only in the leading strip,
+    /// which is what the owner asked for by drawing an arrow across the empty
+    /// space under the breakdown. `popIfDragMeansBack` is handed a translation
+    /// and never a start point, so there is no strip for it to be outside of —
+    /// asserted here rather than left to be read off the signature.
+    @Test("The drag does not have to start at the edge")
+    func aDragFromTheMiddlePopsTheScreen() throws {
+        let open = try pushMeal()
+        let view = try #require(open.gesture.view)
+
+        // The same finished drag, stated twice over: what the function is given
+        // is the distance travelled, and nothing about where it began.
+        #expect(FuelInteractivePop.popIfDragMeansBack(translation: CGSize(width: 90, height: -20), from: view))
+        settle(for: 1.2)
+
+        #expect(open.navigation.viewControllers.count == 1)
+        #expect(open.model.pushedMeal == nil)
+    }
+
+    // MARK: - Drags that do not
+
+    @Test(
+        "A drag that was not a way out leaves the screen where it is",
+        arguments: [
+            CGSize(width: 40, height: 5),
+            CGSize(width: 80, height: 120),
+            CGSize(width: -140, height: 10),
+            CGSize(width: 4, height: 300),
+        ]
+    )
+    func anIdleDragChangesNothing(_ translation: CGSize) throws {
+        let open = try pushMeal()
+
+        #expect(try drag(translation, open.gesture) == false)
+        settle(for: 0.4)
+
+        #expect(open.navigation.viewControllers.count == 2)
+        #expect(open.model.pushedMeal != nil)
+    }
+
+    /// The half of the drag decided before it has finished: which way the
+    /// finger is going.
+    ///
+    /// A pan is asked whether it may begin a few points in, so what settles it
+    /// there is direction and never distance — and the recogniser on the screen
+    /// refuses at rest, where the finger has not gone anywhere yet.
+    /// `FuelBackSwipeTests` holds the rule itself; what is pinned here is that
+    /// this gesture is the thing asking it.
+    @Test("A gesture that has not gone anywhere is not allowed to begin")
+    func aStillFingerDoesNotBegin() throws {
+        let open = try pushMeal()
+        let handler = try #require(open.gesture.delegate as? FuelBackPopHandler)
+
+        #expect(open.gesture.translation(in: open.gesture.view) == .zero)
+        #expect(handler.gestureRecognizerShouldBegin(open.gesture) == false)
+        #expect(FuelBackSwipe.isLeavingDirection(translation: .zero) == false)
+    }
+
+    // MARK: - What the drag must not walk through
+
+    /// A gesture that can destroy work is not a convenience. The shell's own
+    /// question stands in front of this exactly as it stands in front of the
+    /// system's pop: the drag is taken, the confirmation is raised, and the
+    /// meal is still the shell's until it is answered.
+    @Test("A meal with edits is asked about rather than thrown away")
+    func anEditedMealIsAskedAbout() throws {
+        let open = try pushMeal()
+        open.model.mealDetail?.addItem("Olive oil, 1 tbsp")
+        #expect(open.model.mealDetailDiscardsEdits)
+
+        #expect(try drag(CGSize(width: 140, height: 12), open.gesture))
+        settle(for: 1.2)
+
+        // The screen went back on the stack and the meal did not go anywhere:
+        // the shell caught the pop and put its question in front of it.
+        #expect(open.model.pushedMeal != nil)
+        #expect(open.model.mealDetail != nil)
+        #expect(open.model.mealDetail?.draft.hasItemEdits == true)
+    }
+
+    /// The conversation sheet is a presentation of its own, and a drag across
+    /// it belongs to it. Nothing behind a sheet should be quietly leaving.
+    @Test("A sheet over the meal screen holds the gesture off")
+    func aSheetHoldsTheGestureOff() throws {
+        let open = try pushMeal()
+        let view = try #require(open.gesture.view)
+        let pushed = try #require(open.navigation.viewControllers.last)
+        #expect(FuelInteractivePop.canPop(from: view))
+
+        pushed.present(UIViewController(), animated: false)
+        settle(for: 0.5)
+
+        #expect(FuelInteractivePop.canPop(from: view) == false)
+        #expect(try drag(CGSize(width: 140, height: 12), open.gesture) == false)
+        #expect(open.navigation.viewControllers.count == 2)
+    }
+
+    // MARK: - Where it is, and where it is not
+
+    /// Today is the root: there is nothing under it to go back to, and
+    /// `FuelDaySwipe` deliberately does not reserve the left edge there. A back
+    /// gesture on that screen would take the previous day away from the strip
+    /// where reaching for it is most natural.
+    @Test("Today carries no back gesture and cannot be popped")
+    func todayIsLeftAlone() throws {
+        let hosted = try hostToday()
+        let navigation = try #require(navigationController(in: hosted.window.rootViewController))
+        let root = try #require(navigation.viewControllers.first)
+        let content = try #require(root.viewIfLoaded)
+
+        #expect(backPopGestures(in: hosted.window).isEmpty)
+        #expect(FuelInteractivePop.canPop(from: content) == false)
+        #expect(
+            FuelInteractivePop.popIfDragMeansBack(
+                translation: CGSize(width: 140, height: 12),
+                from: content
+            ) == false
+        )
+        #expect(navigation.viewControllers.count == 1)
+    }
+
+    /// Armed from more than one moment — the carrier's arrival on the window and
+    /// its first update — and a screen holding two of these would pop twice.
+    @Test("The meal screen carries one back gesture however often it is armed")
+    func armingIsIdempotent() throws {
+        let open = try pushMeal()
+        let pushed = try #require(open.navigation.viewControllers.last)
+        let content = try #require(pushed.viewIfLoaded)
+
+        FuelInteractivePop.arm(from: content)
+        FuelInteractivePop.arm(from: content)
+
+        let gestures = (content.gestureRecognizers ?? []).compactMap { $0 as? FuelBackPopGesture }
+        #expect(gestures.count == 1)
+        #expect(gestures.first === open.gesture)
+    }
+
+    // MARK: - Getting there ahead of the list
+
+    /// **The mechanism, asked the way UIKit asks it.** A failure requirement can
+    /// be stated from either recogniser of a pair, and this one is stated from
+    /// the side Fuel owns — so the answer is given afresh on every attempt to
+    /// recognise, against whatever list is on the screen at that moment, rather
+    /// than recorded once against a list SwiftUI may have replaced since.
+    @Test("The breakdown is made to wait for it")
+    func theBreakdownWaitsForIt() throws {
+        let open = try pushMeal()
+        let handler = try #require(open.gesture.delegate as? FuelBackPopHandler)
+        let pushed = try #require(open.navigation.viewControllers.last)
+        let content = try #require(pushed.viewIfLoaded)
+        let breakdown = try #require(FuelInteractivePop.scrollViews(in: content).first)
+
+        #expect(
+            handler.gestureRecognizer(
+                open.gesture,
+                shouldBeRequiredToFailBy: breakdown.panGestureRecognizer
+            )
+        )
+        // And nothing runs beside it: a drag read as *back* is not also a
+        // scroll.
+        #expect(
+            handler.gestureRecognizer(
+                open.gesture,
+                shouldRecognizeSimultaneouslyWith: breakdown.panGestureRecognizer
+            ) == false
+        )
+    }
+
+    /// The requirement reaches this screen's lists and stops there, which is
+    /// what keeps it off Today's and off anything inside a sheet — the same
+    /// scope the tie is argued into, asked of the delegate rather than of a
+    /// subtree walk.
+    @Test("A list somewhere else is not made to wait")
+    func aListElsewhereIsLeftAlone() throws {
+        let open = try pushMeal()
+        let handler = try #require(open.gesture.delegate as? FuelBackPopHandler)
+
+        let elsewhere = UIScrollView()
+        #expect(
+            handler.gestureRecognizer(
+                open.gesture,
+                shouldBeRequiredToFailBy: elsewhere.panGestureRecognizer
+            ) == false
+        )
+    }
+
+    /// A scroll view's other recognisers are how it delivers a tap and how it
+    /// drags its indicator. Only its pan is in the way of a sideways drag, and
+    /// only its pan is made to wait.
+    @Test("Only the list's pan is made to wait, not everything it carries")
+    func onlyTheListsPanWaits() throws {
+        let open = try pushMeal()
+        let handler = try #require(open.gesture.delegate as? FuelBackPopHandler)
+        let pushed = try #require(open.navigation.viewControllers.last)
+        let content = try #require(pushed.viewIfLoaded)
+        let breakdown = try #require(FuelInteractivePop.scrollViews(in: content).first)
+
+        let others = (breakdown.gestureRecognizers ?? []).filter { $0 !== breakdown.panGestureRecognizer }
+        #expect(others.isEmpty == false)
+        for other in others {
+            #expect(handler.gestureRecognizer(open.gesture, shouldBeRequiredToFailBy: other) == false)
+        }
     }
 }
