@@ -296,21 +296,54 @@ struct MealChatSheet: View {
                 send()
             }
         } label: {
-            Image(systemName: model.isAnswering ? "stop.fill" : "arrow.up")
-                .fuelStyle(FuelTypography.iconGlyph)
-                .foregroundStyle(palette.onAccent)
-                .frame(width: FuelMetrics.Control.circleButton, height: FuelMetrics.Control.circleButton)
-                .background {
-                    Circle().fill(isReady ? AnyShapeStyle(palette.accentColor) : AnyShapeStyle(palette.soft))
-                }
-                .frame(width: FuelMetrics.Control.minimumHitTarget, height: FuelMetrics.Control.minimumHitTarget)
-                .contentShape(Rectangle())
-                .padding(-FuelMetrics.Control.hitTargetOverhang(around: FuelMetrics.Control.circleButton))
+            sendMark
         }
         .buttonStyle(FuelPressButtonStyle())
         .disabled(!isReady)
         .accessibilityLabel(Text(model.isAnswering ? MealChatCopy.stop : MealChatCopy.send))
         .fuelAnimation(FuelMotion.standard, value: appearance)
+    }
+
+    /// The circle, in a box exactly as tall as one line of the field.
+    ///
+    /// **That box is the alignment.** The two sit in an `HStack` aligned on
+    /// `.bottom`, so what a bare 34-point circle lines up with is the bottom of
+    /// the pill — and the pill's bottom is the field's own 13 points of padding
+    /// below its last line. A circle taller than a line, hung from that edge,
+    /// comes to rest with its centre four and a half points under the text it
+    /// belongs to: at one line it reads as sagging inside the pill, and at two
+    /// it is sixteen points below the pill's middle with nothing to explain
+    /// why.
+    ///
+    /// Giving the circle the field's own line box and the field's own vertical
+    /// padding puts its centre exactly on the last line's centre, at one line
+    /// and at four. The height is measured off a hidden line of the same style
+    /// rather than written down, so it stays right when the user has asked for
+    /// larger text — a number here would be right at one Dynamic Type size and
+    /// wrong at the rest.
+    ///
+    /// The hit region needs no vertical overhang any more: a line of `body`
+    /// inside `s13` above and below is already past `minimumHitTarget` on its
+    /// own. The horizontal overhang stays, so the region is a fingertip wide
+    /// while the layout is only the circle wide and the field keeps the space.
+    private var sendMark: some View {
+        Text(verbatim: " ")
+            .fuelStyle(FuelTypography.body)
+            .frame(width: FuelMetrics.Control.circleButton)
+            .padding(.vertical, FuelMetrics.Space.s13)
+            .hidden()
+            .overlay {
+                Image(systemName: model.isAnswering ? "stop.fill" : "arrow.up")
+                    .fuelStyle(FuelTypography.iconGlyph)
+                    .foregroundStyle(palette.onAccent)
+                    .frame(width: FuelMetrics.Control.circleButton, height: FuelMetrics.Control.circleButton)
+                    .background {
+                        Circle().fill(isReady ? AnyShapeStyle(palette.accentColor) : AnyShapeStyle(palette.soft))
+                    }
+            }
+            .frame(width: FuelMetrics.Control.minimumHitTarget)
+            .contentShape(.rect)
+            .padding(.horizontal, -FuelMetrics.Control.hitTargetOverhang(around: FuelMetrics.Control.circleButton))
     }
 
     /// Whether the control has anything to do — send what has been typed, or
