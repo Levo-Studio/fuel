@@ -138,6 +138,10 @@ struct MealChatSheet: View {
                 ForEach(model.messages) { message in
                     turn(message)
                 }
+
+                if let arriving = model.arrivingReply {
+                    ArrivingTurn(sentence: arriving)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, FuelMetrics.Screen.horizontalPadding)
@@ -147,6 +151,11 @@ struct MealChatSheet: View {
         .defaultScrollAnchor(.bottom)
         .frame(maxHeight: .infinity)
         .fuelAnimation(FuelMotion.standard, value: model.messages)
+        // Not animated on `arrivingReply`: a curve on every word would be a
+        // hundred overlapping animations on one paragraph, and the reveal is
+        // the text arriving rather than anything moving. What is animated is
+        // the row appearing and going away, which `messages` and the row's own
+        // insertion already cover.
     }
 
     @ViewBuilder
@@ -272,29 +281,117 @@ struct MealChatSheet: View {
     /// not ready, which is what an empty field already says. The opacity is
     /// `soft`'s own role, applied to the accent rather than invented as a
     /// number.
+    ///
+    /// **It becomes a stop mark while a reply is arriving**, in the same
+    /// circle rather than beside it, for the same reason it is dimmed rather
+    /// than hidden: a second control appearing next to the first would move
+    /// under the thumb about to press it. A stop has to be somewhere now that a
+    /// question is answered without the analysis states, which is where
+    /// `CANCEL` used to be the only way out of a wait.
     private var sendControl: some View {
-        Button(action: send) {
-            Image(systemName: "arrow.up")
+        Button {
+            if model.isAnswering {
+                stop()
+            } else {
+                send()
+            }
+        } label: {
+            Image(systemName: model.isAnswering ? "stop.fill" : "arrow.up")
                 .fuelStyle(FuelTypography.iconGlyph)
                 .foregroundStyle(palette.onAccent)
                 .frame(width: FuelMetrics.Control.circleButton, height: FuelMetrics.Control.circleButton)
                 .background {
-                    Circle().fill(model.canSend ? AnyShapeStyle(palette.accentColor) : AnyShapeStyle(palette.soft))
+                    Circle().fill(isReady ? AnyShapeStyle(palette.accentColor) : AnyShapeStyle(palette.soft))
                 }
                 .frame(width: FuelMetrics.Control.minimumHitTarget, height: FuelMetrics.Control.minimumHitTarget)
                 .contentShape(Rectangle())
                 .padding(-FuelMetrics.Control.hitTargetOverhang(around: FuelMetrics.Control.circleButton))
         }
         .buttonStyle(FuelPressButtonStyle())
-        .disabled(!model.canSend)
-        .accessibilityLabel(Text(MealChatCopy.send))
-        .fuelAnimation(FuelMotion.standard, value: model.canSend)
+        .disabled(!isReady)
+        .accessibilityLabel(Text(model.isAnswering ? MealChatCopy.stop : MealChatCopy.send))
+        .fuelAnimation(FuelMotion.standard, value: appearance)
+    }
+
+    /// Whether the control has anything to do — send what has been typed, or
+    /// stop what is on its way back.
+    private var isReady: Bool {
+        model.isAnswering || model.canSend
+    }
+
+    /// The two things about the control that change under one curve: the fill
+    /// waking up as the field is typed into, and the mark swapping when a reply
+    /// starts arriving.
+    private var appearance: SendAppearance {
+        SendAppearance(isReady: isReady, isAnswering: model.isAnswering)
+    }
+
+    private struct SendAppearance: Equatable {
+
+        let isReady: Bool
+        let isAnswering: Bool
     }
 
     private func send() {
         guard model.canSend else { return }
         FuelHaptics.play(.selectionChanged)
         model.send()
+    }
+
+    private func stop() {
+        FuelHaptics.play(.selectionChanged)
+        model.cancel()
+    }
+}
+
+// MARK: - A reply on its way
+
+/// The row a reply occupies while it is being written.
+///
+/// **A view of its own rather than a branch inside the transcript**, because
+/// the Reduce Motion decision belongs to `FuelArrival` and a `@ViewBuilder`
+/// method cannot hold one. It is the reply turn's own drawing — `body` in
+/// `ink`, screen 12's type for prose that wraps — so the sentence does not
+/// change weight or colour when the turn lands and the row becomes an ordinary
+/// one.
+///
+/// The waiting line is drawn in `muted` and is Fuel's own words, not the
+/// model's. It stands alone before the first token arrives, and stands for the
+/// whole reply where the user has asked for less motion — see
+/// `FuelMotion.resolveProgressiveReveal`.
+private struct ArrivingTurn: View {
+
+    /// As much of the model's sentence as has been written. Empty until the
+    /// first word.
+    let sentence: String
+
+    @Environment(\.fuelPalette) private var palette
+
+    var body: some View {
+        Group {
+            if sentence.isEmpty {
+                writing
+            } else {
+                FuelArrival {
+                    // Model-written text, bounded at the parse boundary before
+                    // it ever reaches here. Plain `Text`, so there is no markup
+                    // path into the interface for anything a provider wrote.
+                    Text(verbatim: sentence)
+                        .fuelStyle(FuelTypography.body)
+                        .foregroundStyle(palette.ink)
+                } waiting: {
+                    writing
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var writing: some View {
+        Text(MealChatCopy.writing)
+            .fuelStyle(FuelTypography.body)
+            .foregroundStyle(palette.muted)
     }
 }
 
@@ -312,6 +409,11 @@ struct MealChatSheet: View {
 
 #Preview("Nothing said yet") {
     MealChatSheet(model: MealChatPreviewData.empty(), mealTitle: "Salmon with polenta", onClose: {})
+        .environment(\.fuelPalette, FuelPalette(theme: .dark, accent: .mono))
+}
+
+#Preview("A reply arriving") {
+    MealChatSheet(model: MealChatPreviewData.arriving(), mealTitle: "Salmon with polenta", onClose: {})
         .environment(\.fuelPalette, FuelPalette(theme: .dark, accent: .mono))
 }
 
@@ -347,6 +449,18 @@ private enum MealChatPreviewData {
 
     static func empty() -> MealChatModel {
         MealChatModel(subject: PreviewSubject(), client: PreviewAdjuster(), keys: PreviewKeys())
+    }
+
+    /// A question caught half-answered, which is the state that used to be four
+    /// analysis steps over the whole sheet.
+    static func arriving() -> MealChatModel {
+        MealChatModel(
+            subject: PreviewSubject(),
+            client: PreviewAdjuster(),
+            keys: PreviewKeys(),
+            messages: [MealChatMessage(author: .you, text: "Is that a lot of protein?")],
+            arriving: "Around a third of a typical day's protein, and most of it is"
+        )
     }
 }
 
@@ -396,7 +510,7 @@ private struct PreviewAdjuster: AIClient {
         _ meal: AdjustableMeal,
         history: [MealChatTurn],
         message: String
-    ) async throws -> MealAdjustmentOutcome {
-        throw AIError.cancelled
+    ) -> AsyncThrowingStream<MealChatEvent, any Error> {
+        AsyncThrowingStream { $0.finish(throwing: AIError.cancelled) }
     }
 }

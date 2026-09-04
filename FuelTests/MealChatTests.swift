@@ -396,6 +396,137 @@ struct MealChatTests {
         #expect(model.stage == .conversation)
     }
 
+    // MARK: - Which wait a message gets
+
+    /// **The pin.** A question is answered in the conversation, with the
+    /// sentence arriving where the reply will sit — and the four analysis
+    /// states, which describe work on a meal, never appear over a message that
+    /// moves no meal.
+    ///
+    /// The client is held open on purpose: the only moment this is visible is
+    /// while the reply is still being written, which is exactly the moment a
+    /// finished-answer test cannot reach.
+    @Test("a question is answered without the analysis states")
+    func aQuestionShowsNoSteps() async throws {
+        let subject = StandInSubject(meal: Self.meal())
+        let client = GatedClient(
+            adjustments: [.success(MealAdjustmentOutcome(reply: "Polenta is boiled maize meal.", meal: nil))]
+        )
+        let model = makeModel(subject: subject, client: client)
+
+        model.message = "what is in polenta?"
+        model.send()
+        await waitForAWord(model)
+
+        // Mid-turn: the sentence is on screen and nothing is covering it.
+        #expect(model.arrivingReply == "Polenta is boiled maize meal.")
+        #expect(model.stage == .conversation)
+
+        client.release(0)
+        await settle(model)
+
+        #expect(model.stage == .conversation)
+        #expect(model.messages.map(\.author) == [.you, .fuel])
+        #expect(model.messages[1].text == "Polenta is boiled maize meal.")
+        #expect(model.messages[1].movedNothing)
+        #expect(model.arrivingReply == nil)
+        #expect(subject.applied.isEmpty)
+    }
+
+    /// The other half of the same pin: a turn that is moving something still
+    /// gets the states, and gets them while the request is still in flight
+    /// rather than after it.
+    @Test("an adjustment still runs the analysis states")
+    func anAdjustmentShowsTheSteps() async throws {
+        let subject = StandInSubject(meal: Self.meal())
+        let client = GatedClient(
+            adjustments: [.success(MealAdjustmentOutcome(reply: "Raised the rice.", meal: Self.raised()))]
+        )
+        let model = makeModel(subject: subject, client: client)
+
+        model.message = "a second, smaller portion"
+        model.send()
+
+        #expect(await reachedTheSteps(model))
+
+        client.release(0)
+        await settle(model)
+
+        #expect(model.stage == .conversation)
+        #expect(subject.applied.count == 1)
+        #expect(model.messages.map(\.author) == [.you, .fuel])
+    }
+
+    /// One message at a time. The composer draws a stop rather than a send
+    /// while a reply is arriving, and the field's own return key goes through
+    /// the same guard.
+    @Test("a second message while one is in flight is not sent")
+    func oneMessageAtATime() async throws {
+        let subject = StandInSubject(meal: Self.meal())
+        let client = GatedClient(
+            adjustments: [.success(MealAdjustmentOutcome(reply: "Polenta is boiled maize meal.", meal: nil))]
+        )
+        let model = makeModel(subject: subject, client: client)
+
+        model.message = "what is in polenta?"
+        model.send()
+        await waitForAWord(model)
+
+        model.message = "and how much protein?"
+        model.send()
+
+        #expect(client.requests == 1)
+        #expect(model.messages.map(\.author) == [.you])
+        // What was typed is still there to send once the first turn is done.
+        #expect(model.message == "and how much protein?")
+
+        client.release(0)
+        await settle(model)
+    }
+
+    // MARK: - A stream that stops
+
+    /// **The other pin.** A reply that began and then lost its connection must
+    /// not leave four words in the transcript with nothing saying what
+    /// happened. The half sentence goes and the failure takes its place —
+    /// dropped rather than truncated, the same rule the bound on a finished
+    /// sentence follows.
+    @Test("a reply that dies part-way shows the failure and keeps no half sentence")
+    func interruptedReply() async throws {
+        let subject = StandInSubject(meal: Self.meal())
+        let client = InterruptedClient(sentence: "Raised the rice to")
+        let model = makeModel(subject: subject, client: client)
+
+        model.message = "more rice"
+        model.send()
+        await settle(model)
+
+        #expect(model.stage == .failed(.retry(.transport)))
+        #expect(model.arrivingReply == nil)
+        #expect(model.messages.map(\.author) == [.you])
+        #expect(!model.messages.contains { $0.text == "Raised the rice to" })
+        #expect(subject.applied.isEmpty)
+    }
+
+    /// And the retry after one is the ordinary retry: the user's line is still
+    /// there and is not written twice.
+    @Test("the message an interrupted reply was answering can be sent again")
+    func retryAfterAnInterruption() async throws {
+        let subject = StandInSubject(meal: Self.meal())
+        let client = InterruptedClient(sentence: "Raised the rice to")
+        let model = makeModel(subject: subject, client: client)
+
+        model.message = "more rice"
+        model.send()
+        await settle(model)
+
+        model.retry()
+        await settle(model)
+
+        #expect(client.adjustRequests == 2)
+        #expect(model.messages.map(\.author) == [.you])
+    }
+
     // MARK: - On the meal-detail screen
 
     @Test("a turn moves the stored meal and the screen with it")
@@ -520,11 +651,20 @@ struct MealChatTests {
     ///
     /// The client answers from memory and the pacing is instant, so the work
     /// is a handful of continuations rather than a wait. Yielding until the
-    /// stage settles is what keeps this from being a sleep with a number
+    /// model is idle is what keeps this from being a sleep with a number
     /// nobody can justify.
+    ///
+    /// **Idle is both things now, not just the stage.** A turn no longer starts
+    /// on the analysis states — a question never reaches them at all — so a
+    /// settle that watched only the stage would return before the first message
+    /// had been answered. `isAnswering` is the reply still arriving, and it is
+    /// cleared on every way a turn can end.
     private func settle(_ model: MealChatModel) async {
         for _ in 0..<200 {
             await Task.yield()
+            if model.isAnswering {
+                continue
+            }
             if case .analysing = model.stage {
                 continue
             }
@@ -533,6 +673,36 @@ struct MealChatTests {
             await Task.yield()
             return
         }
+    }
+
+    /// Waits until the reply on screen has a word in it, which is where a
+    /// held-open turn parks.
+    ///
+    /// Bounded rather than a `while`: a test that hangs when the behaviour
+    /// breaks tells nobody anything, and the assertion after this one is what
+    /// says whether the wait was long enough.
+    private func waitForAWord(_ model: MealChatModel) async {
+        for _ in 0..<200 {
+            if model.arrivingReply?.isEmpty == false {
+                return
+            }
+            await Task.yield()
+        }
+    }
+
+    /// Whether the analysis states were reached at all.
+    ///
+    /// Any of the four counts: the pacing here is instant, so the walk runs to
+    /// the last step as soon as it starts, and which one it has got to is
+    /// `AnalysisStep`'s subject rather than this one's.
+    private func reachedTheSteps(_ model: MealChatModel) async -> Bool {
+        for _ in 0..<200 {
+            if case .analysing = model.stage {
+                return true
+            }
+            await Task.yield()
+        }
+        return false
     }
 
     private enum ChatFixtureFailure: Error {

@@ -27,9 +27,14 @@ nonisolated struct ProviderKeyValidator: KeyValidating {
     /// reason the clients take one: **no test in Fuel touches a live
     /// endpoint**, so the mapping below is exercised against recorded response
     /// shapes.
-    private let transport: any HTTPTransport
+    ///
+    /// A key check streams nothing. The streaming type is what
+    /// `ProviderClients` asks for, because the clients it builds also hold
+    /// conversations — this path goes on using `send` and one recorded
+    /// response.
+    private let transport: any StreamingHTTPTransport
 
-    init(transport: any HTTPTransport = URLSession.fuel) {
+    init(transport: any StreamingHTTPTransport = URLSession.fuel) {
         self.transport = transport
     }
 

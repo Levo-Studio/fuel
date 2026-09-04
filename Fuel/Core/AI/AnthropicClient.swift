@@ -25,11 +25,11 @@ nonisolated struct AnthropicClient: AIClient {
     private static let messagesURL = URL(string: "https://api.anthropic.com/v1/messages")!
 
 
-    private let transport: any HTTPTransport
+    private let transport: any StreamingHTTPTransport
     private let keys: ProviderKeySource
 
     init(
-        transport: any HTTPTransport = URLSession.fuel,
+        transport: any StreamingHTTPTransport = URLSession.fuel,
         keys: ProviderKeySource = ProviderKeySource(provider: .claude)
     ) {
         self.transport = transport
@@ -121,11 +121,17 @@ nonisolated struct AnthropicClient: AIClient {
 
     // MARK: - Adjusting
 
+    /// The conversation, as a sequence rather than a value.
+    ///
+    /// The body is serialised here, before the task starts, so what crosses
+    /// into it is `Data` and a `Sendable` meal rather than a dictionary of
+    /// `Any`. **The key is still read inside**, at the moment the request is
+    /// built, which is the rule `ProviderKeySource` exists to keep.
     func adjust(
         _ meal: AdjustableMeal,
         history: [MealChatTurn],
         message: String
-    ) async throws -> MealAdjustmentOutcome {
+    ) -> AsyncThrowingStream<MealChatEvent, any Error> {
         // The turns so far, then the meal as it now stands with the new
         // message attached to it. See `MealChatContract.turn(for:message:)`
         // for why the meal rides with the current question rather than with
@@ -139,21 +145,85 @@ nonisolated struct AnthropicClient: AIClient {
             "model": Self.model,
             "max_tokens": MealChatContract.maxTokens,
             "system": MealChatContract.systemPrompt,
-            "messages": messages
+            "messages": messages,
+            "stream": true
         ]
+        let serialised = try? JSONSerialization.data(withJSONObject: body)
 
-        let reply = try await send(body: body)
-        let intent: MealAdjustmentIntent
+        return AsyncThrowingStream { continuation in
+            let run = Task {
+                do {
+                    guard let serialised else {
+                        throw AIError.malformedResponse
+                    }
+                    try await converse(body: serialised, over: meal) { continuation.yield($0) }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            // A message the user called off has to take the connection with
+            // it, not just stop being listened to.
+            continuation.onTermination = { _ in run.cancel() }
+        }
+    }
+
+    /// One streamed conversation: sign, open, read, assemble.
+    private func converse(
+        body: Data,
+        over meal: AdjustableMeal,
+        yield: (MealChatEvent) -> Void
+    ) async throws {
+        // Read the key here, at the moment the request is built, and let it go
+        // out of scope with this function.
+        let key = try keys.key()
+        let request = Self.request(body: body, key: key)
+
+        let response: HTTPStreamResponse
         do {
-            intent = try MealChatContract.intent(from: reply.text)
+            response = try await transport.streamRetryingALostConnection(request)
         } catch {
-            throw Self.ranOutOfTokens(reply.body) ? AIError.truncatedReply : error
+            throw AIError.transportFailure(error)
         }
 
-        return MealAdjustmentOutcome(
-            reply: intent.reply,
-            meal: MealAdjuster.applyAgainstBundledTable(intent, to: meal)
-        )
+        guard (200..<300).contains(response.statusCode) else {
+            throw AIError.from(
+                status: response.statusCode,
+                body: await response.refusalBody(),
+                provider: provider
+            )
+        }
+
+        var events = ServerSentEventDecoder()
+        var assembler = MealChatStreamAssembler()
+
+        do {
+            for try await line in response.lines {
+                guard let payload = events.decode(line) else {
+                    continue
+                }
+                let step = Self.step(in: payload)
+                if let refusal = step.refusal {
+                    throw refusal
+                }
+                if step.ranOutOfTokens {
+                    assembler.noteRanOutOfTokens()
+                }
+                if let text = step.text {
+                    for event in assembler.append(text) {
+                        yield(event)
+                    }
+                }
+            }
+        } catch let error as AIError {
+            throw error
+        } catch {
+            // A body that died part-way. The turn fails rather than landing on
+            // half a sentence — see `MealChatModel.fail(with:as:)`.
+            throw AIError.transportFailure(error)
+        }
+
+        yield(try assembler.finish(over: meal))
     }
 
     // MARK: - The one request path
@@ -224,13 +294,19 @@ nonisolated struct AnthropicClient: AIClient {
         guard let data = try? JSONSerialization.data(withJSONObject: body) else {
             return nil
         }
+        return request(body: data, key: key)
+    }
 
+    /// The same request from a body that is already serialised, which is what
+    /// the streaming path has: it serialises before starting its task so that
+    /// nothing but `Data` crosses into it.
+    private static func request(body: Data, key: APIKey) -> URLRequest {
         var request = URLRequest(url: messagesURL)
         request.httpMethod = "POST"
         request.setValue(key.secret, forHTTPHeaderField: "x-api-key")
         request.setValue(apiVersion, forHTTPHeaderField: "anthropic-version")
         request.setValue("application/json", forHTTPHeaderField: "content-type")
-        request.httpBody = data
+        request.httpBody = body
         return request
     }
 
@@ -271,5 +347,45 @@ nonisolated struct AnthropicClient: AIClient {
             .filter { $0["type"] as? String == "text" }
             .compactMap { $0["text"] as? String }
             .joined()
+    }
+
+    // MARK: - Streamed response
+
+    /// What one server-sent event from a `messages` stream says.
+    ///
+    /// Anthropic's stream is a sequence of typed events. Three of them carry
+    /// anything Fuel reads; the rest — `message_start`, `content_block_start`,
+    /// `content_block_stop`, `message_stop`, `ping` — say only where in the
+    /// answer the stream is, which the assembler does not need to be told.
+    ///
+    /// **The refusal goes through the same mapping a refused status does**, so
+    /// an exhausted balance announced part-way through a `200` is still
+    /// recognised by its own words, and no fragment of what the provider wrote
+    /// travels out of that function.
+    private static func step(
+        in payload: String
+    ) -> (text: String?, ranOutOfTokens: Bool, refusal: AIError?) {
+        guard
+            let object = try? JSONSerialization.jsonObject(with: Data(payload.utf8)) as? [String: Any]
+        else {
+            return (nil, false, nil)
+        }
+
+        switch object["type"] as? String {
+        case "content_block_delta":
+            // `text` and not `partial_json`: Fuel asks for no tools, so a
+            // block that is not text is a block it did not ask for.
+            return ((object["delta"] as? [String: Any])?["text"] as? String, false, nil)
+
+        case "message_delta":
+            let stop = (object["delta"] as? [String: Any])?["stop_reason"] as? String
+            return (nil, stop == "max_tokens", nil)
+
+        case "error":
+            return (nil, false, AIError.from(status: 200, body: Data(payload.utf8), provider: .claude))
+
+        default:
+            return (nil, false, nil)
+        }
     }
 }

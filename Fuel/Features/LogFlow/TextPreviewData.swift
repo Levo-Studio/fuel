@@ -83,8 +83,8 @@ private struct PreviewEstimator: AIClient {
         _ meal: AdjustableMeal,
         history: [MealChatTurn],
         message: String
-    ) async throws -> MealAdjustmentOutcome {
-        throw AIError.cancelled
+    ) -> AsyncThrowingStream<MealChatEvent, any Error> {
+        AsyncThrowingStream { $0.finish(throwing: AIError.cancelled) }
     }
 
     private static let estimate = MealEstimate(

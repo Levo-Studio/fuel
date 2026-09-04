@@ -35,6 +35,22 @@ nonisolated enum MealChatContract {
     /// does by default and must not do here — see the individual notes on
     /// `MealAdjuster`, which is the half of the rule the device enforces
     /// whatever the model writes. **Nothing in this prompt is relied on.**
+    ///
+    /// **The field order is asked for, and the request that it be asked for is
+    /// the screen's.** The reply is read as it arrives, and the two arrays are
+    /// what say whether this turn is moving anything: an empty `changes` and an
+    /// empty `additions` are a question being answered, and either one with an
+    /// object in it is an adjustment. Written first, that answer is known
+    /// within a few tokens and the analysis states can be shown for exactly the
+    /// turns that earn them. Written last, it is known only once the whole
+    /// reply is in, by which time there is nothing left to wait for.
+    ///
+    /// The order is not relied on either. `MealChatStreamReader` reads whatever
+    /// order the object turns out to be in and simply learns the answer later
+    /// if the arrays come last, and the completed object is parsed by the same
+    /// decoder as before, which has never cared about order at all. What a
+    /// model that ignores this paragraph costs is a question that briefly shows
+    /// the analysis states — never a wrong weight.
     static let systemPrompt = """
         You adjust the recorded amounts of a meal someone has already logged.
 
@@ -47,16 +63,20 @@ nonisolated enum MealChatContract {
         prose after it, no code fence.
 
         {
-          "reply": string, one or two short sentences saying what you changed \
-        — or, if you could not tell, what you would need to know,
           "changes": [
             { "item": integer, the item's number, "grams": integer, what that \
         item now weighs }
           ],
           "additions": [
             { "name": string, an ordinary food name, "grams": integer }
-          ]
+          ],
+          "reply": string, one or two short sentences saying what you changed \
+        — or, if you could not tell, what you would need to know
         }
+
+        Write the three fields in that order: the amounts first and the \
+        sentence last, so the sentence describes amounts you have already \
+        settled on.
 
         Amounts are the only thing you decide. Never answer with calories, \
         energy, protein, carbohydrate or fat, in any field or in any words: \

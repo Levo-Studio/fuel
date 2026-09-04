@@ -253,6 +253,18 @@
         }
       }
     },
+    "chat.stop" : {
+      "comment" : "The composer's control while a reply is arriving, which is a stop mark and no word, for VoiceOver. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop"
+          }
+        }
+      }
+    },
     "chat.title" : {
       "comment" : "The title of the conversation sheet. Not in the export.",
       "extractionState" : "manual",
@@ -273,6 +285,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nothing to adjust from that."
+          }
+        }
+      }
+    },
+    "chat.writing" : {
+      "comment" : "Stands in for a reply that has been asked for and has not arrived, and for the whole of one where the user has asked for less motion. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Writing…"
           }
         }
       }

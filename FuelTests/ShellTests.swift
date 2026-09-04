@@ -86,8 +86,8 @@ private nonisolated struct FailingEstimator: AIClient {
         _ meal: AdjustableMeal,
         history: [MealChatTurn],
         message: String
-    ) async throws -> MealAdjustmentOutcome {
-        throw AIError.network
+    ) -> AsyncThrowingStream<MealChatEvent, any Error> {
+        AsyncThrowingStream { $0.finish(throwing: AIError.network) }
     }
 }
 
