@@ -67,12 +67,12 @@ private final class RecordingTransport: StreamingHTTPTransport, @unchecked Senda
     /// provider sends bytes, and what turns those into lines is the thing that
     /// was wrong. `ServerSentEventLineSplitter` is the code the app runs, so a
     /// test built on this fails when the framing does.
-    convenience init(streamingBody body: String, status: Int = 200) {
+    convenience init(streamingBody body: String, status: Int = 200) throws {
         self.init([.failure(URLError(.badServerResponse))])
         var splitter = ServerSentEventLineSplitter()
         var framed: [String] = []
         for byte in Array(body.utf8) {
-            if let line = splitter.append(byte) {
+            if let line = try splitter.append(byte) {
                 framed.append(line)
             }
         }
@@ -2616,7 +2616,7 @@ struct MealAdjustmentClientTests {
         defer { keys.tearDown(provider: .claude) }
 
         let client = AnthropicClient(
-            transport: RecordingTransport(
+            transport: try RecordingTransport(
                 streamingBody: Reply.wire(Reply.anthropicStream(Self.raisesTheRice, chunks: 6))
             ),
             keys: keys.source
@@ -2634,7 +2634,7 @@ struct MealAdjustmentClientTests {
         defer { keys.tearDown(provider: .mistral) }
 
         let client = MistralClient(
-            transport: RecordingTransport(
+            transport: try RecordingTransport(
                 streamingBody: Reply.wire(Reply.mistralStream(Self.raisesTheRice, chunks: 6))
             ),
             keys: keys.source
@@ -2655,7 +2655,7 @@ struct MealAdjustmentClientTests {
 
         let body = Reply.wire(Reply.anthropicStream(Self.raisesTheRice, chunks: 4))
             .replacingOccurrences(of: "\n", with: "\r\n")
-        let client = AnthropicClient(transport: RecordingTransport(streamingBody: body), keys: keys.source)
+        let client = AnthropicClient(transport: try RecordingTransport(streamingBody: body), keys: keys.source)
 
         let turn = try await outcome(of: client.adjust(Self.meal(), history: [], message: "a second portion"))
 
