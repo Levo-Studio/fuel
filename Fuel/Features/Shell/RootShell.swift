@@ -95,10 +95,15 @@ struct RootShell: View {
         NavigationStack(path: mealDetailPath) {
             TodayView(
                 presentation: model.today,
+                navigation: model.dayNavigation,
+                isTravellingBackward: model.dayTravelIsBackward,
                 gettingStarted: model.gettingStarted,
                 onOpenSettings: model.openSettings,
                 onAddEntry: model.openLogFlow,
-                onOpenMeal: model.openMealDetail
+                onOpenMeal: model.openMealDetail,
+                onShowPreviousDay: model.showPreviousDay,
+                onShowNextDay: model.showNextDay,
+                onShowDay: model.showDay
             )
             .toolbar(.hidden, for: .navigationBar)
             // The path element is the meal's identity and the screen is the
@@ -199,7 +204,10 @@ struct RootShell: View {
                     camera: model.cameraLog,
                     text: model.textLog,
                     onCancel: model.dismissDestination,
-                    onLogged: model.dismissDestination
+                    // The one exit that is not the same as the others: a meal
+                    // is logged now, so the flow closes onto the current day
+                    // rather than onto whichever one was being browsed.
+                    onLogged: model.dismissDestinationAfterLogging
                 )
                 // The cover hosts two kinds of screen and the export inks the
                 // status bar differently on each, so the scheme is per stage

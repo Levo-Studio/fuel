@@ -353,6 +353,42 @@ struct FuelMotionTests {
         #expect(FuelMotion.resolve(FuelMotion.emphasised, reduceMotion: true) == nil)
     }
 
+    /// The one difference between the two, and the reason `dayChange` is not
+    /// simply `emphasised`: a sheet leaves the screen underneath standing, and
+    /// a day change replaces everything under the header at once.
+    @Test("a day change is emphasised's shape, and fades where emphasised is dropped")
+    func dayChangeIsEmphasisedThatFades() {
+        #expect(FuelMotion.dayChange.duration == FuelMotion.emphasised.duration)
+        #expect(FuelMotion.dayChange.controlPoint1 == FuelMotion.emphasised.controlPoint1)
+        #expect(FuelMotion.dayChange.controlPoint2 == FuelMotion.emphasised.controlPoint2)
+        #expect(FuelMotion.resolve(FuelMotion.dayChange, reduceMotion: true) != nil)
+    }
+
+    /// What moves is the half of the decision a `Curve` cannot carry, and the
+    /// direction is why it lives here: an arrow, a swipe and a jump that all
+    /// land on the same day have to travel the same way.
+    @Test("a day change travels in the direction it was made")
+    func dayTravelFollowsTheDirection() {
+        #expect(
+            FuelMotion.resolveDayTravel(isBackward: true, reduceMotion: false)
+                == .sideways(isBackward: true)
+        )
+        #expect(
+            FuelMotion.resolveDayTravel(isBackward: false, reduceMotion: false)
+                == .sideways(isBackward: false)
+        )
+    }
+
+    /// Reduce Motion drops the travel and keeps the change followable, which is
+    /// the whole difference between `dayChange` and `emphasised`. Both
+    /// directions collapse onto one answer, because a fade has no direction to
+    /// have.
+    @Test("reduced motion drops a day change's travel and leaves the fade")
+    func dayTravelIsDroppedNotSoftened() {
+        #expect(FuelMotion.resolveDayTravel(isBackward: true, reduceMotion: true) == .fade)
+        #expect(FuelMotion.resolveDayTravel(isBackward: false, reduceMotion: true) == .fade)
+    }
+
     @Test("a paced sequence advances normally, and not at all under reduced motion")
     func pacingStopsRatherThanSoftens() {
         // The distinction from `resolve` is the point. A cross-fade would keep
@@ -487,6 +523,55 @@ struct FuelBackSwipeTests {
             FuelBackSwipe.isBackSwipe(startX: 4, translation: CGSize(width: -200, height: 0))
                 == false
         )
+    }
+}
+
+// MARK: - Day swipe
+
+@Suite("Day swipe")
+struct FuelDaySwipeTests {
+
+    /// Named by the day and not by the finger: a drag to the right moves back,
+    /// the way a page turns.
+    @Test("a drag to the right asks for the earlier day, and to the left the later one")
+    func directionFollowsTheDayNotTheFinger() {
+        #expect(
+            FuelDaySwipe.direction(of: CGSize(width: FuelDaySwipe.travel, height: 0)) == .earlier
+        )
+        #expect(
+            FuelDaySwipe.direction(of: CGSize(width: -FuelDaySwipe.travel, height: 0)) == .later
+        )
+    }
+
+    @Test("a drag that stops short of the travel is nothing")
+    func shortDragIsNotASwipe() {
+        #expect(FuelDaySwipe.direction(of: CGSize(width: FuelDaySwipe.travel - 1, height: 0)) == nil)
+        #expect(FuelDaySwipe.direction(of: .zero) == nil)
+    }
+
+    /// The one that keeps this off the day list underneath it. A thumb
+    /// scrolling a long day drifts sideways, and without the guard it would
+    /// eventually change the day under the person reading it.
+    @Test("a drag down the screen is a scroll, however far it drifts sideways")
+    func verticalDragIsAScroll() {
+        #expect(FuelDaySwipe.direction(of: CGSize(width: 80, height: 300)) == nil)
+        #expect(FuelDaySwipe.direction(of: CGSize(width: -80, height: -300)) == nil)
+    }
+
+    /// Strict, so the ambiguous case falls to the scroll rather than to the
+    /// day: the list is what the finger is usually on.
+    @Test("a perfect diagonal is a scroll")
+    func diagonalIsAScroll() {
+        #expect(FuelDaySwipe.direction(of: CGSize(width: 100, height: 100)) == nil)
+        #expect(FuelDaySwipe.direction(of: CGSize(width: 100, height: 99)) == .earlier)
+    }
+
+    /// One distance for every horizontal drag in the app. Two would mean a
+    /// swipe had to be longer on one screen than on another for no reason a
+    /// user could see.
+    @Test("a day swipe travels as far as a back swipe")
+    func travelIsTheBackSwipesOwn() {
+        #expect(FuelDaySwipe.travel == FuelBackSwipe.travel)
     }
 }
 
