@@ -293,6 +293,26 @@ struct MealChatTests {
         #expect(!model.messages[1].movedNothing)
     }
 
+    /// A store that refuses is not a change that happened. Nothing may go into
+    /// the transcript claiming otherwise.
+    @Test("a refused write lands on the retry state and claims nothing")
+    func refusedWrite() async throws {
+        let subject = StandInSubject(meal: Self.meal())
+        subject.accepts = false
+        let client = ScriptedClient(
+            adjustments: [.success(Self.raisedTheRice())]
+        )
+        let model = makeModel(subject: subject, client: client)
+
+        model.message = "more rice"
+        model.send()
+        await settle(model)
+
+        #expect(model.stage == .failed(.retry(.device)))
+        #expect(model.messages.map(\.author) == [.you])
+        #expect(subject.applied.isEmpty)
+    }
+
     // MARK: - A question is an answer
 
     /// **The owner's report.** "How healthy is this meal" is a question about
@@ -329,26 +349,6 @@ struct MealChatTests {
         #expect(subject.applied.isEmpty)
         #expect(subject.adjustableMeal == Self.meal())
         #expect(model.stage == .conversation)
-    }
-
-    /// A store that refuses is not a change that happened. Nothing may go into
-    /// the transcript claiming otherwise.
-    @Test("a refused write lands on the retry state and claims nothing")
-    func refusedWrite() async throws {
-        let subject = StandInSubject(meal: Self.meal())
-        subject.accepts = false
-        let client = ScriptedClient(
-            adjustments: [.success(Self.raisedTheRice())]
-        )
-        let model = makeModel(subject: subject, client: client)
-
-        model.message = "more rice"
-        model.send()
-        await settle(model)
-
-        #expect(model.stage == .failed(.retry(.device)))
-        #expect(model.messages.map(\.author) == [.you])
-        #expect(subject.applied.isEmpty)
     }
 
     // MARK: - The conversation
