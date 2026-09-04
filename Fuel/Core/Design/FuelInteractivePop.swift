@@ -3,37 +3,51 @@ import UIKit
 
 // MARK: - Interactive pop
 
-/// Gives the navigation controller's own back gestures the first claim on a
-/// horizontal drag anywhere on a pushed screen.
+/// What makes a horizontal drag anywhere on a pushed screen go back, in two
+/// parts: a hint to the system's own back gestures, and a gesture of Fuel's own
+/// underneath it that does not depend on the hint being taken.
 ///
-/// **This draws nothing and is not a gesture of Fuel's.** It restores the one
-/// iOS has always had — the page follows the finger off to the right, the screen
-/// underneath comes forward, and letting go part-way completes or springs back
-/// — which is the animation the owner asked for by name. `FuelBackSwipe` next to
-/// this file is the other thing: a hand-built drag that dismisses a screen the
-/// system offers no gesture for, and it is deliberately *not* what the pushed
-/// meal screen uses.
+/// **The hint came first and is kept, because when it works it is the better
+/// answer.** `tie(from:)` gives `UINavigationController`'s two back gestures
+/// the first claim on the drag, and what they do with it is the transition iOS
+/// has always had — the page follows the finger off to the right, the screen
+/// underneath comes forward, and letting go part-way completes or springs back.
+/// That is the animation the owner asked for by name, and nothing hand-built
+/// reproduces it.
 ///
-/// **Why anything is needed at all.** The system gesture is not disabled here —
-/// measured on the hosted screen, `interactivePopGestureRecognizer` is enabled,
-/// its delegate approves it beginning, and the navigation controller installs no
-/// custom animator that could swallow the transition. What it does not have is
-/// any relationship with the recogniser it has to share the screen with. The
-/// meal screen is a scroll view from edge to edge, and the same measurement says
-/// the two are strangers: the scroll view answers neither
-/// `gestureRecognizer(_:shouldRequireFailureOf:)` nor
-/// `gestureRecognizer(_:shouldBeRequiredToFailBy:)` about the edge pan, and each
-/// recogniser reports it can prevent the other. Two recognisers that can each
-/// prevent the other and have no failure requirement between them are settled by
-/// whichever recognises first — and a scroll view claims a touch as soon as it
-/// moves. So the drag becomes a scroll that goes nowhere, on a list that has
-/// nowhere sideways to go, and the screen stays.
+/// **What it is not is something Fuel can stand behind.** Measured on the real
+/// screen, hosted on a window, with the meal pushed: both pops are enabled,
+/// both delegates approve them beginning, nothing covers the leading edge — a
+/// hit test at x = 5 lands in the breakdown's scroll view, whose ancestors
+/// include the view both pops are attached to — and the breakdown's pan reports
+/// `must-fail = { edgeSwipe, contentSwipe }`, which is exactly the requirement
+/// `tie(from:)` sets out to state. Popping that navigation controller by hand
+/// shrinks the stack and leaves the shell's model holding no meal, so the
+/// transition and the model hand-off both work. Every part of the theory is in
+/// place, and the gesture was still reported dead three times.
 ///
-/// The tie below is the one thing `UINavigationController` publishes either back
-/// gesture for. The SDK header says it of both in the same words — *"This
-/// property should only be used to set up failure requirements with it."* — so
-/// stating a requirement is the sanctioned use of the property rather than a
-/// workaround built on top of it.
+/// The reason that can happen and cannot be chased is that a failure
+/// requirement is a *hint into an arbitration Fuel does not run*. Whether
+/// either pop begins is decided inside `_UIParallaxTransitionPanGestureRecognizer`
+/// and `_UINavigationInteractiveTransition` — private objects Fuel cannot see,
+/// drive, or assert against. Everything provable about the hint is structural,
+/// which is precisely why three rounds of structural evidence kept saying the
+/// gesture was fixed while the screen said otherwise.
+///
+/// **So the screen carries a gesture of Fuel's as well**, and the race stops
+/// mattering because both of its outcomes are now a pop. `arm(from:)` puts a
+/// pan on the pushed screen whose delegate, whose recognition rule and whose
+/// action are all Fuel's, and which pops the navigation controller itself. It
+/// deliberately does **not** wait for either system pop: waiting is what put
+/// the outcome back in UIKit's hands, and an edge pan stays undecided for the
+/// length of a drag that starts at the edge, so waiting for it would kill this
+/// exactly where the gesture is reported dead. At the leading edge the system's
+/// pan is quicker off the mark and normally wins, which is the ordering worth
+/// having — the parallax when it is there, a pop either way.
+///
+/// `FuelBackSwipe` next to this file is the third thing: a hand-built drag for
+/// screens the system offers no gesture for at all, which is a cover rather
+/// than a push. The two share their geometry and nothing else.
 enum FuelInteractivePop {
 
     // MARK: - Tying the two together
@@ -156,6 +170,80 @@ enum FuelInteractivePop {
         )
     }
 
+    // MARK: - The gesture Fuel owns
+
+    /// Puts Fuel's own back gesture on this view's screen, once.
+    ///
+    /// **On the screen's own view, which is what scopes it.** The pushed
+    /// controller's view is torn down with the screen, so the gesture goes with
+    /// it: Today is a different controller and never carries one, which is what
+    /// keeps this off `FuelDaySwipe` — and a sheet is a presentation of its own,
+    /// out of reach for the same reason the tie above is.
+    ///
+    /// Idempotent, because the carrier calls it from more than one moment and a
+    /// screen with two of these would pop twice.
+    static func arm(from view: UIView) {
+        guard
+            let screen = view.fuelOwningViewController,
+            let content = screen.viewIfLoaded,
+            (content.gestureRecognizers ?? []).contains(where: { $0 is FuelBackPopGesture }) == false
+        else {
+            return
+        }
+        content.addGestureRecognizer(FuelBackPopGesture())
+    }
+
+    /// Whether a back gesture may begin on this view's screen at all.
+    ///
+    /// Three conditions, and each is a way the gesture would otherwise be wrong
+    /// rather than merely useless: there has to be something under this screen
+    /// to go back to, this has to be the screen on top of the stack — a drag on
+    /// a screen mid-transition must not pop the one above it — and nothing may
+    /// be presented over it, which is what holds the gesture off while the
+    /// conversation sheet is up.
+    static func canPop(from view: UIView) -> Bool {
+        guard
+            let screen = view.fuelOwningViewController,
+            let navigation = screen.navigationController,
+            navigation.viewControllers.count > 1,
+            navigation.viewControllers.last === screen,
+            screen.presentedViewController == nil
+        else {
+            return false
+        }
+        return true
+    }
+
+    /// Pops the screen this view is on when the drag that just ended meant
+    /// *back*, and answers whether it did.
+    ///
+    /// **`popViewController` and not a write to the shell's path**, which is the
+    /// hand-off worth being explicit about. SwiftUI's `NavigationStack` watches
+    /// the navigation controller it built and writes its path binding when the
+    /// stack shrinks, so a pop made here arrives at `RootShell.mealDetailPath`
+    /// as the system's own pop would — and therefore at the discard
+    /// confirmation standing in front of it. Measured, not assumed: popping the
+    /// hosted controller by hand leaves the shell's model holding no meal, and
+    /// leaves it holding the meal when there are edits to ask about.
+    ///
+    /// `animated: true` is the platform's push-pop, which honours *Reduce
+    /// Motion* on its own account — the same reason `RootShell` hands the stack
+    /// no curve of Fuel's for the push and the pop themselves.
+    @discardableResult
+    static func popIfDragMeansBack(translation: CGSize, from view: UIView) -> Bool {
+        // Asked again rather than trusted from the moment the drag began: a
+        // sheet can arrive over the screen while a finger is still down.
+        guard
+            canPop(from: view),
+            FuelBackSwipe.isLeaving(translation: translation),
+            let navigation = view.fuelOwningViewController?.navigationController
+        else {
+            return false
+        }
+        navigation.popViewController(animated: true)
+        return true
+    }
+
     /// Every scroll view in this subtree, the nested ones included.
     ///
     /// Not "the first one": the meal screen has one list today, and a screen
@@ -202,6 +290,128 @@ final class FuelInteractivePopWatch: UIGestureRecognizer {
     }
 }
 
+// MARK: - Fuel's own back gesture
+
+/// The pan Fuel puts on a pushed screen so that a horizontal drag across it
+/// goes back whether or not the system's pops answered first.
+///
+/// It is its own delegate's and its own target's owner rather than either of
+/// them: `delegate` is weak and an action target is not something to leave to
+/// whoever happens to be holding the screen, so the one object both roles need
+/// is stored here and lives exactly as long as the recogniser does.
+final class FuelBackPopGesture: UIPanGestureRecognizer {
+
+    private let handler = FuelBackPopHandler()
+
+    init() {
+        super.init(target: nil, action: nil)
+        addTarget(handler, action: #selector(FuelBackPopHandler.handle(_:)))
+        delegate = handler
+        // The list underneath keeps its taps and its scroll until this actually
+        // begins, and beginning is already gated on a drag that is going
+        // sideways and going right.
+        cancelsTouchesInView = true
+        delaysTouchesBegan = false
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("FuelBackPopGesture is never loaded from a nib.")
+    }
+}
+
+/// What decides whether the pan begins, what it takes precedence over, and what
+/// happens when it ends.
+///
+/// Split from the recogniser so that all three answers are plain functions over
+/// a view and a translation, which is what lets a test drive a whole drag —
+/// down to the navigation stack shrinking and the shell releasing the meal —
+/// without a simulator having to synthesise a touch.
+final class FuelBackPopHandler: NSObject, UIGestureRecognizerDelegate {
+
+    @objc
+    func handle(_ gesture: UIPanGestureRecognizer) {
+        guard gesture.state == .ended, let view = gesture.view else { return }
+        let travelled = gesture.translation(in: view)
+        FuelInteractivePop.popIfDragMeansBack(
+            // UIKit reports a drag as a point and Fuel measures one as a size,
+            // which is what `DragGesture` hands `FuelBackSwipe` on the covered
+            // screens. Converted here, at the one place the two meet, so the
+            // rule itself is stated once for both.
+            translation: CGSize(width: travelled.x, height: travelled.y),
+            from: view
+        )
+    }
+
+    // MARK: - Arbitration
+
+    /// **The half of the drag that has to be decided before it has finished.**
+    /// A pan is asked this the moment it clears its slop, so the translation
+    /// here is a few points rather than the sixty a finished back swipe needs —
+    /// the question is only which way the finger is going, and how far it went
+    /// is asked again at the end.
+    ///
+    /// Rightward and squarely sideways, so a vertical scroll is never taken
+    /// from the list underneath and a drag to the left is not a way out of a
+    /// screen the user is arriving at.
+    func gestureRecognizerShouldBegin(_ gesture: UIGestureRecognizer) -> Bool {
+        guard
+            let pan = gesture as? UIPanGestureRecognizer,
+            let view = pan.view,
+            FuelInteractivePop.canPop(from: view)
+        else {
+            return false
+        }
+        let travelled = pan.translation(in: view)
+        return FuelBackSwipe.isLeavingDirection(
+            translation: CGSize(width: travelled.x, height: travelled.y)
+        )
+    }
+
+    /// **This is the mechanism, and it is the one the previous rounds could not
+    /// reach.** UIKit asks both recognisers of a pair about a failure
+    /// requirement and takes the union, so "the list waits for the back
+    /// gesture" can be stated from either side — and Fuel owns this side. It
+    /// never has to stand in for SwiftUI's scroll-view delegate, which is the
+    /// objection that sent the earlier fix to `require(toFail:)` instead.
+    ///
+    /// What that buys is the thing a stated requirement cannot have: this is
+    /// asked afresh on every attempt to recognise, against whatever list is on
+    /// the screen at that instant. A requirement recorded once goes stale the
+    /// moment SwiftUI rebuilds the list under a screen that never left the
+    /// stack, silently, with nothing to notice it.
+    ///
+    /// Scoped to the screen this is attached to, for the reason the tie is: a
+    /// scroll view somewhere else in the app is not this screen's to delay.
+    func gestureRecognizer(
+        _ gesture: UIGestureRecognizer,
+        shouldBeRequiredToFailBy other: UIGestureRecognizer
+    ) -> Bool {
+        guard
+            let view = gesture.view,
+            let scroll = other.view as? UIScrollView,
+            // Its pan and nothing else it carries. A scroll view's delayed-touch
+            // and knob recognisers are how it delivers taps and how it drags its
+            // indicator, and making either wait would take something from the
+            // list that this has no quarrel with.
+            other === scroll.panGestureRecognizer,
+            scroll.isDescendant(of: view)
+        else {
+            return false
+        }
+        return true
+    }
+
+    /// Nothing runs beside this. A drag that has been read as *back* is not
+    /// also a scroll, and the screen is on its way out either way.
+    func gestureRecognizer(
+        _ gesture: UIGestureRecognizer,
+        shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
+    ) -> Bool {
+        false
+    }
+}
+
 // MARK: - The view that carries it
 
 /// A view with no size, no colour and no touches, whose only job is to be
@@ -225,14 +435,16 @@ private final class FuelInteractivePopCarrier: UIView {
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
-        keepTied()
+        attach()
     }
 
-    /// Nothing to tie while the screen is off the window: there is no navigation
-    /// controller to reach and no scroll view laid out to reach it from.
-    func keepTied() {
+    /// Nothing to attach while the screen is off the window: there is no
+    /// navigation controller to reach and no scroll view laid out to reach it
+    /// from.
+    func attach() {
         guard window != nil else { return }
         FuelInteractivePop.keepTied(from: self)
+        FuelInteractivePop.arm(from: self)
     }
 }
 
@@ -247,7 +459,7 @@ private struct FuelInteractivePopCarrierView: UIViewRepresentable {
     /// kept because attaching is exactly when there is something to do, and
     /// doing it twice costs nothing.
     func updateUIView(_ view: UIView, context: Context) {
-        (view as? FuelInteractivePopCarrier)?.keepTied()
+        (view as? FuelInteractivePopCarrier)?.attach()
     }
 }
 
@@ -266,19 +478,24 @@ private struct FuelInteractivePopModifier: ViewModifier {
 
 extension View {
 
-    /// Lets the system's interactive pop win a horizontal drag anywhere on this
-    /// screen, ahead of any scroll view on it.
+    /// Makes a horizontal drag anywhere on this screen go back.
+    ///
+    /// Two mechanisms, and the file above says at length why it takes two: the
+    /// system's own back gestures are given the first claim on the drag,
+    /// because what they do with it is the transition that follows the finger,
+    /// and a gesture of Fuel's own sits underneath them so the screen goes back
+    /// whether they took the claim or not.
     ///
     /// **Apply it to a screen that is pushed on a navigation stack.** On a
     /// screen presented some other way there is nothing to pop and this does
     /// nothing at all — which is the honest outcome, not a silent failure: a
-    /// covered screen has no system gesture to give priority to, and
-    /// `fuelBackSwipe` is what those screens use instead.
+    /// covered screen has no stack to shrink, and `fuelBackSwipe` is what those
+    /// screens use instead.
     ///
-    /// **And apply it deliberately, screen by screen.** The mid-content half of
-    /// this puts every vertical scroll on the screen behind a gesture that has
-    /// to fail first, which `tie(from:)` argues is a fair price on a short
-    /// screen and does not argue anywhere else.
+    /// **And apply it deliberately, screen by screen.** Both halves put every
+    /// vertical scroll on the screen behind a horizontal gesture that has to
+    /// fail first, which `tie(from:)` argues is a fair price on a screen this
+    /// short and does not argue anywhere else.
     func fuelInteractivePop() -> some View {
         modifier(FuelInteractivePopModifier())
     }
