@@ -3,12 +3,12 @@ import SwiftUI
 
 // MARK: - Camera tab
 
-/// Screen 07: the viewfinder, and the shutter under it.
+/// Screen 07: the viewfinder, the context line, and the shutter under them.
 ///
-/// Presentation only — it is handed a preview source and hands back a tap, so
-/// it renders without a capture session and without a Keychain. The chrome
-/// around it (the cancel control, the gallery button, the three tabs) belongs
-/// to `LogFlowScaffold`; this is the body between them.
+/// Presentation only — it is handed a preview source and a binding and hands
+/// back a tap, so it renders without a capture session and without a Keychain.
+/// The chrome around it (the cancel control, the gallery button, the three
+/// tabs) belongs to `LogFlowScaffold`; this is the body between them.
 struct CameraTabView: View {
 
     let preview: MealCameraPreview
@@ -17,12 +17,21 @@ struct CameraTabView: View {
     /// so the shutter goes with it and the tab says why.
     let isScanAvailable: Bool
 
+    /// What the user has typed under the viewfinder. Optional in the plainest
+    /// sense — see `contextField`.
+    @Binding var context: String
+
+    /// Which field in the flow is holding the keyboard. See
+    /// `LogFlowChrome.canHoldPhotoContextFocus`.
+    @FocusState.Binding var writing: LogFlowField?
+
     let onShutter: () -> Void
 
     var body: some View {
         if isScanAvailable {
             VStack(alignment: .center, spacing: .zero) {
                 viewfinder
+                contextField
                 shutter
             }
         } else {
@@ -50,6 +59,45 @@ struct CameraTabView: View {
         .clipped()
         .padding(.top, FuelMetrics.Space.s20)
         .accessibilityHidden(true)
+    }
+
+    // MARK: - Context
+
+    /// Detail the photograph cannot carry — the oil something was fried in,
+    /// what is in a sauce — sent to the model alongside the frame.
+    ///
+    /// **The export draws no field on screen 07.** What it draws between the
+    /// viewfinder and the shutter is nothing at all: `flex:1` on the
+    /// viewfinder, then `padding:22px 0 18px` around a 70px ring. What stands
+    /// here instead is this field, on the owner's instruction after testing a
+    /// build. That is a deviation from the design and is recorded as one; it is
+    /// the owner's call and not a reading of the export.
+    ///
+    /// Nothing drawn moves for it. The viewfinder is the flexible element on
+    /// this screen — the export gives it a height only through `flex:1` — so it
+    /// is what gives the field its room, exactly as it gives room to a taller
+    /// device. The shutter keeps its drawn ring, fill and its `22`/`18` bands,
+    /// and the tab bar under it is untouched. The field's own `s20` above it is
+    /// the drop the export already puts over the viewfinder, and its inset is
+    /// the flow's own `logFlowHorizontalPadding`; both are drawn values, used
+    /// where the design does not draw one.
+    ///
+    /// It never asks for the keyboard by itself. A camera screen that opened
+    /// with a keyboard over the viewfinder would be a camera screen you cannot
+    /// see through, so focus arrives only from a tap, and the shutter takes it
+    /// away again through the stage change — see
+    /// `LogFlowChrome.canHoldPhotoContextFocus`.
+    private var contextField: some View {
+        MealTextField(
+            text: $context,
+            field: .photoContext,
+            examples: CameraCopy.contextExamples,
+            line: CameraCopy.contextLine,
+            accessibilityLabel: CameraCopy.contextLabel,
+            writing: $writing
+        )
+        .padding(.top, FuelMetrics.Space.s20)
+        .padding(.horizontal, FuelMetrics.Screen.logFlowHorizontalPadding)
     }
 
     // MARK: - Shutter
@@ -175,19 +223,55 @@ struct CameraGalleryButton: View {
 // MARK: - Previews
 
 #Preview("Camera") {
+    @Previewable @State var context = ""
+    @Previewable @FocusState var writing: LogFlowField?
+
     ZStack {
         FuelPalette(theme: .dark, accent: .mono).camera
             .ignoresSafeArea()
 
-        CameraTabView(preview: .unavailable, isScanAvailable: true, onShutter: {})
+        CameraTabView(
+            preview: .unavailable,
+            isScanAvailable: true,
+            context: $context,
+            writing: $writing,
+            onShutter: {}
+        )
+    }
+}
+
+#Preview("Camera, context written in") {
+    @Previewable @State var context = "Fried in butter, not oil"
+    @Previewable @FocusState var writing: LogFlowField?
+
+    ZStack {
+        FuelPalette(theme: .dark, accent: .mono).camera
+            .ignoresSafeArea()
+
+        CameraTabView(
+            preview: .unavailable,
+            isScanAvailable: true,
+            context: $context,
+            writing: $writing,
+            onShutter: {}
+        )
     }
 }
 
 #Preview("Camera without a key") {
+    @Previewable @State var context = ""
+    @Previewable @FocusState var writing: LogFlowField?
+
     ZStack {
         FuelPalette(theme: .light, accent: .mono).camera
             .ignoresSafeArea()
 
-        CameraTabView(preview: .unavailable, isScanAvailable: false, onShutter: {})
+        CameraTabView(
+            preview: .unavailable,
+            isScanAvailable: false,
+            context: $context,
+            writing: $writing,
+            onShutter: {}
+        )
     }
 }
