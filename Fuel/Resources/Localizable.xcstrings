@@ -188,19 +188,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tell me how the meal differed from what is recorded — a bigger portion, a second helping, the oil it was fried in."
+            "value" : "Ask how filling this meal is, or what would go with it — or say how it differed from what is recorded, like a bigger portion or the oil it was fried in."
           }
         }
       }
     },
     "chat.hint" : {
-      "comment" : "Under the sheet's title, saying what the conversation can and cannot do: it moves the recorded amounts, and every figure follows from them. Not in the export.",
+      "comment" : "Under the sheet's title, saying what the conversation is for: questions about the meal, and corrections to the amounts, whose figures then follow from the table. Not in the export.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Say how this meal differed and the amounts are adjusted. The calories and macros follow from the food table."
+            "value" : "Ask about this meal, or say how it differed and the amounts are adjusted. The calories and macros follow from the food table."
           }
         }
       }
@@ -224,7 +224,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The meal is unchanged. Naming an amount is what lets it be adjusted."
+            "value" : "The meal is unchanged."
           }
         }
       }

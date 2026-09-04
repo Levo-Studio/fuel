@@ -25,7 +25,13 @@ nonisolated enum MealChatCopy {
     }
 
     /// The line under the title, which is the only place the rule of the whole
-    /// feature is stated to the user: amounts move, and the figures follow.
+    /// feature is stated to the user: a question is answered, amounts move, and
+    /// the figures follow from the table rather than from anything said here.
+    ///
+    /// **It used to name only the amounts**, and a line that tells someone what
+    /// they may say is a line that decides what they will say. A person who
+    /// wanted to know whether their lunch was any good read this, saw a sheet
+    /// for correcting portions, and did not ask.
     static var hint: String {
         String(localized: "chat.hint")
     }
