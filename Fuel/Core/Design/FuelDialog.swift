@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - What a dialog says
 
@@ -323,6 +324,80 @@ struct FuelDialog: View {
         .buttonStyle(FuelPressButtonStyle())
     }
 
+    // MARK: - How tall the shortest question is
+
+    /// The height of a question with one line of title, no line under it, no
+    /// field, and its two answers: the delete question and both discard
+    /// questions, which is three of the four this app asks.
+    ///
+    /// **It exists to open the sheet at, not to draw at.** The detent is
+    /// measured from the question — see `FuelDialogModifier.height` — and a
+    /// measurement does not exist until the question has been laid out once, so
+    /// without this the first raise asks UIKit for a detent of zero and the
+    /// sheet grows under the user's finger. Every term is a drawn value or the
+    /// bundled face's own line height for a drawn type; nothing here is a
+    /// number for a panel.
+    static var shortestQuestion: CGFloat {
+        FuelMetrics.Space.s22
+            + FuelTypography.sheetTitle.height(ofLines: 1)
+            + FuelMetrics.Space.s24
+            + FuelMetrics.Space.s17 + FuelTypography.buttonLabel.height(ofLines: 1) + FuelMetrics.Space.s17
+            + FuelMetrics.Space.s18
+    }
+
+    /// What to open the sheet at, before the question has been measured on it.
+    ///
+    /// **A zero detent is not a neutral placeholder.** UIKit refuses it and
+    /// says so — `[Invalid Configuration] Invalid sheet detent height: 0.0`,
+    /// once per raise — and then opens the sheet at a height of its own
+    /// choosing, which the measurement corrects a frame later by moving every
+    /// answer on it. `MealDetailView` is built again on every push, so that is
+    /// not a first-run cost: it is what a user would see every time they open a
+    /// meal and reach for the trash mark.
+    ///
+    /// **The question is asked its own height rather than told what it is.**
+    /// The obvious seed — the paddings and one line of each type, added up,
+    /// which is `shortestQuestion` — is right only for a question that fits on
+    /// one line, and the one this app asks most does not: the owner's delete
+    /// sentence wraps at 22 points, and a seed short by that line opened the
+    /// sheet 28 points under its settled height. Laying the same view out once,
+    /// at the width it is about to come up at, is the only thing that knows how
+    /// many lines a question takes at the user's own text size.
+    ///
+    /// `shortestQuestion` stays as the answer before the screen underneath has
+    /// reported its own width, which is the one moment there is nothing to
+    /// measure against.
+    static func seed(
+        for copy: FuelDialogCopy,
+        entry: FuelDialogEntry?,
+        on ground: FuelDialogGround,
+        palette: FuelPalette,
+        textSize: DynamicTypeSize
+    ) -> CGFloat {
+        guard ground.width > .zero else { return shortestQuestion + ground.inset }
+        let measuring = UIHostingController(
+            rootView: FuelDialog(copy: copy, entry: entry, onConfirm: {}, onCancel: {})
+                .environment(\.fuelPalette, palette)
+                .dynamicTypeSize(textSize)
+        )
+        let fitted = measuring.sizeThatFits(
+            in: CGSize(width: ground.width, height: .greatestFiniteMagnitude)
+        )
+        return fitted.height + ground.inset
+    }
+}
+
+// MARK: - The screen underneath
+
+/// What a dialog needs to know about the screen it is raised over before it has
+/// a sheet of its own to measure.
+nonisolated struct FuelDialogGround: Equatable {
+
+    var width: CGFloat = .zero
+
+    /// The strip the home indicator takes, which the card has to pay for out of
+    /// its own height.
+    var inset: CGFloat = .zero
 }
 
 // MARK: - Raising one
@@ -373,11 +448,38 @@ private struct FuelDialogModifier: ViewModifier {
     /// points tall on an 874-point screen, which is the whole screen.
     ///
     /// It is held out here rather than inside the sheet so it survives the
-    /// dialog being put away and asked again.
+    /// dialog being put away and asked again — though not the screen being
+    /// pushed again, which is why the value below matters.
     @State private var height: CGFloat = .zero
 
+    /// The screen this is raised over: how wide it is, and how much of its
+    /// bottom the home indicator takes.
+    ///
+    /// Read from the screen rather than from the sheet because both are needed
+    /// *before* the sheet exists — see `seed`. What the sheet itself measures
+    /// already includes the strip, so nothing is added to it there.
+    @State private var ground = FuelDialogGround()
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var seed: CGFloat {
+        FuelDialog.seed(
+            for: copy,
+            entry: entry,
+            on: ground,
+            palette: palette,
+            textSize: dynamicTypeSize
+        )
+    }
+
     func body(content: Content) -> some View {
-        content.sheet(isPresented: $isPresented, onDismiss: answer) {
+        content
+        .onGeometryChange(for: FuelDialogGround.self) { proxy in
+            FuelDialogGround(width: proxy.size.width, inset: proxy.safeAreaInsets.bottom)
+        } action: { measured in
+            ground = measured
+        }
+        .sheet(isPresented: $isPresented, onDismiss: answer) {
             FuelDialog(
                 copy: copy,
                 entry: entry,
@@ -401,7 +503,7 @@ private struct FuelDialogModifier: ViewModifier {
             } action: { measured in
                 height = measured
             }
-            .presentationDetents([.height(height)])
+            .presentationDetents([.height(height > .zero ? height : seed)])
             .presentationDragIndicator(.visible)
             .presentationBackground(palette.background)
             .environment(\.fuelPalette, palette)

@@ -623,6 +623,31 @@ struct FuelDialogPresentationTests {
         #expect(fieldHeight > plainHeight, "a question with a field in it is no taller than one without")
     }
 
+    /// **The height it opens at is the height it stays at.**
+    ///
+    /// The detent is measured from the question, and a measurement does not
+    /// exist until the question has been laid out once — so the first raise
+    /// opens at `FuelDialog.shortestQuestion` plus the strip the home indicator
+    /// takes. If that seed is not what the question actually measures, the
+    /// sheet corrects itself a frame later and every answer on it moves. It is
+    /// not a first-run cost: `MealDetailView` is built again on every push, so
+    /// it would be what a user sees every time they open a meal and reach for
+    /// the trash mark.
+    @Test("the height it opens at is the height it settles at")
+    func theSeedIsTheSettledHeight() throws {
+        let screen = try raise(Self.question)
+        let settled = try #require(screen.sheet).frame.height
+        let seed = FuelDialog.seed(
+            for: Self.question,
+            entry: nil,
+            on: FuelDialogGround(width: screen.window.bounds.width, inset: screen.window.safeAreaInsets.bottom),
+            palette: Self.palette,
+            textSize: .large
+        )
+
+        #expect(abs(settled - seed) <= 1, "it opens at \(seed) and settles at \(settled)")
+    }
+
     /// The answers stand their own `s18` above the safe area, and the safe area
     /// stands clear of the home indicator — the drawn distance spent once
     /// rather than twice.
