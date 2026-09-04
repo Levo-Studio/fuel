@@ -85,7 +85,8 @@ final class FoodEntry {
     var advice: String?
 
     /// How sure the model was of the estimate this meal was logged from, as a
-    /// whole percent — the figure drawn beside the kilocalories.
+    /// whole percent — the score `MealResultView` draws on the meal detail
+    /// screen.
     ///
     /// **Stored rather than derived from `items`, and the Recent list is why.**
     /// A meal repeated from the Recent list carries the breakdown of the meal

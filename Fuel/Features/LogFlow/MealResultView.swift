@@ -409,7 +409,7 @@ struct MealResultView<Lede: View>: View {
             mealLabelPill
 
             if let percent = draft.estimateConfidencePercent {
-                FuelAccuracyLabel(percent: percent)
+                MealAccuracyLabel(percent: percent)
             }
 
             Spacer(minLength: FuelMetrics.Space.s14)

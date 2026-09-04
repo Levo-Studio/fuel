@@ -1,30 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "accuracy.figure" : {
-      "comment" : "How sure the model is of a meal's estimate, drawn beside its calorie figure on Today and on a result screen. Already uppercase, because overlayCaption does not transform. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld%% ACC"
-          }
-        }
-      }
-    },
-    "accuracy.figure.spoken" : {
-      "comment" : "The same figure for VoiceOver, where the abbreviation saves no room. Not in the export.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld%% accuracy"
-          }
-        }
-      }
-    },
     "camera.context.example.milk" : {
       "comment" : "Screen 07, an example in the empty context field. Names something the photograph cannot show. Not in the export.",
       "extractionState" : "manual",
@@ -1347,6 +1323,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Step 2 of 2"
+          }
+        }
+      }
+    },
+    "result.accuracy" : {
+      "comment" : "How sure the model is of a meal's estimate, on the row of meal facts above the calorie figure on a result or detail screen. Already uppercase, because overlayCaption does not transform. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%% ACC"
+          }
+        }
+      }
+    },
+    "result.accuracy.spoken" : {
+      "comment" : "The same score for VoiceOver, where the abbreviation saves no room. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%% accuracy"
           }
         }
       }

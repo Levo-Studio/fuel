@@ -19,7 +19,7 @@ struct AccuracyLabelTests {
     /// test alone stayed green when `body` was set in a different style.
     @Test("The style the label names is the export's own small tracked mono")
     func drawnStyle() {
-        let style = FuelAccuracyLabel.style
+        let style = MealAccuracyLabel.style
 
         #expect(style == FuelTypography.overlayCaption)
         #expect(style.family == .mono)
@@ -32,23 +32,24 @@ struct AccuracyLabelTests {
     /// style must not transform on top of the value.
     @Test("The style does not uppercase what the catalog already did")
     func doesNotTransform() {
-        #expect(FuelAccuracyLabel.style.isUppercased == false)
-        #expect(FuelAccuracyCopy.figure(80) == "80% ACC")
+        #expect(MealAccuracyLabel.style.isUppercased == false)
+        #expect(MealResultCopy.accuracy(80) == "80% ACC")
     }
 
     /// A tracked uppercase eyebrow is pinned by `FuelTypography`'s own rule.
-    /// Here it also keeps the day-list row's trailing group a fixed width, so
-    /// the meal name's share of the row does not shrink as text size grows.
+    /// Here it also keeps the score from crowding the two pills it stands
+    /// between as the user's text size grows.
     @Test("The figure does not grow with Dynamic Type")
     func pinnedAgainstDynamicType() {
-        #expect(FuelAccuracyLabel.style.scalesRelativeTo == nil)
+        #expect(MealAccuracyLabel.style.scalesRelativeTo == nil)
     }
 
-    /// Smaller than the kilocalorie figure it sits beside, at both sites.
-    @Test("The figure is smaller than the number it qualifies")
-    func smallerThanTheNumber() {
-        #expect(FuelAccuracyLabel.style.size < FuelTypography.listValue.size)
-        #expect(FuelAccuracyLabel.style.size < FuelTypography.resultCalories.size)
+    /// Quieter than everything around it on the row it joins: the two pills'
+    /// 11.5pt sans, and the 58pt figure under them.
+    @Test("The score is smaller than what it stands among")
+    func smallerThanItsNeighbours() {
+        #expect(MealAccuracyLabel.style.size < FuelTypography.tabLabel.size)
+        #expect(MealAccuracyLabel.style.size < FuelTypography.resultCalories.size)
     }
 
     /// `muted` is derived from the theme's ink and never from the accent, so
@@ -64,15 +65,15 @@ struct AccuracyLabelTests {
 
     @Test("Both ends of the scale format")
     func formatsWholeScale() {
-        #expect(FuelAccuracyCopy.figure(0) == "0% ACC")
-        #expect(FuelAccuracyCopy.figure(100) == "100% ACC")
+        #expect(MealResultCopy.accuracy(0) == "0% ACC")
+        #expect(MealResultCopy.accuracy(100) == "100% ACC")
     }
 
     /// `80% ACC` spoken letter by letter is not a word, and an abbreviation
     /// that saves room on a row saves none in speech.
     @Test("VoiceOver is given the word, not the abbreviation")
     func spokenFormIsAWord() {
-        #expect(FuelAccuracyCopy.spoken(80) == "80% accuracy")
+        #expect(MealResultCopy.accuracySpoken(80) == "80% accuracy")
     }
 }
 
@@ -82,7 +83,7 @@ struct AccuracyLabelTests {
 /// measures the ink.
 ///
 /// **The distinction is not pedantry — it is the finding that produced this
-/// suite.** `FuelAccuracyLabel.style` is a constant the view happens to
+/// suite.** `MealAccuracyLabel.style` is a constant the view happens to
 /// reference; changing `body` to `.fuelStyle(FuelTypography.listValue)` and
 /// leaving the constant alone left the entire suite green, so nothing tested
 /// what the user sees. Rendering the label and measuring the drawn glyphs
@@ -152,7 +153,7 @@ struct AccuracyLabelDrawingTests {
     /// The same string, set from the export's literals and nothing else.
     private func reference(_ percent: Int) -> some View {
         let face = UIFont(name: Self.drawnFace, size: Self.drawnSize)
-        return Text(FuelAccuracyCopy.figure(percent))
+        return Text(MealResultCopy.accuracy(percent))
             .font(Font(face ?? .monospacedSystemFont(ofSize: Self.drawnSize, weight: .regular)))
             .tracking(Self.drawnTrackingEm * Self.drawnSize)
             .foregroundStyle(Self.palette.muted)
@@ -160,7 +161,7 @@ struct AccuracyLabelDrawingTests {
 
     @Test("the drawn label is the size the export's own values give")
     func drawnInkMatchesTheExport() throws {
-        let label = try ink(of: FuelAccuracyLabel(percent: Self.sample))
+        let label = try ink(of: MealAccuracyLabel(percent: Self.sample))
         let expected = try ink(of: reference(Self.sample))
 
         expect(label.width, isTheDrawn: CGFloat(expected.width))
@@ -173,8 +174,8 @@ struct AccuracyLabelDrawingTests {
     /// 58pt figure — and it is worth having measured rather than reasoned.
     @Test("a longer figure is wider, and the reference widens with it")
     func widthFollowsTheDigitCount() throws {
-        let short = try ink(of: FuelAccuracyLabel(percent: 9))
-        let long = try ink(of: FuelAccuracyLabel(percent: 100))
+        let short = try ink(of: MealAccuracyLabel(percent: 9))
+        let long = try ink(of: MealAccuracyLabel(percent: 100))
 
         #expect(long.width > short.width)
         expect(long.width - short.width, isTheDrawn: CGFloat(

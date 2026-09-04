@@ -86,8 +86,8 @@ nonisolated struct ItemConfidence: Codable, Hashable, Sendable {
 
 // MARK: - The meal's figure
 
-/// The accuracy figure drawn beside a meal's kilocalories: how sure the model
-/// is of the estimate it produced.
+/// The accuracy figure a meal is drawn with: how sure the model is of the
+/// estimate it produced.
 ///
 /// Pure arithmetic over plain values, like everything else in this folder. It
 /// knows nothing about the store, the screens, or which provider answered — it
