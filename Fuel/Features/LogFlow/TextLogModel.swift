@@ -361,6 +361,7 @@ final class TextLogModel {
             kilocalories: estimate.kilocalories,
             macros: estimate.macros,
             advice: estimate.advice,
+            estimateConfidencePercent: estimate.confidencePercent,
             items: estimate.items,
             label: store.provisionalLabel(at: enteredAt),
             isLabelUserSet: false,
@@ -484,6 +485,7 @@ final class TextLogModel {
                 source: .text,
                 isFavourite: draft.isFavourite,
                 advice: draft.advice,
+                estimateConfidencePercent: draft.estimateConfidencePercent,
                 items: draft.items,
                 typedSentence: typedText
             )

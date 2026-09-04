@@ -65,6 +65,25 @@ nonisolated struct RecognisedItem: Codable, Hashable, Sendable, Identifiable {
     /// that came from one place with a macro figure that came from another.
     var macros: MacroTotals?
 
+    /// How sure the model is about this row, per step of the work that produced
+    /// it — the identification and the weight, and the food-table match.
+    ///
+    /// **Separate from the `confidence` word inside `note`, and not a
+    /// duplicate of it.** The word is drawn: the export writes `confident ·
+    /// approx. 150 g` under a photo row's name, in one of exactly two forms,
+    /// and a typed row has no such line at all. This is the figure the meal's
+    /// accuracy percentage is averaged from, it is asked for in both log modes,
+    /// and it spans a second step the word says nothing about. Deriving one
+    /// from the other in either direction would need a threshold the export
+    /// does not establish.
+    ///
+    /// `nil` where nothing ever supplied one: a row the user typed themselves,
+    /// a row whose model left the field out or answered it unreadably, and
+    /// every row stored before this property existed. The absence is carried
+    /// rather than filled — see `ItemConfidence` — so a meal with nothing to
+    /// say draws nothing rather than a number Fuel made up.
+    var confidence: ItemConfidence?
+
     var note: Note
 
     init(
@@ -73,6 +92,7 @@ nonisolated struct RecognisedItem: Codable, Hashable, Sendable, Identifiable {
         kilocalories: Int,
         grams: Int? = nil,
         macros: MacroTotals? = nil,
+        confidence: ItemConfidence? = nil,
         note: Note
     ) {
         self.id = id
@@ -80,6 +100,7 @@ nonisolated struct RecognisedItem: Codable, Hashable, Sendable, Identifiable {
         self.kilocalories = kilocalories
         self.grams = grams
         self.macros = macros
+        self.confidence = confidence
         self.note = note
     }
 

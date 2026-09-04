@@ -159,6 +159,7 @@ final class MealDetailModel {
             kilocalories: entry.kilocalories,
             macros: entry.macros,
             advice: entry.advice,
+            estimateConfidencePercent: entry.estimateConfidencePercent,
             items: entry.items,
             label: entry.label,
             isLabelUserSet: entry.isLabelUserSet,
@@ -240,6 +241,16 @@ final class MealDetailModel {
                 kilocalories: updated.kilocalories,
                 macros: entry.macros,
                 advice: entry.advice,
+                // Re-averaged over the stored rows that survive, for the reason
+                // `MealResultDraft.removeItem` gives: a row the user threw out
+                // is not part of this meal, so what the model said about it is
+                // not part of how sure it is about this meal. Over `entry.items`
+                // and not the draft's list, like every other figure on this
+                // path — and a meal that never had an estimate cannot gain one
+                // here, because its stored rows carry no confidence either.
+                estimateConfidencePercent: EstimateConfidence.percent(
+                    of: entry.items.filter { $0.id != id }.map(\.confidence)
+                ),
                 items: entry.items.filter { $0.id != id }
             )
         } catch {
@@ -440,6 +451,7 @@ final class MealDetailModel {
                 kilocalories: merged.kilocalories,
                 macros: merged.macros,
                 advice: merged.advice,
+                estimateConfidencePercent: merged.estimateConfidencePercent,
                 items: merged.items
             )
         } catch {
@@ -546,7 +558,17 @@ extension MealDetailModel: MealChatSubject {
     /// on fat is less true once a tablespoon of oil has been added to it — and
     /// the honest fix for that is a re-analysis, which is a request the user
     /// asks for rather than one this path spends on their behalf.
+    ///
+    /// **The accuracy figure is re-averaged over the rows the adjustment
+    /// leaves, and on this path that is almost always the same number.**
+    /// `MealAdjuster` re-prices a row rather than re-reading it — the row keeps
+    /// the confidence it arrived with, because the model's certainty is about
+    /// what the food is, not about an amount the user has just stated. The
+    /// figure moves here only when the list itself changes: a row the
+    /// adjustment removed stops counting, and a row it added counts for
+    /// nothing, because the chat is never asked how sure it is.
     func apply(_ adjusted: AdjustedMeal) -> Bool {
+        let confidence = EstimateConfidence.percent(of: adjusted.items.map(\.confidence))
         do {
             try store.update(
                 entry,
@@ -554,6 +576,7 @@ extension MealDetailModel: MealChatSubject {
                 kilocalories: adjusted.kilocalories,
                 macros: adjusted.macros,
                 advice: entry.advice,
+                estimateConfidencePercent: confidence,
                 items: adjusted.items
             )
         } catch {
@@ -562,6 +585,7 @@ extension MealDetailModel: MealChatSubject {
 
         draft.kilocalories = adjusted.kilocalories
         draft.macros = adjusted.macros
+        draft.estimateConfidencePercent = confidence
         draft.items = adjusted.items
         return true
     }

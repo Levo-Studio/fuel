@@ -44,6 +44,10 @@ nonisolated enum EstimateContract {
               "kilocalories": integer,
               "grams": integer, the approximate weight of this item,
               "confidence": "confident" or "unsure",
+              "confidence_pct": integer from 0 to 100, how sure you are that \
+        you have identified this food correctly and that its amount is right. \
+        Write a whole number on a scale of 0 to 100, never a fraction such as \
+        0.8,
               "amount": "recognised" if the amount was stated, otherwise \
         "estimated"
             }
@@ -227,14 +231,14 @@ nonisolated enum EstimateContract {
     /// it is not caution spent against the user's credit; refusing to is.
     ///
     /// **Sized against the contract's own shape, not against a photograph.**
-    /// Five fields per item — `name`, `kilocalories`, `grams`, `confidence`,
-    /// `amount` — plus the raw-weight convention's bracketed suffix on a name
-    /// that used it, and the four top-level fields around the list. A busy
-    /// plate of twelve to fifteen items, at that shape, runs somewhere in the
-    /// 600–900 token range; this is roughly double the top of that, so a
-    /// plate half again as busy still has headroom, and so does a reply a
-    /// model has indented or spaced despite being told to write one compact
-    /// object — neither provider's JSON mode is a guarantee, and whitespace a
+    /// Six fields per item — `name`, `kilocalories`, `grams`, `confidence`,
+    /// `confidence_pct`, `amount` — plus the raw-weight convention's bracketed
+    /// suffix on a name that used it, and the four top-level fields around the
+    /// list. A busy plate of twelve to fifteen items, at that shape, runs
+    /// somewhere in the 700–1050 token range; this is comfortably past the top
+    /// of that, so a plate half again as busy still has headroom, and so does a
+    /// reply a model has indented or spaced despite being told to write one
+    /// compact object — neither provider's JSON mode is a guarantee, and whitespace a
     /// human would call formatting is tokens here.
     ///
     /// **What raising it costs in the other direction.** A model that ignores
@@ -391,6 +395,46 @@ nonisolated enum EstimateContract {
         return String(trimmed.prefix(maximumNameLength))
     }
 
+    /// Reads an item's `confidence_pct` into a whole percent, or `nil` where
+    /// the model did not answer the question that was asked.
+    ///
+    /// **`nil` is a real answer here and is never substituted for.** The figure
+    /// is drawn to the user as the model's own certainty, so a value this
+    /// cannot read must produce no figure at all rather than a middling one —
+    /// which is the opposite of how the neighbouring `confidence` word falls
+    /// back to `unsure`. That fallback is safe because `unsure` is the more
+    /// cautious of two words and claims nothing; there is no equivalently
+    /// modest number, and every percentage on the scale is a claim.
+    ///
+    /// **A fraction is refused rather than rescaled, and it is the one case
+    /// worth spelling out.** A model asked for a confidence will sometimes
+    /// answer `0.8` on the nought-to-one scale it is used to, which is why the
+    /// prompt names the scale and rules the shape out in as many words. Read
+    /// literally, `0.8` rounds to `1` and would draw `1% ACC` over an estimate
+    /// the model was almost sure of — an alarming number, and a wrong one.
+    /// Multiplying it by a hundred instead would be Fuel deciding what the
+    /// model meant. Neither is defensible, so a non-integer below one is
+    /// treated as an unreadable answer and the meal simply carries one row
+    /// fewer into its average. `0` and `1` themselves are whole numbers on the
+    /// asked scale and are read as written.
+    ///
+    /// Anything outside `0...100`, and anything that is not a number at all, is
+    /// unreadable for the same reason. `Int(exactly:)` rather than `Int(_:)`
+    /// because a provider can put `1e300` on the wire and the plain conversion
+    /// traps on it — the same trap `LenientInt` documents.
+    static func confidencePercent(_ raw: Double?) -> Int? {
+        guard let raw, raw.isFinite else {
+            return nil
+        }
+        if raw > 0, raw < 1 {
+            return nil
+        }
+        guard let percent = Int(exactly: raw.rounded()) else {
+            return nil
+        }
+        return EstimateConfidence.range.contains(percent) ? percent : nil
+    }
+
     // MARK: - Parsing
 
     /// Reads the model's reply into a `MealEstimate`.
@@ -541,7 +585,17 @@ private nonisolated struct EstimatePayload: Decodable {
         var kilocalories: LenientInt?
         var grams: LenientInt?
         var confidence: String?
+        var confidencePercent: LenientDouble?
         var amount: String?
+
+        enum CodingKeys: String, CodingKey {
+            case name
+            case kilocalories
+            case grams
+            case confidence
+            case confidencePercent = "confidence_pct"
+            case amount
+        }
 
         /// Converts one row, or `nil` if it carries nothing the result screen
         /// can honestly draw.
@@ -558,11 +612,20 @@ private nonisolated struct EstimatePayload: Decodable {
         /// from the top-level fields, not from summing these — and a missing
         /// row is visibly missing, where a zero is a quiet lie.
         ///
-        /// Confidence is different, and does fall back: it has only two
-        /// values, and an absent one reads as `unsure` the same way
+        /// The confidence **word** is different, and does fall back: it has
+        /// only two values, and an absent one reads as `unsure` the same way
         /// `RecognisedItem` reads an entry written by another build.
         /// Overstating what the model was sure of is the worse failure, and
         /// `unsure` claims nothing the model did not say.
+        ///
+        /// The confidence **percentage** falls back to nothing at all, and the
+        /// two are not in tension. A word can have a modest default; a number
+        /// cannot, because every value on the scale is a claim about how sure
+        /// the model was. `EstimateContract.confidencePercent(_:)` has the
+        /// argument in full. The word and the number are asked for separately
+        /// rather than one derived from the other, because deriving `confident`
+        /// from a percentage would need a threshold — and the export draws the
+        /// two words without establishing where between them the line falls.
         ///
         /// **`grams` is kept for both modes now, and only the photo mode still
         /// insists on it.** The field was always asked for and always answered
@@ -602,6 +665,22 @@ private nonisolated struct EstimatePayload: Decodable {
                 // said nothing about its weight. `weightInGrams` states the
                 // same rule from the reading side.
                 grams: (weight ?? 0) > 0 ? weight : nil,
+                // Both log modes, which is the point of the field: a typed meal
+                // had no confidence of any kind before this, and the figure is
+                // drawn on every meal however it was logged. Only the
+                // identification step is answered here; the grounding step is
+                // `FoodTableGrounding`'s to fill in.
+                //
+                // **A model that answered nothing readable leaves this `nil`
+                // rather than an `ItemConfidence` with nothing in it.** The two
+                // read the same through `percent`, and they are not the same
+                // stored row: an empty value writes `"confidence":{}` into
+                // every item blob for good, and it makes `confidence != nil` —
+                // the obvious way to ask "did any step answer" — true of an
+                // item no step answered for.
+                confidence: EstimateContract
+                    .confidencePercent(confidencePercent?.value)
+                    .map { ItemConfidence(estimatePercent: $0) },
                 note: note
             )
         }
@@ -663,6 +742,44 @@ private nonisolated struct LenientString: Decodable {
 
     init(from decoder: any Decoder) throws {
         value = try? decoder.singleValueContainer().decode(String.self)
+    }
+}
+
+// MARK: - Lenient double
+
+/// A `Double` that reads as absent rather than as an error when the value is
+/// not a number, and that hands its caller the number **as written**.
+///
+/// **Not `LenientInt`, and the difference is the whole reason it exists.**
+/// `LenientInt` rounds on the way through, which is right for grams and
+/// kilocalories and destroys the one distinction a confidence turns on: `0.8`
+/// and `1` both arrive as `1` there, so the fraction-scale answer becomes
+/// indistinguishable from a genuine one per cent.
+/// `EstimateContract.confidencePercent(_:)` has to see the fraction to refuse
+/// it, so the rounding happens there, after the decision, rather than here.
+///
+/// A JSON integer decodes as a `Double` without complaint, so nothing is lost
+/// on the ordinary reply. Anything that is not a number — prose, a range, an
+/// object — reads as `nil`, for the reason `LenientString` gives: a throw
+/// inside the decoder would take the whole estimate with it.
+private nonisolated struct LenientDouble: Decodable {
+
+    let value: Double?
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+
+        if let double = try? container.decode(Double.self) {
+            value = double
+            return
+        }
+
+        if let string = try? container.decode(String.self) {
+            value = Double(string.trimmingCharacters(in: .whitespaces))
+            return
+        }
+
+        value = nil
     }
 }
 

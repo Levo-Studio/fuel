@@ -198,6 +198,49 @@ struct DrawnPixels {
             top: minY
         )
     }
+
+    /// The tightest box around everything that is **not** the ground colour, or
+    /// nothing if the region is bare.
+    ///
+    /// **The inverse of `box(ofColour:in:)`, and text is why it exists.** That
+    /// one finds pixels matching a colour, which works for an opaque fill like
+    /// the accent pill and cannot work for type: `muted` is
+    /// `rgba(18,18,18,.45)`, so no pixel on the screen ever holds it — what is
+    /// drawn is that colour composited over whatever is behind it, at a
+    /// coverage that varies glyph by glyph. Asking what differs from the ground
+    /// is the same question asked from the side that has an answer.
+    ///
+    /// What it reports is the fully painted core of the ink rather than the
+    /// glyph's geometric extent, because `tolerance` discards the faintest
+    /// antialiased edges. That is exactly why a measurement taken through this
+    /// is only ever compared against another one taken through it: the bearings
+    /// and the rasterisation cancel, and what is left is the difference the
+    /// test is asking about.
+    func inkBox(against ground: Channels, in region: CGRect? = nil) -> Box? {
+        let searched = region ?? CGRect(origin: .zero, size: size)
+        var minX = Int.max
+        var maxX = Int.min
+        var minY = Int.max
+        var maxY = Int.min
+
+        for y in Int(searched.minY)..<Int(searched.maxY) {
+            for x in Int(searched.minX)..<Int(searched.maxX) {
+                guard deviation(fromColour: ground, x: x, y: y) > Self.tolerance else { continue }
+                minX = min(minX, x)
+                maxX = max(maxX, x)
+                minY = min(minY, y)
+                maxY = max(maxY, y)
+            }
+        }
+
+        guard minX <= maxX else { return nil }
+        return Box(
+            left: minX,
+            right: Int(size.width) - maxX - 1,
+            bottom: Int(size.height) - maxY - 1,
+            top: minY
+        )
+    }
 }
 
 // MARK: - Against what was drawn

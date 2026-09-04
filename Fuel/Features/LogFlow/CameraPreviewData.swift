@@ -18,6 +18,34 @@ import Foundation
 /// `FuelStore`, which is.
 enum CameraPreviewData {
 
+    /// Screen 14's three rows, with a confidence on each.
+    ///
+    /// The percentages are not in the export either — it draws the two words
+    /// and no number — so they are chosen to sit either side of them: the two
+    /// rows the export calls `sicher` are high, the one it calls `unsicher` is
+    /// low, which is what a model that answered both fields consistently would
+    /// send.
+    nonisolated static let items = [
+        RecognisedItem(
+            name: "Salmon fillet, pan-fried",
+            kilocalories: 240,
+            confidence: ItemConfidence(estimatePercent: 90),
+            note: .photo(confidence: .confident, approximateGrams: 150)
+        ),
+        RecognisedItem(
+            name: "Polenta",
+            kilocalories: 150,
+            confidence: ItemConfidence(estimatePercent: 85),
+            note: .photo(confidence: .confident, approximateGrams: 180)
+        ),
+        RecognisedItem(
+            name: "Leaf spinach",
+            kilocalories: 70,
+            confidence: ItemConfidence(estimatePercent: 45),
+            note: .photo(confidence: .unsure, approximateGrams: 90)
+        ),
+    ]
+
     /// `nonisolated` so the stand-in client below, which is not on the main
     /// actor, can hand it back.
     nonisolated static let draft = MealResultDraft(
@@ -28,23 +56,10 @@ enum CameraPreviewData {
         // the kind of sentence a model returns, so the canvas shows the line at
         // the length it will usually be.
         advice: "Plenty of protein and healthy fats. The plate is light on carbohydrate for an evening meal.",
-        items: [
-            RecognisedItem(
-                name: "Salmon fillet, pan-fried",
-                kilocalories: 240,
-                note: .photo(confidence: .confident, approximateGrams: 150)
-            ),
-            RecognisedItem(
-                name: "Polenta",
-                kilocalories: 150,
-                note: .photo(confidence: .confident, approximateGrams: 180)
-            ),
-            RecognisedItem(
-                name: "Leaf spinach",
-                kilocalories: 70,
-                note: .photo(confidence: .unsure, approximateGrams: 90)
-            ),
-        ],
+        // Derived rather than written down, so the canvas cannot show a
+        // percentage the rows under it do not add up to.
+        estimateConfidencePercent: EstimateConfidence.percent(of: items.map(\.confidence)),
+        items: items,
         label: .dinner,
         isLabelUserSet: false,
         isFavourite: false

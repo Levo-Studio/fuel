@@ -193,6 +193,7 @@ struct FuelStoreTests {
             kilocalories: 390,
             macros: MacroTotals(protein: 34, carbs: 15, fat: 21),
             advice: "Plenty of protein, and now with the polenta weighed.",
+            estimateConfidencePercent: nil,
             items: [RecognisedItem(name: "Polenta, raw 50 g", kilocalories: 80, note: .text(amount: .recognised))]
         )
 

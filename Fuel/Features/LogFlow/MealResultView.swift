@@ -382,10 +382,38 @@ struct MealResultView<Lede: View>: View {
 
     // MARK: - Label and favourite
 
+    /// The meal pill, the accuracy score and the favourite mark.
+    ///
+    /// **This row is where the score goes, and the export's own structure is
+    /// what puts it here.** Screens 14 and 15 draw exactly one row of standing
+    /// facts about the meal — which meal it is, and whether the user has
+    /// starred it — between the thing at the top of the screen and the
+    /// kilocalorie figure. A score is a third fact of that kind, so it joins
+    /// the row that already holds them rather than displacing something on a
+    /// row that holds figures.
+    ///
+    /// **It leads, beside the meal pill, and not at the trailing end.** The two
+    /// drawn ends are not interchangeable: the meal label is derived from the
+    /// estimate and the favourite mark is the user's own, so the score belongs
+    /// with the first. That also leaves both drawn pills where the export puts
+    /// them — the row is `space-between` with a short pill at each end and
+    /// roughly a hundred and sixty points of nothing in the middle, which is
+    /// where this stands. Nothing on the row moves, which is the whole
+    /// difference between this position and the one it came from.
+    ///
+    /// The `s14` between the pill and the score is this row's own spacing,
+    /// already its `HStack` spacing and its `Spacer`'s minimum before the score
+    /// existed.
     private var labelRow: some View {
         HStack(alignment: .center, spacing: FuelMetrics.Space.s14) {
             mealLabelPill
+
+            if let percent = draft.estimateConfidencePercent {
+                MealAccuracyLabel(percent: percent)
+            }
+
             Spacer(minLength: FuelMetrics.Space.s14)
+
             favouritePill
         }
         .padding(.top, FuelMetrics.Space.s24)
@@ -466,6 +494,15 @@ struct MealResultView<Lede: View>: View {
     ///
     /// The figure still animates, because it still changes — a re-analysis
     /// replaces it.
+    ///
+    /// **The accuracy figure stood here for one round and does not any more.**
+    /// To the left of the number, it pushed the 58pt figure sixty-odd points
+    /// off the screen's drawn 28pt margin — and by a different sixty-odd per
+    /// meal, because a mono element's width follows its digit count, so `9%`
+    /// and `100%` put the hero number in two different places. Seven stacked
+    /// elements share that margin on screen 14 and this broke the largest of
+    /// them, in the middle of the stack. The owner moved the score up to
+    /// `labelRow`; this row is the export's again, unchanged.
     private var caloriesRow: some View {
         HStack(alignment: .lastTextBaseline, spacing: FuelMetrics.Space.s8) {
             Text(LogFlowFormat.figure(draft.kilocalories))

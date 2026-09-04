@@ -76,6 +76,27 @@ nonisolated enum MealResultCopy {
         String(format: String(localized: "result.macro.grams"), value)
     }
 
+    // MARK: - Accuracy
+
+    /// The score on the row above the figure — `80% ACC`.
+    ///
+    /// Casing is the value's rather than the style's, exactly as `CAPTURED
+    /// PHOTO` and `CANCEL` are stored: `overlayCaption` does not transform,
+    /// because the export draws those runs already uppercase. Which is also
+    /// where a ruling on the abbreviation would land — see
+    /// `MealAccuracyLabel`, whose type follows this string's casing rather
+    /// than the other way round.
+    static func accuracy(_ percent: Int) -> String {
+        String(format: String(localized: "result.accuracy"), percent)
+    }
+
+    /// What VoiceOver says instead. `80% ACC` spoken letter by letter is not a
+    /// word, and an abbreviation that exists to save room on a row has no room
+    /// to save in speech.
+    static func accuracySpoken(_ percent: Int) -> String {
+        String(format: String(localized: "result.accuracy.spoken"), percent)
+    }
+
     // MARK: - Breakdown
 
     /// The remove mark at the trailing edge of a breakdown row, for VoiceOver.

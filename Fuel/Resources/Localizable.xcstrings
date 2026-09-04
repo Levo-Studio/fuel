@@ -1339,6 +1339,30 @@
         }
       }
     },
+    "result.accuracy" : {
+      "comment" : "How sure the model is of a meal's estimate, on the row of meal facts above the calorie figure on a result or detail screen. Already uppercase, because overlayCaption does not transform. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%% ACC"
+          }
+        }
+      }
+    },
+    "result.accuracy.spoken" : {
+      "comment" : "The same score for VoiceOver, where the abbreviation saves no room. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%% accuracy"
+          }
+        }
+      }
+    },
     "result.add" : {
       "comment" : "Screens 14 and 15, the filled footer action. Drawn Hinzufügen.",
       "extractionState" : "manual",
