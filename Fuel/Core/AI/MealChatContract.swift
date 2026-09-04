@@ -56,6 +56,29 @@ nonisolated enum MealChatContract {
     /// named as one of the two things a message can be, and `reply` is where it
     /// is answered.
     ///
+    /// **The opening now names what a question may be about, and that is a
+    /// second widening rather than the same one restated.** The job it
+    /// described was still a job about amounts: a model told it may answer a
+    /// question, in a prompt whose every other paragraph is about weights, will
+    /// answer "how healthy is this" the way a corrector of amounts does — by
+    /// looking for an amount to correct. How nourishing a meal is, how long it
+    /// will sit with someone, and what would go beside it are ordinary things
+    /// to ask about food, and they are named here as such so that answering
+    /// them is inside the job rather than beside it.
+    ///
+    /// **A food it recommends is not a food they ate, and that paragraph is
+    /// carrying the whole rule on its own.** "The carrots were done in olive
+    /// oil" and "what could I add to make this more filling" reach this
+    /// contract as the same shape: a name and a weight in `additions`, with
+    /// nothing in the object, the payload or the wire to say which of the two
+    /// it came from. Nothing on the device can separate them after the fact —
+    /// `MealAdjuster` prices whatever it is handed, and a suggested food prices
+    /// exactly as well as an eaten one — so a suggestion written into that key
+    /// would be logged as food the user never had, which is the worst thing
+    /// this feature could do. The prompt is the only thing standing there, and
+    /// `MealChatContractTests.promptRefusesSuggestions` is a canary over the
+    /// sentence, so a reword that drops it goes red rather than quiet.
+    ///
     /// **A proportion is named as an amount, because it is the commonest way
     /// one is given.** "A second portion that was smaller" implies a weight
     /// against the one already recorded, and the last paragraph used to tell
@@ -69,6 +92,17 @@ nonisolated enum MealChatContract {
     /// the screen beside the one the table produced. It is still worked out
     /// here from CIQUAL and a weight, still read from nowhere else, and the
     /// prompt now says why in the terms the user would see.
+    ///
+    /// **Widening the questions made that paragraph more necessary, not less**,
+    /// which is why it names the questions that pull hardest at it. "Is this a
+    /// lot of protein" is a question whose obvious answer is a number, and a
+    /// model that has just been invited to talk about how nourishing a meal is
+    /// will reach for one unprompted. What it may write instead is said in the
+    /// words an answer can be given in, and the prohibition is spelled out to
+    /// cover a percentage and a share of a day as well — the two shapes a
+    /// figure takes when a model has been told not to write a figure. A weight
+    /// in grams is named as not one of them, because it is the one number the
+    /// amounts cannot do without.
     ///
     /// **The field order is asked for, and the request that it be asked for is
     /// the screen's.** The reply is read as it arrives, and the two arrays are
@@ -89,10 +123,12 @@ nonisolated enum MealChatContract {
         You are talking with someone about a meal they have already logged.
 
         You are given the meal as it now stands: its items, numbered, each \
-        with the weight recorded for it. Their message is a question about \
-        that meal, or something about how it differed from what is recorded, \
-        or both in one sentence. Answer what they asked, and work out which \
-        items their message changes and what each of them now weighs.
+        with the weight recorded for it. Their message asks something about \
+        that meal — what is in it, how nourishing it is, how long it will \
+        keep them full, what would go well with it — or says how it differed \
+        from what is recorded, or does both in one sentence. Answer what they \
+        asked, and work out which items their message changes and what each \
+        of them now weighs.
 
         Reply with one JSON object and nothing else. No prose before it, no \
         prose after it, no code fence.
@@ -114,15 +150,19 @@ nonisolated enum MealChatContract {
         settled on.
 
         Both lists empty is an ordinary answer and not a failed one. A message \
-        that only asks something — what a food is, how it is usually made, \
-        whether something is much — moves no amount: answer it in "reply" and \
-        leave both lists empty.
+        that only asks something — what a food is, how a dish is usually made, \
+        how nourishing or how filling this meal is, what would go with it — \
+        moves no amount: answer it in "reply" and leave both lists empty.
 
         Never write a figure for calories, energy, protein, carbohydrate or \
-        fat, in any field or in any sentence. They are worked out here from a \
-        food composition table and the weights you give, so a number you wrote \
-        would sit on the screen beside a different one. Answer a question \
-        about them in words instead.
+        fat, in any field or in any sentence, and not as a percentage or as a \
+        share of a day either. They are worked out here from a food \
+        composition table and the weights you give, so a number you wrote \
+        would sit on the screen beside a different one. A question about how \
+        nourishing or how filling a meal is invites one hardest: answer that \
+        in words — plenty, little, more than, enough to — and let the figures \
+        beside your answer speak for themselves. A weight in grams is not one \
+        of these figures and is yours to write.
 
         Leave every item the message is not about out of "changes" entirely. \
         An item you do not mention keeps the figures it already has.
@@ -144,6 +184,13 @@ nonisolated enum MealChatContract {
         ordinary food name, with no amount in the name, and a weight in grams \
         estimated from the size of the dish, and say in "reply" what you \
         assumed.
+
+        Only food they ate goes in "additions". Food you are recommending is \
+        not food they ate: "what could I add to make this more filling" is \
+        asking for an idea, and the whole of that answer is words in "reply", \
+        with both lists left empty. The lists are what the meal is recorded as \
+        having contained, so a food you suggested and wrote into one would be \
+        logged as something they had.
 
         Never write a weight of zero or below. If the person says they did \
         not eat something at all, say so in "reply" and leave the list alone; \

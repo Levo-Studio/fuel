@@ -257,6 +257,26 @@ struct MealChatContractTests {
         }
     }
 
+    /// **A canary over the one rule here that nothing structural enforces.**
+    ///
+    /// Every other promise this contract makes is kept by the device whatever
+    /// the model writes: a figure has no key to arrive in and no property to
+    /// land in, a weight is priced against CIQUAL rather than believed, an
+    /// unreadable row is dropped. This one cannot be. "The carrots were done in
+    /// olive oil" and "what could I add to make this more filling" produce the
+    /// same `additions` entry — a food name and a weight — and there is nothing
+    /// in the object, the payload or the wire that says which of the two it
+    /// came from, so a suggestion written into that key would be logged as food
+    /// the user never ate.
+    ///
+    /// The sentence in the prompt is therefore the whole of the protection, and
+    /// this exists so that a reword which quietly drops it fails here instead
+    /// of in somebody's day.
+    @Test("the prompt says a food it suggested is not a food that was eaten")
+    func promptRefusesSuggestions() {
+        #expect(MealChatContract.systemPrompt.contains("Only food they ate goes in \"additions\""))
+    }
+
     @Test("a meal with no breakdown says so rather than sending an empty list")
     func turnWithoutItems() {
         let meal = AdjustableMeal(title: "Leftovers", kilocalories: 300, macros: .zero, items: [])
