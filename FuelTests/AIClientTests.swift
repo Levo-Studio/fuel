@@ -1006,6 +1006,79 @@ struct ReplyParsingTests {
         #expect(estimate.title.allSatisfy { $0 == "🍜" })
     }
 
+    // MARK: - The advisor line
+
+    /// A helper for the five cases below, which differ only in what the
+    /// `advice` key holds — including holding nothing at all.
+    private func estimate(advice: String?) async throws -> MealEstimate {
+        let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
+        defer { keys.tearDown(provider: .claude) }
+
+        let field = advice.map { #""advice":\#($0),"# } ?? ""
+        let reply = """
+            {"title":"Porridge","kilocalories":420,"protein_g":14,"carbs_g":62,\
+            "fat_g":11,\(field)"items":[]}
+            """
+        let client = AnthropicClient(
+            transport: RecordingTransport(status: 200, body: Reply.anthropic(reply)),
+            keys: keys.source
+        )
+        return try await client.estimate(text: "porridge")
+    }
+
+    @Test("an advisor line is read, with its whitespace collapsed")
+    func adviceIsRead() async throws {
+        // Two paragraphs, which a model writes without being asked, and which
+        // would decide the height of a block on the result screen if they
+        // survived.
+        let estimate = try await estimate(advice: #""Good protein.\n\n  Light on fibre.""#)
+
+        #expect(estimate.advice == "Good protein. Light on fibre.")
+    }
+
+    @Test("a missing advisor line is simply absent")
+    func adviceMayBeOmitted() async throws {
+        let estimate = try await estimate(advice: nil)
+
+        #expect(estimate.advice == nil)
+        // And the estimate is exactly as usable as it was before the field
+        // existed, which is the whole claim of an optional field.
+        #expect(estimate.kilocalories == 420)
+    }
+
+    @Test("an advisor line of nothing but whitespace is absent")
+    func emptyAdviceIsAbsent() async throws {
+        #expect(try await estimate(advice: #""   \n ""#).advice == nil)
+    }
+
+    /// **Dropped, not truncated** — the opposite of what an overlong title
+    /// gets, because a sentence cut mid-word is not a shorter sentence.
+    @Test("an overlong advisor line is dropped and the estimate survives")
+    func overlongAdviceIsDropped() async throws {
+        let long = String(repeating: "a", count: EstimateContract.maximumAdviceLength + 1)
+        let estimate = try await estimate(advice: "\"\(long)\"")
+
+        #expect(estimate.advice == nil)
+        #expect(estimate.kilocalories == 420)
+    }
+
+    @Test("an advisor line at the cap is kept")
+    func adviceAtTheCapIsKept() async throws {
+        let long = String(repeating: "a", count: EstimateContract.maximumAdviceLength)
+        let estimate = try await estimate(advice: "\"\(long)\"")
+
+        #expect(estimate.advice?.count == EstimateContract.maximumAdviceLength)
+    }
+
+    /// A throw inside the decoder would take the whole object with it, and the
+    /// user has already paid for the calories in it.
+    @Test("an advisor line that is not a string costs nothing but itself")
+    func nonStringAdviceIsAbsent() async throws {
+        #expect(try await estimate(advice: "42").advice == nil)
+        #expect(try await estimate(advice: #"{"text":"Good protein."}"#).advice == nil)
+        #expect(try await estimate(advice: "42").kilocalories == 420)
+    }
+
     @Test("a code fence around the object is tolerated")
     func codeFence() async throws {
         let keys = try KeyFixture(provider: .claude, secret: "sk-ant-abcdefghijklmnop")
