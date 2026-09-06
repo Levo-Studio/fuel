@@ -164,6 +164,33 @@ struct MealResultDraftTests {
         #expect(subject.itemSentence.isEmpty)
     }
 
+    /// The same removal over rows that each carry their own CIQUAL figure. The
+    /// rows then account for the whole meal, so the removed row's protein,
+    /// carbohydrate and fat leave with it rather than staying in a total drawn
+    /// over a shorter list.
+    ///
+    /// `removalSubtractsAndAsksNothing` above is the other half of the rule and
+    /// is deliberately left as it is: its rows carry no macro figures, so
+    /// subtracting one would take out a number that was never put in, and the
+    /// model's meal-wide estimate stands.
+    @Test("a removal takes the row's macros out where every row has its own")
+    func removalSubtractsMacrosWhereTheRowsHaveThem() {
+        let rice = RecognisedItem(
+            name: "Rice", kilocalories: 200, grams: 150,
+            macros: MacroTotals(protein: 5, carbs: 42, fat: 1), note: .text(amount: .estimated)
+        )
+        let chicken = RecognisedItem(
+            name: "Chicken", kilocalories: 180, grams: 100,
+            macros: MacroTotals(protein: 30, carbs: 0, fat: 8), note: .text(amount: .estimated)
+        )
+        var subject = Self.draft([rice, chicken], kilocalories: 380)
+
+        subject.removeItem(chicken.id)
+
+        #expect(subject.kilocalories == 200)
+        #expect(subject.macros == MacroTotals(protein: 5, carbs: 42, fat: 1))
+    }
+
     /// The refusal on the last row changes nothing at all, the total included.
     @Test("a removal the draft refuses changes no figure")
     func refusedRemovalChangesNothing() {

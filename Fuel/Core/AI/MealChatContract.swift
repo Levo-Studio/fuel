@@ -24,11 +24,15 @@ import Foundation
 /// the exact rule and for what still fails.
 ///
 /// **The model is never asked for a figure, and there is no field it could put
-/// one in.** The reply carries names and weights. Every kilocalorie and every
-/// gram of protein, carbohydrate and fat that reaches the screen after an
-/// adjustment is worked out on the device, by `MealAdjuster`, from a CIQUAL
-/// row and a weight. That is the whole architecture of this app said once
-/// more: the model names food and says how much, and the table prices it. A
+/// one in.** The reply carries names and weights, and that stayed true when the
+/// chat gained the ability to say a row's figures are wrong: the answer to
+/// "that cannot be 400 kcal" is a better food name in `corrections`, which the
+/// table then prices, and not a number. See `MealAdjustmentIntent.Correction`.
+/// Every kilocalorie and every gram of protein, carbohydrate and fat that
+/// reaches the screen after an adjustment is worked out on the device, by
+/// `MealAdjuster`, from a CIQUAL row and a weight. That is the whole
+/// architecture of this app said once more: the model names food and says how
+/// much, and the table prices it. A
 /// chat that answered `"kilocalories": 620` and was believed would quietly
 /// undo it, so the shape below has no key for one and the decoder has no
 /// property for one.
@@ -105,13 +109,14 @@ nonisolated enum MealChatContract {
     /// amounts cannot do without.
     ///
     /// **The field order is asked for, and the request that it be asked for is
-    /// the screen's.** The reply is read as it arrives, and the two arrays are
-    /// what say whether this turn is moving anything: an empty `changes` and an
-    /// empty `additions` are a question being answered, and either one with an
-    /// object in it is an adjustment. Written first, that answer is known
-    /// within a few tokens and the analysis states can be shown for exactly the
-    /// turns that earn them. Written last, it is known only once the whole
-    /// reply is in, by which time there is nothing left to wait for.
+    /// the screen's.** The reply is read as it arrives, and the three arrays
+    /// are what say whether this turn is moving anything: `changes`,
+    /// `corrections` and `additions` all empty is a question being answered,
+    /// and any one of them with an object in it is an adjustment. Written
+    /// first, that answer is known within a few tokens and the analysis states
+    /// can be shown for exactly the turns that earn them. Written last, it is
+    /// known only once the whole reply is in, by which time there is nothing
+    /// left to wait for.
     ///
     /// The order is not relied on either. `MealChatStreamReader` reads whatever
     /// order the object turns out to be in and simply learns the answer later
@@ -138,6 +143,10 @@ nonisolated enum MealChatContract {
             { "item": integer, the item's number, "grams": integer, what that \
         item now weighs }
           ],
+          "corrections": [
+            { "item": integer, the item's number, "name": string, the food it \
+        actually was, "grams": integer, only if they said how much }
+          ],
           "additions": [
             { "name": string, an ordinary food name, "grams": integer }
           ],
@@ -145,20 +154,21 @@ nonisolated enum MealChatContract {
         they said, and what you changed if you changed anything
         }
 
-        Write the three fields in that order: the amounts first and the \
-        sentence last, so the sentence describes amounts you have already \
-        settled on.
+        Write the fields in that order: the amounts first and the sentence \
+        last, so the sentence describes amounts you have already settled on.
 
-        Both lists empty is an ordinary answer and not a failed one. A message \
+        Every list empty is an ordinary answer and not a failed one. A message \
         that only asks something — what a food is, how a dish is usually made, \
         how nourishing or how filling this meal is, what would go with it — \
-        moves no amount: answer it in "reply" and leave both lists empty.
+        moves no amount: answer it in "reply" and leave the lists empty.
 
         Never write a figure for calories, energy, protein, carbohydrate or \
         fat, in any field or in any sentence, and not as a percentage or as a \
         share of a day either. They are worked out here from a food \
-        composition table and the weights you give, so a number you wrote \
-        would sit on the screen beside a different one. A question about how \
+        composition table and the names and weights you give, so a number you \
+        wrote would sit on the screen beside a different one. When someone \
+        says a figure is wrong, the answer is the right food name in \
+        "corrections", never a figure of your own. A question about how \
         nourishing or how filling a meal is invites one hardest: answer that \
         in words — plenty, little, more than, enough to — and let the figures \
         beside your answer speak for themselves. A weight in grams is not one \
@@ -166,6 +176,17 @@ nonisolated enum MealChatContract {
 
         Leave every item the message is not about out of "changes" entirely. \
         An item you do not mention keeps the figures it already has.
+
+        Use "corrections" when the message says an item is not the food it is \
+        recorded as, or that the figures beside one are far wrong. Those are \
+        usually the same thing said two ways: the figures come from looking \
+        the food up, so figures that are far out mean the wrong food was \
+        looked up. Give the plainest, most ordinary name for what it actually \
+        was — "apple compote" rather than "apple sauce", "boiled potatoes" \
+        rather than "the potatoes" — because that name is looked up in the \
+        food composition table and priced from it. Add "grams" only if the \
+        message also says how much; leave it out and the weight already \
+        recorded stands. Correct only the item they named.
 
         A second helping is one larger amount of the same item, not a second \
         item. Raise that item's weight; do not repeat the row.
@@ -188,7 +209,7 @@ nonisolated enum MealChatContract {
         Only food they ate goes in "additions". Food you are recommending is \
         not food they ate: "what could I add to make this more filling" is \
         asking for an idea, and the whole of that answer is words in "reply", \
-        with both lists left empty. The lists are what the meal is recorded as \
+        with the lists left empty. The lists are what the meal is recorded as \
         having contained, so a food you suggested and wrote into one would be \
         logged as something they had.
 
@@ -197,7 +218,7 @@ nonisolated enum MealChatContract {
         taking a row out is theirs to do.
 
         Ask back only when the message points at no amount you could put a \
-        number on and asks nothing you could answer. Then leave both lists \
+        number on and asks nothing you could answer. Then leave the lists \
         empty and use "reply" to say what you would need to know.
         """
 
@@ -427,6 +448,7 @@ nonisolated enum MealChatContract {
                 // follows, and for the same reason: the other rows are still a
                 // usable answer to what was asked.
                 changes: payload.changes.compactMap(\.change),
+                corrections: payload.corrections.compactMap(\.correction),
                 additions: payload.additions.compactMap(\.addition),
                 // Read from the rows as they arrived rather than from the two
                 // lists above, because a row that was just dropped is still a
@@ -434,7 +456,9 @@ nonisolated enum MealChatContract {
                 // different answer to a turn that tried and failed than to a
                 // question that never tried. See
                 // `MealAdjustmentIntent.askedForAChange`.
-                askedForAChange: !payload.changes.isEmpty || !payload.additions.isEmpty
+                askedForAChange: !payload.changes.isEmpty
+                    || !payload.corrections.isEmpty
+                    || !payload.additions.isEmpty
             )
         }
 
@@ -486,11 +510,13 @@ private nonisolated struct AdjustmentPayload: Decodable {
 
     var reply: String?
     var changes: [ChangePayload]
+    var corrections: [CorrectionPayload]
     var additions: [AdditionPayload]
 
     private enum CodingKeys: String, CodingKey {
         case reply
         case changes
+        case corrections
         case additions
     }
 
@@ -502,7 +528,57 @@ private nonisolated struct AdjustmentPayload: Decodable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         reply = try? container.decode(String.self, forKey: .reply)
         changes = (try? container.decode([ChangePayload].self, forKey: .changes)) ?? []
+        corrections = (try? container.decode([CorrectionPayload].self, forKey: .corrections)) ?? []
         additions = (try? container.decode([AdditionPayload].self, forKey: .additions)) ?? []
+    }
+
+    // MARK: - A re-identified row
+
+    nonisolated struct CorrectionPayload: Decodable {
+
+        var item: LenientInt?
+        var name: String?
+        var grams: LenientInt?
+
+        private enum CodingKeys: String, CodingKey {
+            case item
+            case name
+            case grams
+        }
+
+        /// Written out for the reason `AdjustmentPayload`'s is: a field that
+        /// arrived as the wrong type must cost this row and not the whole list.
+        init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            item = try? container.decode(LenientInt.self, forKey: .item)
+            name = try? container.decode(String.self, forKey: .name)
+            grams = try? container.decode(LenientInt.self, forKey: .grams)
+        }
+
+        /// The correction this row asks for, or `nil` where it asks for nothing
+        /// usable.
+        ///
+        /// The number and the name are required; the weight is not, and its
+        /// absence is the ordinary case — a message that says what a food was
+        /// has usually not restated how much of it there was. A weight of zero
+        /// or below is dropped rather than honoured, exactly as a change's is,
+        /// and the row then keeps the amount already recorded rather than
+        /// losing it to a number the model should not have written.
+        ///
+        /// The name goes through `EstimateContract.boundedName` for the reason
+        /// an addition's does: it becomes a `RecognisedItem.name` like any
+        /// other and is held to one rule.
+        var correction: MealAdjustmentIntent.Correction? {
+            guard let item = item?.value, let name = EstimateContract.boundedName(name) else {
+                return nil
+            }
+            let weight = grams?.value
+            return MealAdjustmentIntent.Correction(
+                itemNumber: item,
+                name: name,
+                grams: (weight ?? 0) > 0 ? weight : nil
+            )
+        }
     }
 
     // MARK: - A changed row

@@ -167,6 +167,88 @@ struct MealChatContractTests {
         #expect(intent.additions.isEmpty)
     }
 
+    // MARK: - Correcting what a row is
+
+    @Test("a correction reads as the food it names")
+    func readsCorrections() throws {
+        let reply = """
+            {"reply":"That is apple compote.","corrections":[{"item":2,"name":"Apple compote"}]}
+            """
+
+        let intent = try MealChatContract.intent(from: reply)
+
+        #expect(
+            intent.corrections == [
+                MealAdjustmentIntent.Correction(itemNumber: 2, name: "Apple compote", grams: nil)
+            ]
+        )
+        #expect(intent.askedForAChange)
+    }
+
+    @Test("a correction may restate the weight as well as the food")
+    func readsCorrectionWithWeight() throws {
+        let intent = try MealChatContract.intent(
+            from: #"{"corrections":[{"item":1,"name":"Apple compote","grams":120}]}"#
+        )
+
+        #expect(intent.corrections.first?.grams == 120)
+    }
+
+    /// A weight of zero or below is not a smaller portion, so it is dropped and
+    /// the amount already recorded stands — the row is still corrected, because
+    /// the food is what the message was about.
+    @Test(
+        "a correction with an impossible weight keeps the food and drops the weight",
+        arguments: [0, -50]
+    )
+    func correctionWithEmptyWeight(grams: Int) throws {
+        let intent = try MealChatContract.intent(
+            from: #"{"corrections":[{"item":1,"name":"Apple compote","grams":\#(grams)}]}"#
+        )
+
+        #expect(intent.corrections.first?.name == "Apple compote")
+        #expect(intent.corrections.first?.grams == nil)
+    }
+
+    @Test("a correction with no name and one with no item number are both dropped")
+    func correctionWithoutTheEssentials() throws {
+        #expect(try MealChatContract.intent(from: #"{"corrections":[{"item":1}]}"#).corrections.isEmpty)
+        #expect(try MealChatContract.intent(from: #"{"corrections":[{"name":"Apple compote"}]}"#).corrections.isEmpty)
+    }
+
+    /// **The architecture, checked on the new key.** A correction is where a
+    /// model is most tempted to write the figure it thinks the row should have,
+    /// because the message it answers is about a figure. There is nowhere for
+    /// one to land here either.
+    @Test("a correction carrying figures has no field to put them in")
+    func correctionFiguresAreNotRead() throws {
+        let reply = """
+            {"corrections":[{"item":1,"name":"Apple compote","grams":200,\
+            "kilocalories":180,"kcal_per_100g":107,"protein_g":1}]}
+            """
+
+        let intent = try MealChatContract.intent(from: reply)
+
+        #expect(
+            intent.corrections == [
+                MealAdjustmentIntent.Correction(itemNumber: 1, name: "Apple compote", grams: 200)
+            ]
+        )
+    }
+
+    /// A canary over the sentence that tells the model what to do when someone
+    /// says a figure is wrong. A reword that drops it goes red rather than
+    /// quiet, exactly as `promptRefusesSuggestions` does for its own paragraph.
+    @Test("the prompt answers a wrong figure with a food name and never a figure")
+    func promptAnswersWrongFiguresWithAName() {
+        #expect(MealChatContract.systemPrompt.contains("\"corrections\""))
+        #expect(
+            MealChatContract.systemPrompt.contains(
+                "the answer is the right food name in \"corrections\", never a figure of your own"
+            )
+        )
+    }
+
     // MARK: - An answer written as prose
 
     /// **The failure the owner saw nine times in ten.** A conversational answer
@@ -668,5 +750,424 @@ struct MealAdjusterTests {
         // Provenance survives here too: scaling a CIQUAL figure keeps it a
         // CIQUAL figure, and the marker stays non-nil.
         #expect(adjusted.items[0].macros != nil)
+    }
+
+    // MARK: - Correcting what a row is
+
+    /// **The owner's example, end to end.** `Apple sauce` is a name no CIQUAL
+    /// row covers — nothing in the table carries both of those words — so
+    /// grounding declined it and the row kept the model's own guess of 400 kcal
+    /// for 200 g. `Apple compote` is the same food under the name the table
+    /// publishes, at 107 kcal/100 g.
+    ///
+    /// The message says which food it was; the table says what that costs.
+    /// Nothing here reads a figure from anything the model wrote.
+    @Test("a row named as a different food is re-priced from that food's row")
+    func correctsTheFood() throws {
+        let meal = AdjustableMeal(
+            title: "Pork with apple sauce",
+            kilocalories: 700,
+            macros: MacroTotals(protein: 30, carbs: 50, fat: 20),
+            items: [
+                RecognisedItem(
+                    name: "Pork chop", kilocalories: 300, grams: 120,
+                    note: .photo(confidence: .confident, approximateGrams: 120)
+                ),
+                RecognisedItem(
+                    name: "Apple sauce", kilocalories: 400, grams: 200,
+                    confidence: ItemConfidence(estimatePercent: 90),
+                    note: .photo(confidence: .confident, approximateGrams: 200)
+                ),
+            ]
+        )
+
+        // The premise: the recorded name resolves to nothing, which is why the
+        // row was never priced from the table in the first place.
+        #expect(FoodTableGrounding.bestMatch(for: "Apple sauce", preferring: .prepared, in: table) == nil)
+
+        let adjusted = try #require(
+            MealAdjuster.apply(
+                MealAdjustmentIntent(
+                    reply: "Re-priced that as apple compote.",
+                    corrections: [
+                        MealAdjustmentIntent.Correction(itemNumber: 2, name: "Apple compote")
+                    ]
+                ),
+                to: meal,
+                table: table
+            )
+        )
+
+        let compote = try price("Apple compote", at: 200)
+        #expect(adjusted.items[1].name == "Apple compote")
+        #expect(adjusted.items[1].kilocalories == compote.kilocalories)
+        #expect(adjusted.items[1].macros == compote.macros)
+        // The weight was not restated, so the one already recorded stands.
+        #expect(adjusted.items[1].grams == 200)
+        // Far less than 400, which is what the owner said and what the table says.
+        #expect(adjusted.items[1].kilocalories < 400)
+        #expect(adjusted.kilocalories == 700 + (compote.kilocalories - 400))
+    }
+
+    /// **Only the named item changes.** The row the message did not mention
+    /// keeps its name, its figures, its weight, its note and its confidence,
+    /// byte for byte — the rule a spliced re-analysis holds to, checked here
+    /// because a correction is the instruction most able to break it.
+    @Test("a correction leaves every other row exactly as it was")
+    func correctionTouchesOnlyItsOwnRow() throws {
+        let meal = AdjustableMeal(
+            title: "Pork with apple sauce",
+            kilocalories: 700,
+            macros: MacroTotals(protein: 30, carbs: 50, fat: 20),
+            items: [
+                RecognisedItem(
+                    name: "Pork chop", kilocalories: 300, grams: 120,
+                    macros: MacroTotals(protein: 25, carbs: 0, fat: 20),
+                    confidence: ItemConfidence(estimatePercent: 80),
+                    note: .photo(confidence: .confident, approximateGrams: 120)
+                ),
+                RecognisedItem(
+                    name: "Apple sauce", kilocalories: 400, grams: 200,
+                    note: .photo(confidence: .confident, approximateGrams: 200)
+                ),
+            ]
+        )
+
+        let adjusted = try #require(
+            MealAdjuster.apply(
+                MealAdjustmentIntent(
+                    corrections: [
+                        MealAdjustmentIntent.Correction(itemNumber: 2, name: "Apple compote")
+                    ]
+                ),
+                to: meal,
+                table: table
+            )
+        )
+
+        #expect(adjusted.items[0] == meal.items[0])
+    }
+
+    /// The confidence goes with the old name. It measured how sure the model
+    /// was about a food this row is no longer, so it leaves the meal's accuracy
+    /// average rather than vouching for a reading the user has just corrected.
+    @Test("a corrected row loses the confidence it was read with")
+    func correctionClearsConfidence() throws {
+        let meal = AdjustableMeal(
+            title: "Apple sauce",
+            kilocalories: 400,
+            macros: .zero,
+            items: [
+                RecognisedItem(
+                    name: "Apple sauce", kilocalories: 400, grams: 200,
+                    confidence: ItemConfidence(estimatePercent: 90),
+                    note: .photo(confidence: .confident, approximateGrams: 200)
+                )
+            ]
+        )
+
+        let adjusted = try #require(
+            MealAdjuster.apply(
+                MealAdjustmentIntent(
+                    corrections: [
+                        MealAdjustmentIntent.Correction(itemNumber: 1, name: "Apple compote")
+                    ]
+                ),
+                to: meal,
+                table: table
+            )
+        )
+
+        #expect(meal.items[0].confidence != nil)
+        #expect(adjusted.items[0].confidence == nil)
+    }
+
+    /// A correction may restate the amount as well as the food, and then both
+    /// move together off the row the new name resolves to.
+    @Test("a correction that also names a weight prices the new food at it")
+    func correctionCarriesAWeight() throws {
+        let meal = AdjustableMeal(
+            title: "Apple sauce",
+            kilocalories: 400,
+            macros: .zero,
+            items: [
+                RecognisedItem(
+                    name: "Apple sauce", kilocalories: 400, grams: 200,
+                    note: .photo(confidence: .confident, approximateGrams: 200)
+                )
+            ]
+        )
+
+        let adjusted = try #require(
+            MealAdjuster.apply(
+                MealAdjustmentIntent(
+                    corrections: [
+                        MealAdjustmentIntent.Correction(itemNumber: 1, name: "Apple compote", grams: 120)
+                    ]
+                ),
+                to: meal,
+                table: table
+            )
+        )
+
+        let compote = try price("Apple compote", at: 120)
+        #expect(adjusted.items[0].grams == 120)
+        #expect(adjusted.items[0].kilocalories == compote.kilocalories)
+    }
+
+    /// **No scaling branch behind a correction**, unlike a quantity change. A
+    /// name the table cannot resolve leaves the row alone rather than stretching
+    /// the figures of the food it was wrongly recorded as under a new name.
+    @Test("a correction the table cannot resolve changes nothing")
+    func refusesAnUnresolvableCorrection() throws {
+        let meal = AdjustableMeal(
+            title: "Apple sauce",
+            kilocalories: 400,
+            macros: .zero,
+            items: [
+                RecognisedItem(
+                    name: "Apple sauce", kilocalories: 400, grams: 200,
+                    note: .photo(confidence: .confident, approximateGrams: 200)
+                )
+            ]
+        )
+
+        let adjusted = MealAdjuster.apply(
+            MealAdjustmentIntent(
+                corrections: [
+                    MealAdjustmentIntent.Correction(itemNumber: 1, name: "Zzznotafood")
+                ]
+            ),
+            to: meal,
+            table: table
+        )
+
+        #expect(adjusted == nil)
+    }
+
+    /// A row that never had a weight cannot be priced as any food at any
+    /// amount, so a correction naming no weight of its own is declined rather
+    /// than recorded at an amount nobody stated.
+    @Test("a correction with no weight anywhere is declined")
+    func refusesACorrectionWithNoWeight() {
+        let meal = AdjustableMeal(
+            title: "Something",
+            kilocalories: 400,
+            macros: .zero,
+            items: [RecognisedItem(name: "Apple sauce", kilocalories: 400, note: .text(amount: .estimated))]
+        )
+
+        #expect(
+            MealAdjuster.apply(
+                MealAdjustmentIntent(
+                    corrections: [
+                        MealAdjustmentIntent.Correction(itemNumber: 1, name: "Apple compote")
+                    ]
+                ),
+                to: meal,
+                table: table
+            ) == nil
+        )
+    }
+
+    /// Corrections run after changes, so a reply that both re-weighs and
+    /// re-identifies the same row settles on the food, at the weight the change
+    /// just set.
+    @Test("a correction over a change in the same reply prices the new food at the new weight")
+    func correctionFollowsAChangeOnTheSameRow() throws {
+        let meal = AdjustableMeal(
+            title: "Apple sauce",
+            kilocalories: 400,
+            macros: .zero,
+            items: [
+                RecognisedItem(
+                    name: "Apple sauce", kilocalories: 400, grams: 200,
+                    note: .photo(confidence: .confident, approximateGrams: 200)
+                )
+            ]
+        )
+
+        let adjusted = try #require(
+            MealAdjuster.apply(
+                MealAdjustmentIntent(
+                    changes: [MealAdjustmentIntent.Change(itemNumber: 1, grams: 150)],
+                    corrections: [
+                        MealAdjustmentIntent.Correction(itemNumber: 1, name: "Apple compote")
+                    ]
+                ),
+                to: meal,
+                table: table
+            )
+        )
+
+        let compote = try price("Apple compote", at: 150)
+        #expect(adjusted.items[0].name == "Apple compote")
+        #expect(adjusted.items[0].grams == 150)
+        #expect(adjusted.items[0].kilocalories == compote.kilocalories)
+    }
+
+    // MARK: - The macros move with the calories
+
+    /// A meal whose every row the table knows, carrying the model's own
+    /// meal-wide macro guess over the top of them.
+    ///
+    /// **That combination is not contrived: it is what a meal logged before
+    /// this rule existed looks like on disk.** Grounding used to correct the
+    /// meal's macros only for a single-item reply, so every stored multi-item
+    /// meal has CIQUAL figures on its rows and the model's guess above them.
+    /// Those entries are still in the store and are still what a message
+    /// arrives about.
+    private func fullyGroundedMeal() throws -> AdjustableMeal {
+        let rice = try price("Rice", at: 150)
+        let chicken = try price("Chicken breast", at: 100)
+
+        return AdjustableMeal(
+            title: "Rice and chicken",
+            kilocalories: rice.kilocalories + chicken.kilocalories,
+            macros: MacroTotals(protein: 41, carbs: 62, fat: 14),
+            items: [
+                RecognisedItem(
+                    name: "Rice", kilocalories: rice.kilocalories, grams: 150, macros: rice.macros,
+                    note: .photo(confidence: .confident, approximateGrams: 150)
+                ),
+                RecognisedItem(
+                    name: "Chicken breast", kilocalories: chicken.kilocalories, grams: 100,
+                    macros: chicken.macros,
+                    note: .photo(confidence: .confident, approximateGrams: 100)
+                ),
+            ]
+        )
+    }
+
+    /// **The defect, on the table branch.** The rice moves and the meal's
+    /// protein, carbohydrate and fat move with it, to the figures the rows now
+    /// carry rather than to the model's meal-wide guess nudged by a delta.
+    ///
+    /// The expectation is written as the two rows added up, so that it follows
+    /// the arithmetic rather than standing over it as a constant.
+    @Test("a changed weight moves the meal's macros as well as its calories")
+    func macrosFollowTheTableBranch() throws {
+        let meal = try fullyGroundedMeal()
+
+        let adjusted = try #require(
+            MealAdjuster.apply(
+                MealAdjustmentIntent(changes: [MealAdjustmentIntent.Change(itemNumber: 1, grams: 300)]),
+                to: meal,
+                table: table
+            )
+        )
+
+        let rice = try price("Rice", at: 300)
+        let chicken = try price("Chicken breast", at: 100)
+        #expect(adjusted.macros == rice.macros + chicken.macros)
+        #expect(adjusted.macros != meal.macros)
+        #expect(adjusted.kilocalories != meal.kilocalories)
+    }
+
+    /// **The defect as the owner met it**: a row that had no macro figure at
+    /// all before the message and has CIQUAL's afterwards.
+    ///
+    /// A typed meal whose sentence named no weight is never grounded — there is
+    /// no amount to price it at — so it arrives here with the model's own
+    /// kilocalorie guess, no per-row macros, and the model's meal-wide macro
+    /// estimate over the top. The message supplies the weight. The calories
+    /// then moved and the macros stood still, because a delta needs a figure on
+    /// both sides of the change and this row had none on the near side.
+    @Test("a row that gains its first macro figure moves the meal's macros too")
+    func macrosFollowARowThatHadNone() throws {
+        let modelMacros = MacroTotals(protein: 9, carbs: 40, fat: 7)
+        let meal = AdjustableMeal(
+            title: "Rice",
+            kilocalories: 250,
+            macros: modelMacros,
+            items: [
+                RecognisedItem(name: "Rice", kilocalories: 250, note: .text(amount: .estimated))
+            ]
+        )
+
+        let adjusted = try #require(
+            MealAdjuster.apply(
+                MealAdjustmentIntent(changes: [MealAdjustmentIntent.Change(itemNumber: 1, grams: 200)]),
+                to: meal,
+                table: table
+            )
+        )
+
+        let rice = try price("Rice", at: 200)
+        #expect(adjusted.items[0].macros == rice.macros)
+        #expect(adjusted.macros == rice.macros)
+        #expect(adjusted.macros != modelMacros)
+    }
+
+    /// **The same defect on the scaling branch**, where no table row is
+    /// involved at any point. Both rows carry macros the meal's own figure was
+    /// never composed from, so the delta moved the meal off a base that had
+    /// nothing to do with the rows underneath it.
+    @Test("a scaled row moves the meal's macros to what the rows now say")
+    func macrosFollowTheScalingBranch() throws {
+        let first = MacroTotals(protein: 10, carbs: 20, fat: 4)
+        let second = MacroTotals(protein: 6, carbs: 12, fat: 2)
+        let meal = AdjustableMeal(
+            title: "Two things the table has never heard of",
+            kilocalories: 500,
+            // Deliberately not the sum of the rows: this is the model's own
+            // meal-wide guess, which is what such a meal actually carries.
+            macros: MacroTotals(protein: 31, carbs: 55, fat: 19),
+            items: [
+                RecognisedItem(
+                    name: "Zzznotafood", kilocalories: 300, grams: 100, macros: first,
+                    note: .photo(confidence: .confident, approximateGrams: 100)
+                ),
+                RecognisedItem(
+                    name: "Qqxnotafood", kilocalories: 200, grams: 100, macros: second,
+                    note: .photo(confidence: .confident, approximateGrams: 100)
+                ),
+            ]
+        )
+
+        let adjusted = try #require(
+            MealAdjuster.apply(
+                MealAdjustmentIntent(changes: [MealAdjustmentIntent.Change(itemNumber: 1, grams: 150)]),
+                to: meal,
+                table: table
+            )
+        )
+
+        // Neither row resolved, so both figures are the device scaling the
+        // model's own earlier estimate by the ratio of the two weights.
+        let scaled = MacroTotals(protein: 15, carbs: 30, fat: 6)
+        #expect(adjusted.items[0].macros == scaled)
+        #expect(adjusted.items[1].macros == second)
+        #expect(adjusted.macros == scaled + second)
+        #expect(adjusted.kilocalories == 500 + 150)
+    }
+
+    /// The rule stops where the rows stop being able to answer. One row without
+    /// a macro figure means summing would drop it, so the meal's standing
+    /// figure is moved by the honest deltas instead — which is what
+    /// `groundedMeal` already exercises and what this pins as deliberate.
+    @Test("a meal with one figureless row still moves by the delta and not by a sum")
+    func mixedMealKeepsTheDeltaRule() throws {
+        let meal = try groundedMeal()
+        let before = try #require(meal.items[0].macros)
+
+        let adjusted = try #require(
+            MealAdjuster.apply(
+                MealAdjustmentIntent(changes: [MealAdjustmentIntent.Change(itemNumber: 1, grams: 300)]),
+                to: meal,
+                table: table
+            )
+        )
+
+        let after = try #require(adjusted.items[0].macros)
+        #expect(adjusted.items[1].macros == nil)
+        #expect(adjusted.macros == MacroTotals(
+            protein: meal.macros.protein + (after.protein - before.protein),
+            carbs: meal.macros.carbs + (after.carbs - before.carbs),
+            fat: meal.macros.fat + (after.fat - before.fat)
+        ))
+        // And emphatically not the sum of the rows, which would have thrown the
+        // second row's share of the meal away.
+        #expect(adjusted.macros != after)
     }
 }

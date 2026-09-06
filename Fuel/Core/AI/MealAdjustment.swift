@@ -34,6 +34,12 @@ nonisolated struct AdjustableMeal: Sendable, Equatable {
 /// in.** Names and weights are the whole of what it says about food. See
 /// `MealChatContract` for why that is the architecture rather than a
 /// simplification.
+///
+/// **A correction is a third kind of instruction and still not a figure.** A
+/// user who says the apple sauce cannot possibly be 400 kcal is not quoting a
+/// number they want written down; they are saying the row is not the food it
+/// was priced as. `Correction` carries the food it actually was, and the table
+/// prices it. See that type.
 nonisolated struct MealAdjustmentIntent: Sendable, Equatable {
 
     /// The model's own sentence, already bounded. `nil` where it wrote nothing
@@ -41,6 +47,7 @@ nonisolated struct MealAdjustmentIntent: Sendable, Equatable {
     var reply: String?
 
     var changes: [Change]
+    var corrections: [Correction]
     var additions: [Addition]
 
     /// Whether the reply asked for anything at all to move.
@@ -51,7 +58,7 @@ nonisolated struct MealAdjustmentIntent: Sendable, Equatable {
     /// wants nothing said under it; the other is a model claiming something
     /// happened that did not, and has to be contradicted. Neither is readable
     /// from the words, and neither has to be — the model wrote which it was
-    /// when it opened or did not open its two arrays.
+    /// when it opened or did not open its three arrays.
     ///
     /// **Stored rather than `!changes.isEmpty || !additions.isEmpty`, and the
     /// difference is the reason it exists.** A row the parse could not read —
@@ -66,17 +73,20 @@ nonisolated struct MealAdjustmentIntent: Sendable, Equatable {
     /// `askedForAChange` follows from the rows unless it is stated, so the only
     /// caller that has to think about it is the one that has seen rows this
     /// initialiser never will: `MealChatContract.intent(from:)`, which reads
-    /// the two arrays as they arrived rather than after they were filtered.
+    /// the three arrays as they arrived rather than after they were filtered.
     init(
         reply: String? = nil,
         changes: [Change] = [],
+        corrections: [Correction] = [],
         additions: [Addition] = [],
         askedForAChange: Bool? = nil
     ) {
         self.reply = reply
         self.changes = changes
+        self.corrections = corrections
         self.additions = additions
-        self.askedForAChange = askedForAChange ?? (!changes.isEmpty || !additions.isEmpty)
+        self.askedForAChange = askedForAChange
+            ?? (!changes.isEmpty || !corrections.isEmpty || !additions.isEmpty)
     }
 
     /// One existing row, at a new weight.
@@ -91,6 +101,39 @@ nonisolated struct MealAdjustmentIntent: Sendable, Equatable {
 
         init(itemNumber: Int, grams: Int) {
             self.itemNumber = itemNumber
+            self.grams = grams
+        }
+    }
+
+    /// One existing row, said to be a different food from the one it is
+    /// recorded as.
+    ///
+    /// **This is the answer to "these figures are far too high", and the reason
+    /// that sentence does not need a figure field to answer it.** A row is
+    /// priced by looking its name up in CIQUAL; a row whose figures are wrong
+    /// is, almost always, a row whose name found the wrong table entry or found
+    /// none at all. `Apple sauce` is the live example — no CIQUAL row covers
+    /// both of those words, so the row keeps the model's own guess of 400 kcal
+    /// for 200 g, while `Apple compote` is right there at 107 kcal/100 g. The
+    /// remedy is a better name, not a better number.
+    ///
+    /// So this carries the food it actually was, and `MealAdjuster` prices that
+    /// against the table exactly as it prices everything else. A model that
+    /// wanted to assert 180 kcal still has nowhere to write it.
+    ///
+    /// `grams` is `nil` where the message corrected only the food. The weight
+    /// already recorded for the row then stands — the user said what it was,
+    /// not how much of it there was, and inventing a new amount would answer a
+    /// question nobody asked.
+    nonisolated struct Correction: Sendable, Equatable {
+
+        var itemNumber: Int
+        var name: String
+        var grams: Int?
+
+        init(itemNumber: Int, name: String, grams: Int? = nil) {
+            self.itemNumber = itemNumber
+            self.name = name
             self.grams = grams
         }
     }
@@ -159,7 +202,7 @@ nonisolated struct MealAdjustmentOutcome: Sendable, Equatable {
     /// meal is both a question that never asked for a change and a change that
     /// asked and did not survive, and the screen says something different about
     /// each. `MealAdjustmentIntent.askedForAChange` is where it is read, and
-    /// says why it is read from the model's own two arrays rather than from
+    /// says why it is read from the model's own three arrays rather than from
     /// anything the model wrote about itself.
     var askedForAChange: Bool
 
@@ -199,23 +242,31 @@ nonisolated struct MealAdjustmentOutcome: Sendable, Equatable {
 /// non-`nil` marker that says "this is a CIQUAL figure" cannot flip to `nil`
 /// on a row whose row is still there.
 ///
-/// **The meal's own figures move by the rows' deltas, and the two halves are
-/// not symmetric.** Kilocalories always move: every row has a real prior
-/// kilocalorie figure to take a delta against, and the meal's total has
-/// already been reconciled against those figures by `FoodTableGrounding`,
-/// which adjusts it by exactly this kind of delta. Macros move only for a row
-/// that has a real macro figure on *both* sides of the change — which after a
-/// grounding pass is any grounded row, and which is precisely the case
-/// `FoodTableGrounding` says it does not have: the model is asked for macros
-/// once, for the whole meal, so at *estimate* time a row has no prior macro
-/// figure to subtract. Here it does. A row without one contributes nothing to
-/// the macro total, and the meal's macro figure keeps that row's share exactly
-/// as the model estimated it, because nothing on the device knows what that
-/// share was.
+/// **The meal's own figures come from the rows the adjustment leaves, and only
+/// fall back to a delta where the rows cannot answer.** Kilocalories move by
+/// each row's own delta: every row has a real prior kilocalorie figure to
+/// subtract, and the meal's total has already been reconciled against those
+/// figures by `FoodTableGrounding`, which adjusts it by exactly this kind of
+/// delta. Macros go the other way round, through
+/// `MealArithmetic.macros(ofRows:)` — once every row carries a complete macro
+/// figure the meal's macros are their sum, whatever the meal's figure used to
+/// say.
 ///
-/// The one-item rule that file needs is not needed here and is not written:
-/// with one grounded item the meal's macros already *are* that item's, so
-/// `meal + (new − old)` is `new` by arithmetic rather than by special case.
+/// **That is the fix for a meal whose calories moved and whose macros did
+/// not.** A delta needs a real figure on *both* sides of the change, and the
+/// commonest thing a message does is give a row its first weight — a typed meal
+/// grounding declined for want of one, a photo row the table never matched —
+/// so the row arrives with no macros, leaves with CIQUAL's, and had no prior
+/// figure to take a delta against. Under the delta rule alone it contributed
+/// nothing: the kilocalories moved and the protein, carbohydrate and fat stood
+/// still at the old amount's values, on the same screen, describing the same
+/// plate. Summing the rows has no such hole, because it never asks what a row
+/// used to be.
+///
+/// Where some row still has no macro figure the delta rule is what stands, and
+/// it is unchanged: the meal's macro figure is then the model's meal-wide
+/// estimate, which keeps that row's share exactly as the model guessed it
+/// because nothing on the device knows what that share was.
 nonisolated enum MealAdjuster {
 
     // MARK: - Entry point
@@ -275,6 +326,31 @@ nonisolated enum MealAdjuster {
             moved = true
         }
 
+        // **After the changes and before the additions**, and the order is the
+        // rule rather than an accident. A correction is the more specific
+        // statement about a row — it names the food, where a change names only
+        // an amount — so where a reply carries both about the same row the
+        // correction is what settles it. Running second also means a
+        // correction with no weight of its own picks up the weight a change in
+        // the same reply just set, which is the reading a user who said "that
+        // was apple compote, and there was more of it" would expect.
+        for correction in intent.corrections {
+            let index = correction.itemNumber - 1
+            guard items.indices.contains(index) else {
+                continue
+            }
+
+            let previous = items[index]
+            guard let corrected = reidentifying(previous, as: correction, in: table) else {
+                continue
+            }
+
+            kilocalorieDelta += corrected.kilocalories - previous.kilocalories
+            macroDelta = macroDelta + macroChange(from: previous, to: corrected)
+            items[index] = corrected
+            moved = true
+        }
+
         for addition in intent.additions {
             guard let item = added(addition, in: table) else {
                 continue
@@ -292,14 +368,9 @@ nonisolated enum MealAdjuster {
         }
 
         return AdjustedMeal(
-            // The floor is `PortionCalculator`'s own: a negative meal is not a
-            // value that reaches the day's ring, however a delta got there.
-            kilocalories: max(0, meal.kilocalories + kilocalorieDelta),
-            macros: MacroTotals(
-                protein: max(0, meal.macros.protein + macroDelta.protein),
-                carbs: max(0, meal.macros.carbs + macroDelta.carbs),
-                fat: max(0, meal.macros.fat + macroDelta.fat)
-            ),
+            kilocalories: MealArithmetic.kilocalories(meal.kilocalories, movedBy: kilocalorieDelta),
+            macros: MealArithmetic.macros(ofRows: items.map(\.macros))
+                ?? MealArithmetic.macros(meal.macros, movedBy: macroDelta),
             items: items
         )
     }
@@ -377,6 +448,66 @@ nonisolated enum MealAdjuster {
             )
         }
         return repriced
+    }
+
+    // MARK: - Re-identifying one row
+
+    /// `item` as the food the message says it actually was, or `nil` where
+    /// there is no honest way to price it as that food.
+    ///
+    /// **One route, and it is the table.** Unlike a quantity change there is no
+    /// scaling branch behind this, and there must not be: scaling would take
+    /// the figures of the food the row was wrongly recorded as and stretch
+    /// them, which is the wrong number carried forward under a new name. A
+    /// correction the table cannot resolve is dropped, and if it was the only
+    /// instruction in the reply the caller says the meal did not move — the
+    /// same answer an unpriceable addition gets, for the same reason.
+    ///
+    /// **Only this row changes.** Every other row keeps its name, its figures,
+    /// its provenance and its confidence, which is the rule a spliced
+    /// re-analysis already holds to.
+    ///
+    /// The weight is the message's where it gave one and the row's own
+    /// otherwise, and a row with neither cannot be priced at any weight, so it
+    /// is declined rather than recorded at an amount nobody stated.
+    ///
+    /// **The confidence goes with the old name**, which is the one thing here
+    /// that differs from a quantity change. `repricing(_:to:in:)` keeps it,
+    /// because how sure the model was about what it was looking at is not
+    /// answered either way by an amount. A correction answers it directly and
+    /// in the negative: the user has just said the model read the food wrong,
+    /// so the figure leaves the meal's accuracy average rather than going on
+    /// vouching for a row it was never about. `MealResultDraft.editItem(_:to:)`
+    /// clears it for the same reason when the user retypes a row by hand.
+    ///
+    /// The note is left exactly as it was. It says how the amount was arrived
+    /// at, which a change of food does not answer, and the shapes it can take
+    /// are the two the export draws — there is no drawn form for "the user
+    /// named this one", and inventing one is a design question rather than a
+    /// gap to fill here.
+    private static func reidentifying(
+        _ item: RecognisedItem,
+        as correction: MealAdjustmentIntent.Correction,
+        in table: FoodTable?
+    ) -> RecognisedItem? {
+        guard
+            let table,
+            let grams = correction.grams ?? item.weightInGrams,
+            grams > 0,
+            let match = FoodTableGrounding.bestMatch(for: correction.name, preferring: .prepared, in: table)
+        else {
+            return nil
+        }
+
+        let portion = PortionCalculator.portion(of: match.per100g, grams: Double(grams))
+
+        var corrected = item
+        corrected.name = correction.name
+        corrected.setWeight(grams)
+        corrected.kilocalories = portion.kilocalories
+        corrected.macros = portion.incompleteMacros ? nil : portion.macros
+        corrected.confidence = nil
+        return corrected
     }
 
     /// The row an addition becomes, or `nil` if the table cannot price it.

@@ -92,6 +92,15 @@ struct MealChatStreamReaderTests {
         #expect(progress(#"{"changes":[],"additions":[{"name":"Ol"#).movesSomething)
     }
 
+    /// And so does a correction, so the early warning and the finished turn
+    /// cannot disagree about whether a re-identified row was a turn that moved
+    /// something.
+    @Test("a correction counts as much as a change")
+    func correctionCounts() {
+        #expect(progress(#"{"changes":[],"corrections":[{"item":2,"name":"Apple com"#).movesSomething)
+        #expect(!progress(#"{"changes":[],"corrections":[],"additions":[]"#).movesSomething)
+    }
+
     /// The prompt asks for the arrays first and the reader does not require it.
     @Test("the arrays are read wherever in the object they were written")
     func orderDoesNotMatter() {
