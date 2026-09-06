@@ -669,4 +669,169 @@ struct MealAdjusterTests {
         // CIQUAL figure, and the marker stays non-nil.
         #expect(adjusted.items[0].macros != nil)
     }
+
+    // MARK: - The macros move with the calories
+
+    /// A meal whose every row the table knows, carrying the model's own
+    /// meal-wide macro guess over the top of them.
+    ///
+    /// **That combination is not contrived: it is what a meal logged before
+    /// this rule existed looks like on disk.** Grounding used to correct the
+    /// meal's macros only for a single-item reply, so every stored multi-item
+    /// meal has CIQUAL figures on its rows and the model's guess above them.
+    /// Those entries are still in the store and are still what a message
+    /// arrives about.
+    private func fullyGroundedMeal() throws -> AdjustableMeal {
+        let rice = try price("Rice", at: 150)
+        let chicken = try price("Chicken breast", at: 100)
+
+        return AdjustableMeal(
+            title: "Rice and chicken",
+            kilocalories: rice.kilocalories + chicken.kilocalories,
+            macros: MacroTotals(protein: 41, carbs: 62, fat: 14),
+            items: [
+                RecognisedItem(
+                    name: "Rice", kilocalories: rice.kilocalories, grams: 150, macros: rice.macros,
+                    note: .photo(confidence: .confident, approximateGrams: 150)
+                ),
+                RecognisedItem(
+                    name: "Chicken breast", kilocalories: chicken.kilocalories, grams: 100,
+                    macros: chicken.macros,
+                    note: .photo(confidence: .confident, approximateGrams: 100)
+                ),
+            ]
+        )
+    }
+
+    /// **The defect, on the table branch.** The rice moves and the meal's
+    /// protein, carbohydrate and fat move with it, to the figures the rows now
+    /// carry rather than to the model's meal-wide guess nudged by a delta.
+    ///
+    /// The expectation is written as the two rows added up, so that it follows
+    /// the arithmetic rather than standing over it as a constant.
+    @Test("a changed weight moves the meal's macros as well as its calories")
+    func macrosFollowTheTableBranch() throws {
+        let meal = try fullyGroundedMeal()
+
+        let adjusted = try #require(
+            MealAdjuster.apply(
+                MealAdjustmentIntent(changes: [MealAdjustmentIntent.Change(itemNumber: 1, grams: 300)]),
+                to: meal,
+                table: table
+            )
+        )
+
+        let rice = try price("Rice", at: 300)
+        let chicken = try price("Chicken breast", at: 100)
+        #expect(adjusted.macros == rice.macros + chicken.macros)
+        #expect(adjusted.macros != meal.macros)
+        #expect(adjusted.kilocalories != meal.kilocalories)
+    }
+
+    /// **The defect as the owner met it**: a row that had no macro figure at
+    /// all before the message and has CIQUAL's afterwards.
+    ///
+    /// A typed meal whose sentence named no weight is never grounded — there is
+    /// no amount to price it at — so it arrives here with the model's own
+    /// kilocalorie guess, no per-row macros, and the model's meal-wide macro
+    /// estimate over the top. The message supplies the weight. The calories
+    /// then moved and the macros stood still, because a delta needs a figure on
+    /// both sides of the change and this row had none on the near side.
+    @Test("a row that gains its first macro figure moves the meal's macros too")
+    func macrosFollowARowThatHadNone() throws {
+        let modelMacros = MacroTotals(protein: 9, carbs: 40, fat: 7)
+        let meal = AdjustableMeal(
+            title: "Rice",
+            kilocalories: 250,
+            macros: modelMacros,
+            items: [
+                RecognisedItem(name: "Rice", kilocalories: 250, note: .text(amount: .estimated))
+            ]
+        )
+
+        let adjusted = try #require(
+            MealAdjuster.apply(
+                MealAdjustmentIntent(changes: [MealAdjustmentIntent.Change(itemNumber: 1, grams: 200)]),
+                to: meal,
+                table: table
+            )
+        )
+
+        let rice = try price("Rice", at: 200)
+        #expect(adjusted.items[0].macros == rice.macros)
+        #expect(adjusted.macros == rice.macros)
+        #expect(adjusted.macros != modelMacros)
+    }
+
+    /// **The same defect on the scaling branch**, where no table row is
+    /// involved at any point. Both rows carry macros the meal's own figure was
+    /// never composed from, so the delta moved the meal off a base that had
+    /// nothing to do with the rows underneath it.
+    @Test("a scaled row moves the meal's macros to what the rows now say")
+    func macrosFollowTheScalingBranch() throws {
+        let first = MacroTotals(protein: 10, carbs: 20, fat: 4)
+        let second = MacroTotals(protein: 6, carbs: 12, fat: 2)
+        let meal = AdjustableMeal(
+            title: "Two things the table has never heard of",
+            kilocalories: 500,
+            // Deliberately not the sum of the rows: this is the model's own
+            // meal-wide guess, which is what such a meal actually carries.
+            macros: MacroTotals(protein: 31, carbs: 55, fat: 19),
+            items: [
+                RecognisedItem(
+                    name: "Zzznotafood", kilocalories: 300, grams: 100, macros: first,
+                    note: .photo(confidence: .confident, approximateGrams: 100)
+                ),
+                RecognisedItem(
+                    name: "Qqxnotafood", kilocalories: 200, grams: 100, macros: second,
+                    note: .photo(confidence: .confident, approximateGrams: 100)
+                ),
+            ]
+        )
+
+        let adjusted = try #require(
+            MealAdjuster.apply(
+                MealAdjustmentIntent(changes: [MealAdjustmentIntent.Change(itemNumber: 1, grams: 150)]),
+                to: meal,
+                table: table
+            )
+        )
+
+        // Neither row resolved, so both figures are the device scaling the
+        // model's own earlier estimate by the ratio of the two weights.
+        let scaled = MacroTotals(protein: 15, carbs: 30, fat: 6)
+        #expect(adjusted.items[0].macros == scaled)
+        #expect(adjusted.items[1].macros == second)
+        #expect(adjusted.macros == scaled + second)
+        #expect(adjusted.kilocalories == 500 + 150)
+    }
+
+    /// The rule stops where the rows stop being able to answer. One row without
+    /// a macro figure means summing would drop it, so the meal's standing
+    /// figure is moved by the honest deltas instead — which is what
+    /// `groundedMeal` already exercises and what this pins as deliberate.
+    @Test("a meal with one figureless row still moves by the delta and not by a sum")
+    func mixedMealKeepsTheDeltaRule() throws {
+        let meal = try groundedMeal()
+        let before = try #require(meal.items[0].macros)
+
+        let adjusted = try #require(
+            MealAdjuster.apply(
+                MealAdjustmentIntent(changes: [MealAdjustmentIntent.Change(itemNumber: 1, grams: 300)]),
+                to: meal,
+                table: table
+            )
+        )
+
+        let after = try #require(adjusted.items[0].macros)
+        #expect(adjusted.items[1].macros == nil)
+        #expect(adjusted.macros == MacroTotals(
+            protein: meal.macros.protein + (after.protein - before.protein),
+            carbs: meal.macros.carbs + (after.carbs - before.carbs),
+            fat: meal.macros.fat + (after.fat - before.fat)
+        ))
+        // And emphatically not the sum of the rows, which would have thrown the
+        // second row's share of the meal away.
+        #expect(adjusted.macros != after)
+    }
 }

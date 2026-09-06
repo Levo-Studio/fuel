@@ -199,23 +199,31 @@ nonisolated struct MealAdjustmentOutcome: Sendable, Equatable {
 /// non-`nil` marker that says "this is a CIQUAL figure" cannot flip to `nil`
 /// on a row whose row is still there.
 ///
-/// **The meal's own figures move by the rows' deltas, and the two halves are
-/// not symmetric.** Kilocalories always move: every row has a real prior
-/// kilocalorie figure to take a delta against, and the meal's total has
-/// already been reconciled against those figures by `FoodTableGrounding`,
-/// which adjusts it by exactly this kind of delta. Macros move only for a row
-/// that has a real macro figure on *both* sides of the change — which after a
-/// grounding pass is any grounded row, and which is precisely the case
-/// `FoodTableGrounding` says it does not have: the model is asked for macros
-/// once, for the whole meal, so at *estimate* time a row has no prior macro
-/// figure to subtract. Here it does. A row without one contributes nothing to
-/// the macro total, and the meal's macro figure keeps that row's share exactly
-/// as the model estimated it, because nothing on the device knows what that
-/// share was.
+/// **The meal's own figures come from the rows the adjustment leaves, and only
+/// fall back to a delta where the rows cannot answer.** Kilocalories move by
+/// each row's own delta: every row has a real prior kilocalorie figure to
+/// subtract, and the meal's total has already been reconciled against those
+/// figures by `FoodTableGrounding`, which adjusts it by exactly this kind of
+/// delta. Macros go the other way round, through
+/// `MealArithmetic.macros(ofRows:)` — once every row carries a complete macro
+/// figure the meal's macros are their sum, whatever the meal's figure used to
+/// say.
 ///
-/// The one-item rule that file needs is not needed here and is not written:
-/// with one grounded item the meal's macros already *are* that item's, so
-/// `meal + (new − old)` is `new` by arithmetic rather than by special case.
+/// **That is the fix for a meal whose calories moved and whose macros did
+/// not.** A delta needs a real figure on *both* sides of the change, and the
+/// commonest thing a message does is give a row its first weight — a typed meal
+/// grounding declined for want of one, a photo row the table never matched —
+/// so the row arrives with no macros, leaves with CIQUAL's, and had no prior
+/// figure to take a delta against. Under the delta rule alone it contributed
+/// nothing: the kilocalories moved and the protein, carbohydrate and fat stood
+/// still at the old amount's values, on the same screen, describing the same
+/// plate. Summing the rows has no such hole, because it never asks what a row
+/// used to be.
+///
+/// Where some row still has no macro figure the delta rule is what stands, and
+/// it is unchanged: the meal's macro figure is then the model's meal-wide
+/// estimate, which keeps that row's share exactly as the model guessed it
+/// because nothing on the device knows what that share was.
 nonisolated enum MealAdjuster {
 
     // MARK: - Entry point
@@ -292,14 +300,9 @@ nonisolated enum MealAdjuster {
         }
 
         return AdjustedMeal(
-            // The floor is `PortionCalculator`'s own: a negative meal is not a
-            // value that reaches the day's ring, however a delta got there.
-            kilocalories: max(0, meal.kilocalories + kilocalorieDelta),
-            macros: MacroTotals(
-                protein: max(0, meal.macros.protein + macroDelta.protein),
-                carbs: max(0, meal.macros.carbs + macroDelta.carbs),
-                fat: max(0, meal.macros.fat + macroDelta.fat)
-            ),
+            kilocalories: MealArithmetic.kilocalories(meal.kilocalories, movedBy: kilocalorieDelta),
+            macros: MealArithmetic.macros(ofRows: items.map(\.macros))
+                ?? MealArithmetic.macros(meal.macros, movedBy: macroDelta),
             items: items
         )
     }
