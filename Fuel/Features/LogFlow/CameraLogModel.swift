@@ -3,7 +3,7 @@ import SwiftUI
 
 // MARK: - Model
 
-/// The camera half of the log flow: screen 07, the four analysis states, and
+/// The camera half of the log flow: screen 07, the analysis captions, and
 /// screen 14.
 ///
 /// The frame is captured, compressed and sent; no temporary file is written
@@ -116,11 +116,21 @@ final class CameraLogModel {
 
     /// How long each analysis step is held before the next one.
     ///
-    /// Injected so a test can walk all four instantly. The duration itself is
-    /// `FuelMotion.analysisStepHold` — the export draws four states and says
-    /// nothing about their timing, and a value the design does not dictate
-    /// still belongs to the design layer rather than to this initialiser.
+    /// Injected so a test can walk the whole sequence instantly. The duration
+    /// itself is `FuelMotion.analysisStepHold` — the export draws four states
+    /// and says nothing about their timing, and a value the design does not
+    /// dictate still belongs to the design layer rather than to this
+    /// initialiser.
     private let pace: @Sendable () async -> Void
+
+    /// Whether the user has asked for less motion, read when a walk starts
+    /// rather than held, so a scan begun after the setting changed honours it.
+    ///
+    /// Injected for the reason `pace` is: a test decides it rather than the
+    /// simulator's accessibility settings. What it decides is
+    /// `AnalysisStep.walk(reduceMotion:)`, and the rule behind that answer is
+    /// `FuelMotion.resolvePacedNarration`.
+    private let reduceMotion: @MainActor () -> Bool
 
     /// The running scan, so `CANCEL` can stop it.
     private var scan: Task<Void, Never>?
@@ -158,7 +168,8 @@ final class CameraLogModel {
         keys: any MealKeyPresence = KeychainStore(),
         provider: AIProvider = .claude,
         now: @escaping () -> Date = Date.init,
-        pace: @escaping @Sendable () async -> Void = { try? await Task.sleep(for: FuelMotion.analysisStepHold) }
+        pace: @escaping @Sendable () async -> Void = { try? await Task.sleep(for: FuelMotion.analysisStepHold) },
+        reduceMotion: @escaping @MainActor () -> Bool = { UIAccessibility.isReduceMotionEnabled }
     ) {
         self.store = store
         self.client = client
@@ -167,6 +178,7 @@ final class CameraLogModel {
         self.provider = provider
         self.now = now
         self.pace = pace
+        self.reduceMotion = reduceMotion
     }
 
     // MARK: - Availability
@@ -217,7 +229,7 @@ final class CameraLogModel {
 
         photo = image
         capturedAt = now()
-        stage = .analysing(.analysingMeal)
+        stage = .analysing(.sendingRequest)
         scan = start { [weak self] run in await self?.run(image, as: run) }
     }
 
@@ -301,7 +313,7 @@ final class CameraLogModel {
         }
 
         isReanalysing = true
-        stage = .analysing(.analysingMeal)
+        stage = .analysing(.sendingRequest)
         scan = start { [weak self] run in await self?.rerun(described, as: run) }
     }
 
@@ -336,10 +348,10 @@ final class CameraLogModel {
         }
     }
 
-    /// Walks the four analysis states around one request.
+    /// Walks the analysis states around one request.
     ///
     /// Shared by the scan and the re-analysis because the export draws one set
-    /// of four states and says nothing about what is being waited on.
+    /// of states and says nothing about what is being waited on.
     private func stepping(as run: Int, _ request: () async throws -> MealEstimate) async throws -> MealEstimate {
         let stepper = Task { [weak self] in await self?.walkSteps(as: run) }
         do {
@@ -356,8 +368,15 @@ final class CameraLogModel {
         }
     }
 
-    /// Walks steps two to four. The first is set the moment the shutter fires,
-    /// and the fourth is held until the answer arrives.
+    /// Walks the captions after the first. `sendingRequest` is set where the
+    /// request is handed over rather than by this walk — it is the one caption
+    /// anchored to something the model can see — and the last one is held until
+    /// the answer arrives, which is why it has to be one that stays true.
+    ///
+    /// **The walk is cut short, never padded.** Every dwell ends the moment the
+    /// estimate lands, so a request answered in 300 ms shows one caption and a
+    /// request answered in a minute shows the last one for most of it. Nothing
+    /// here waits on the clock before letting a result through.
     ///
     /// **Guarded by run identity, not only by its own cancellation.** This
     /// task is unstructured — `stepping()` creates it with a bare `Task { }`,
@@ -374,10 +393,10 @@ final class CameraLogModel {
     ///
     /// Bounded and cosmetic on its own — every stage this can still write is
     /// an analysing step, and both the run it belongs to and the one that
-    /// replaced it are showing the same four screens — but it was the one
+    /// replaced it are showing the same screens — but it was the one
     /// stage writer the run numbering elsewhere in this file did not reach.
     private func walkSteps(as run: Int) async {
-        for step in AnalysisStep.allCases.dropFirst() {
+        for step in AnalysisStep.walk(reduceMotion: reduceMotion()) {
             await pace()
             guard !Task.isCancelled, isCurrent(run) else { return }
             stage = .analysing(step)

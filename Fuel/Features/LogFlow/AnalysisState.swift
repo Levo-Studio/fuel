@@ -2,24 +2,102 @@ import Foundation
 
 // MARK: - Analysis step
 
-/// The four states screens 08 to 11 draw, in order.
+/// What the screen says while an analysis runs, in the order the work happens.
 ///
-/// One screen rendered four times, not four screens: the bar and the label
-/// move, nothing else does. The steps are paced rather than reported — there
-/// is one request, and the provider says nothing on the way — so they stand
-/// for elapsed work in the same way the key test's four steps do.
+/// One screen rendered once per caption, not one screen per caption: the bar
+/// and the label move, nothing else does. Screens 08 to 11 draw four of these;
+/// the export's own note calls them "one per step, not four different
+/// designs", and the two either side of them are drawn exactly as the four
+/// are.
+///
+/// **What is actually observable during an analysis is one boundary, and the
+/// captions are honest about which side of it they sit on.** A scan is:
+/// compress the frame (photo only, and synchronous — the main actor never gets
+/// a frame out during it, so it can have no caption of its own), then one
+/// `AIClient.estimate` call, then the draft. That call is opaque from here: it
+/// reads the key, signs and sends the request, waits for the whole reply,
+/// parses it, looks every item up in the bundled CIQUAL table and prices the
+/// portions, and none of that is reported on the way. So:
+///
+/// - `sendingRequest` is **anchored**. The model sets it at the moment it hands
+///   the request to the client, and it is true while the key is read, the body
+///   is built and — for a photo — the image goes up.
+/// - The four in the middle are **paced**, exactly as the export's four always
+///   were and for the reason `FuelMotion.analysisStepHold` gives: there is one
+///   request and the provider says nothing on the way, so they stand for
+///   elapsed work in the same way the key test's four steps do. They name the
+///   model's own work in the order it is asked for.
+/// - `waitingForModel` is the **end of the narration**, and it is the answer to
+///   a request that outlasts everything Fuel can say about it. Nothing cycles
+///   and nothing repeats: once there is nothing left to claim, the screen says
+///   what is actually true, which is that it is waiting.
+///
+/// **There is no caption for reading the reply, for the food-table lookup or
+/// for the arithmetic, and there deliberately is not.** All three happen inside
+/// `AIClient.estimate`, after the answer has landed, and take milliseconds
+/// between them. A caption for any of them could only ever be shown once the
+/// work it names had finished, which is the fabrication this repository refuses
+/// elsewhere.
 nonisolated enum AnalysisStep: CaseIterable, Hashable, Sendable {
+
+    /// The request going out. Anchored: set where `AIClient.estimate` is
+    /// called, not by the clock.
+    case sendingRequest
 
     case analysingMeal
     case identifyingIngredients
     case estimatingAmounts
     case calculatingNutrition
 
-    /// How much of the 120×2 bar is filled. The export draws 25%, 50%, 75%
-    /// and 100% — quarters, one per step.
+    /// Everything sayable has been said and the answer is not back yet.
+    ///
+    /// The one caption that is still true after a minute, which is what lets
+    /// the walk stop here rather than cycle.
+    case waitingForModel
+
+    /// How much of the 120×2 bar is filled.
+    ///
+    /// **The export's quarters, unchanged, and the two added captions take no
+    /// share of their own.** Screens 08 to 11 draw the bar at 25, 50, 75 and
+    /// 100 per cent and `Fuel Design Notes.md` says in as many words that it
+    /// fills in quarters, so those four figures are drawn values rather than a
+    /// rule to be generalised. Dividing by the count instead would move three
+    /// of the four drawn frames — 08 to a third, 10 to two thirds, 11 to five
+    /// sixths — which is a departure from the export in exchange for nothing
+    /// the user can see.
+    ///
+    /// So the captions either side of them borrow rather than displace:
+    ///
+    /// - `sendingRequest` is the bare track. The export draws no filled bar
+    ///   before its first state, and this caption stands before it.
+    /// - `waitingForModel` holds at full, beside `calculatingNutrition`.
+    ///   They mean the same thing about the bar and this file says so already:
+    ///   full means **Fuel has said everything it can say about a request that
+    ///   is still out**, not that the estimate has arrived. Screen 11 draws a
+    ///   full bar under `Berechne Nährwerte …` and the result is a different
+    ///   screen; two captions sharing that meaning share the share.
     var progress: Double {
-        guard let index = Self.allCases.firstIndex(of: self) else { return 0 }
-        return Double(index + 1) / Double(Self.allCases.count)
+        switch self {
+        case .sendingRequest: 0
+        case .analysingMeal: 0.25
+        case .identifyingIngredients: 0.5
+        case .estimatingAmounts: 0.75
+        case .calculatingNutrition, .waitingForModel: 1
+        }
+    }
+
+    /// The captions a walk beside one request goes through, after the anchored
+    /// first one the model has already set.
+    ///
+    /// Under Reduce Motion this is the last caption alone: one change, from
+    /// what is being done to what is being waited for, rather than a caption
+    /// rewriting itself four more times while it is being read.
+    /// `FuelMotion.resolvePacedNarration` is where that decision lives and why.
+    static func walk(reduceMotion: Bool) -> [AnalysisStep] {
+        guard FuelMotion.resolvePacedNarration(reduceMotion: reduceMotion) else {
+            return [.waitingForModel]
+        }
+        return Array(allCases.dropFirst())
     }
 }
 

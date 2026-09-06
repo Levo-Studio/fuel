@@ -517,6 +517,30 @@
         }
       }
     },
+    "logFlow.analysis.step.sending" : {
+      "comment" : "The analysis screen, before the four drawn steps: the request is being built and sent. Anchored to that moment rather than paced, so it stands exactly while it is true. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sending it to your model …"
+          }
+        }
+      }
+    },
+    "logFlow.analysis.step.waiting" : {
+      "comment" : "The analysis screen, after the four drawn steps: the walk has run out and the answer is still not back. The one caption that stays true however long a request takes, which is why the sequence ends here rather than cycling. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for your model …"
+          }
+        }
+      }
+    },
     "logFlow.cancel" : {
       "comment" : "The control top left on every log screen. Drawn as ✕ Abbrechen; the style uppercases it.",
       "extractionState" : "manual",

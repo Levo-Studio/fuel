@@ -1,8 +1,9 @@
 import Foundation
+import UIKit
 
 // MARK: - Model
 
-/// The text half of the log flow: screen 12, the four analysis states, and
+/// The text half of the log flow: screen 12, the analysis captions, and
 /// screen 15.
 ///
 /// The same shape as the camera half without the picture — a key has to be
@@ -92,9 +93,19 @@ final class TextLogModel {
     private let now: () -> Date
 
     /// How long each analysis step is held before the next one. Injected so a
-    /// test can walk all four instantly; the duration itself is
+    /// test can walk the whole sequence instantly; the duration itself is
     /// `FuelMotion.analysisStepHold`.
     private let pace: @Sendable () async -> Void
+
+    /// Whether the user has asked for less motion, read when a walk starts
+    /// rather than held, so an analysis begun after the setting changed
+    /// honours it.
+    ///
+    /// Injected for the reason `pace` is: a test decides it rather than the
+    /// simulator's accessibility settings. What it decides is
+    /// `AnalysisStep.walk(reduceMotion:)`, and the rule behind that answer is
+    /// `FuelMotion.resolvePacedNarration`.
+    private let reduceMotion: @MainActor () -> Bool
 
     /// The running estimate, so `CANCEL` can stop it.
     private var estimation: Task<Void, Never>?
@@ -131,7 +142,8 @@ final class TextLogModel {
         keys: any MealKeyPresence = KeychainStore(),
         provider: AIProvider = .claude,
         now: @escaping () -> Date = Date.init,
-        pace: @escaping @Sendable () async -> Void = { try? await Task.sleep(for: FuelMotion.analysisStepHold) }
+        pace: @escaping @Sendable () async -> Void = { try? await Task.sleep(for: FuelMotion.analysisStepHold) },
+        reduceMotion: @escaping @MainActor () -> Bool = { UIAccessibility.isReduceMotionEnabled }
     ) {
         self.store = store
         self.client = client
@@ -139,6 +151,7 @@ final class TextLogModel {
         self.provider = provider
         self.now = now
         self.pace = pace
+        self.reduceMotion = reduceMotion
     }
 
     // MARK: - Availability
@@ -185,7 +198,7 @@ final class TextLogModel {
         guard !described.isEmpty else { return }
 
         enteredAt = now()
-        stage = .analysing(.analysingMeal)
+        stage = .analysing(.sendingRequest)
         estimation = start { [weak self] run in await self?.run(described, as: run) }
     }
 
@@ -277,7 +290,7 @@ final class TextLogModel {
         }
 
         isReanalysing = true
-        stage = .analysing(.analysingMeal)
+        stage = .analysing(.sendingRequest)
         estimation = start { [weak self] run in await self?.rerun(described, as: run) }
     }
 
@@ -305,7 +318,7 @@ final class TextLogModel {
         }
     }
 
-    /// Walks the four analysis states around one request.
+    /// Walks the analysis captions around one request.
     ///
     /// Shared by the first estimate and the re-analysis because the export
     /// draws one set of four states and says nothing about what is being
@@ -326,8 +339,13 @@ final class TextLogModel {
         }
     }
 
-    /// Walks steps two to four. The first is set the moment `Analyse` is
-    /// tapped, and the fourth is held until the answer arrives.
+    /// Walks the captions after the first. `sendingRequest` is set the moment
+    /// `Analyse` is tapped — it is the one caption anchored to something the
+    /// model can see — and the last one is held until the answer arrives,
+    /// which is why it has to be one that stays true.
+    ///
+    /// **The walk is cut short, never padded.** Every dwell ends the moment
+    /// the estimate lands, so nothing here delays a result.
     ///
     /// **Guarded by run identity, not only by its own cancellation.** This
     /// task is unstructured — `stepping()` creates it with a bare `Task { }`,
@@ -344,10 +362,10 @@ final class TextLogModel {
     ///
     /// Bounded and cosmetic on its own — every stage this can still write is
     /// an analysing step, and both the run it belongs to and the one that
-    /// replaced it are showing the same four screens — but it was the one
+    /// replaced it are showing the same screens — but it was the one
     /// stage writer the run numbering elsewhere in this file did not reach.
     private func walkSteps(as run: Int) async {
-        for step in AnalysisStep.allCases.dropFirst() {
+        for step in AnalysisStep.walk(reduceMotion: reduceMotion()) {
             await pace()
             guard !Task.isCancelled, isCurrent(run) else { return }
             stage = .analysing(step)

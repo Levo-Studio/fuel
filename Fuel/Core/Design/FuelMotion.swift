@@ -167,19 +167,32 @@ nonisolated enum FuelMotion {
 
     // MARK: - Paced sequences
 
-    /// How long one of the four analysis steps is held before the next.
+    /// How long one analysis caption is held before the next.
     ///
     /// Not a curve, because nothing is being interpolated: the steps are a
-    /// sequence of four states, and this is the dwell between them. It lives
-    /// here for the same reason the curves do — the export draws the four
-    /// analysis frames and says nothing about their timing, which is precisely
-    /// the case that sends a missing value to the design layer rather than to
-    /// the call site that first needed one.
+    /// sequence of states, and this is the dwell between them. It lives here
+    /// for the same reason the curves do — the export draws the four analysis
+    /// frames and says nothing about their timing, which is precisely the case
+    /// that sends a missing value to the design layer rather than to the call
+    /// site that first needed one.
     ///
-    /// The whole walk is four holds, and the last one is cut short the moment
-    /// the estimate arrives, so this is a pace rather than a floor on how long
-    /// a scan takes.
+    /// Every hold is cut short the moment the estimate arrives, so this is a
+    /// pace rather than a floor on how long a scan takes.
     static let analysisStepHold: Duration = .milliseconds(700)
+
+    /// The longest a caption in a paced sequence may be scheduled to stand.
+    ///
+    /// **Owner's rule, and it applies to what is scheduled rather than to what
+    /// is seen.** A sequence's last caption is not scheduled at all — it stands
+    /// until the work it is waiting on finishes, which is unbounded and cannot
+    /// be otherwise, so the caption a sequence ends on has to be one that is
+    /// still true after a minute. Every caption before it is on a timer, and a
+    /// timer longer than this reads as a screen that has stopped.
+    ///
+    /// A ceiling rather than the dwell itself: `analysisStepHold` is well under
+    /// it, and the two answer different questions. This one is the rule a
+    /// future dwell is held to.
+    static let pacedStepCeiling: Duration = .seconds(2)
 
     /// How long one example is held in the empty text field before the next.
     ///
@@ -304,6 +317,29 @@ nonisolated enum FuelMotion {
     /// thing as four.
     static func resolvePacing(_ hold: Duration, reduceMotion: Bool) -> Duration? {
         reduceMotion ? nil : hold
+    }
+
+    /// Whether a paced sequence may narrate the states between its first and
+    /// its last, or should go from the one straight to the other.
+    ///
+    /// **`resolvePacing`'s answer for a sequence that cannot simply stop.** A
+    /// rotating placeholder loses nothing by standing still — one example
+    /// teaches the same thing as four — so that function returns `nil` and the
+    /// caller shows the state it is on. The analysis captions cannot do that:
+    /// they stand over a request that is still out, and the state the sequence
+    /// starts on names the request going out, which stops being true a moment
+    /// later. A caption frozen on something that has finished is worse than one
+    /// that never moved.
+    ///
+    /// So `false` means **show the first caption, then the last, and nothing in
+    /// between**. That is one change rather than a rotation, which is the
+    /// distinction Reduce Motion is asked to draw: what it objects to is text
+    /// rewriting itself while someone is reading it, not a screen reporting
+    /// that what it was doing is now something else. A sequence built for this
+    /// has to end on a caption that is true for as long as the work lasts, and
+    /// `AnalysisStep` does.
+    static func resolvePacedNarration(reduceMotion: Bool) -> Bool {
+        !reduceMotion
     }
 
     /// Whether text that is still being written may be drawn as it is written.

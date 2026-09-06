@@ -2,13 +2,18 @@ import Foundation
 
 // MARK: - Copy
 
-/// The words the four analysis states print, and the words a failed estimate
+/// The words the analysis states print, and the words a failed estimate
 /// prints.
 ///
 /// Neither set belongs to a log mode. The export's four step labels — analyse,
 /// identify, estimate, calculate — describe the work rather than the input, and
 /// both AI modes do exactly that work; the failures are the same three
-/// remedies whichever way the meal was described.
+/// remedies whichever way the meal was described. **The two captions added
+/// either side of those four hold to the same rule**, which is why they say
+/// "your model" rather than naming a photograph or a sentence: the request
+/// going out and the answer not being back yet are the same two facts for a
+/// scan, a typed meal, a re-analysis and an adjustment, and all four draw this
+/// screen.
 ///
 /// One hint is the exception, and it is the reason `AILogMode` reaches this
 /// file at all: telling someone to "take the photo again" after they typed a
@@ -30,10 +35,12 @@ nonisolated enum AnalysisCopy {
 
     static func step(_ step: AnalysisStep) -> String {
         switch step {
+        case .sendingRequest: String(localized: "logFlow.analysis.step.sending")
         case .analysingMeal: String(localized: "logFlow.analysis.step.meal")
         case .identifyingIngredients: String(localized: "logFlow.analysis.step.ingredients")
         case .estimatingAmounts: String(localized: "logFlow.analysis.step.amounts")
         case .calculatingNutrition: String(localized: "logFlow.analysis.step.nutrition")
+        case .waitingForModel: String(localized: "logFlow.analysis.step.waiting")
         }
     }
 

@@ -116,9 +116,19 @@ final class MealDetailModel {
     /// copy of that decision here would drift.
     private let provider: AIProvider
 
-    /// How long each analysis step is held. Injected so a test can walk all
-    /// four instantly.
+    /// How long each analysis step is held. Injected so a test can walk the
+    /// whole sequence instantly.
     private let pace: @Sendable () async -> Void
+
+    /// Whether the user has asked for less motion, read when a walk starts
+    /// rather than held, so an analysis begun after the setting changed
+    /// honours it.
+    ///
+    /// Injected for the reason `pace` is: a test decides it rather than the
+    /// simulator's accessibility settings. What it decides is
+    /// `AnalysisStep.walk(reduceMotion:)`, and the rule behind that answer is
+    /// `FuelMotion.resolvePacedNarration`.
+    private let reduceMotion: @MainActor () -> Bool
 
     private var estimation: Task<Void, Never>?
 
@@ -144,7 +154,8 @@ final class MealDetailModel {
         client: any AIClient,
         keys: any MealKeyPresence = KeychainStore(),
         provider: AIProvider = .claude,
-        pace: @escaping @Sendable () async -> Void = { try? await Task.sleep(for: FuelMotion.analysisStepHold) }
+        pace: @escaping @Sendable () async -> Void = { try? await Task.sleep(for: FuelMotion.analysisStepHold) },
+        reduceMotion: @escaping @MainActor () -> Bool = { UIAccessibility.isReduceMotionEnabled }
     ) {
         guard let entry = (try? store.entry(withID: entryID)) ?? nil else { return nil }
 
@@ -154,6 +165,7 @@ final class MealDetailModel {
         self.keys = keys
         self.provider = provider
         self.pace = pace
+        self.reduceMotion = reduceMotion
         self.draft = MealResultDraft(
             title: entry.title,
             kilocalories: entry.kilocalories,
@@ -329,7 +341,7 @@ final class MealDetailModel {
             return
         }
 
-        stage = .analysing(.analysingMeal)
+        stage = .analysing(.sendingRequest)
         estimation?.cancel()
         currentRun += 1
         let run = currentRun
@@ -376,7 +388,7 @@ final class MealDetailModel {
         }
     }
 
-    /// Walks the four analysis states around one request.
+    /// Walks the analysis captions around one request.
     ///
     /// The third copy of this in `Features/LogFlow/` — the two log modes each
     /// hold one — and it is a copy on purpose rather than by neglect: pulling
@@ -399,8 +411,9 @@ final class MealDetailModel {
         }
     }
 
-    /// Walks steps two to four. The first is set the moment `Re-analyse` is
-    /// tapped, and the fourth is held until the answer arrives.
+    /// Walks the captions after the first, which is set the moment `Re-analyse`
+    /// is tapped, and the last of which is held until the answer arrives —
+    /// which is why the sequence ends on one that stays true.
     ///
     /// **Guarded by run identity, not only by its own cancellation.** This
     /// task is unstructured — `stepping()` creates it with a bare `Task { }`,
@@ -412,7 +425,7 @@ final class MealDetailModel {
     /// still stops a stepper whose own request has simply finished. The same
     /// guard is in both log modes, for the same reason.
     private func walkSteps(as run: Int) async {
-        for step in AnalysisStep.allCases.dropFirst() {
+        for step in AnalysisStep.walk(reduceMotion: reduceMotion()) {
             await pace()
             guard !Task.isCancelled, isCurrent(run) else { return }
             stage = .analysing(step)

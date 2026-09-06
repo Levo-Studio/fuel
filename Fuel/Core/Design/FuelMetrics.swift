@@ -387,7 +387,9 @@ nonisolated enum FuelMetrics {
     // MARK: - Progress
 
     /// The analysis progress bar over the frozen frame. It fills in quarters,
-    /// one per step.
+    /// one per state the export draws. Two captions were added either side of
+    /// those four and neither takes a share of its own, so the drawn quarters
+    /// are still the only figures this bar shows — see `AnalysisStep.progress`.
     enum Progress {
 
         static let width: CGFloat = 120
