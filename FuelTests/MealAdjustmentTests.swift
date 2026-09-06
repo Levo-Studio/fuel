@@ -1170,4 +1170,200 @@ struct MealAdjusterTests {
         // second row's share of the meal away.
         #expect(adjusted.macros != after)
     }
+
+    // MARK: - A meal logged before any row carried macros
+
+    /// A meal in the state the store is full of: rows the table could price,
+    /// with no macro figure on any of them, under the model's own meal-wide
+    /// guess.
+    ///
+    /// **The kilocalorie figures are deliberately the model's and not the
+    /// table's**, so that a test can tell a row that was left alone from a row
+    /// that was quietly re-priced. And the meal's own macros are deliberately
+    /// not the sum of anything: they are what a model wrote about the plate,
+    /// which is the only figure such an entry has ever held.
+    private func unpricedMeal() -> AdjustableMeal {
+        AdjustableMeal(
+            title: "Rice and chicken",
+            kilocalories: 430,
+            macros: MacroTotals(protein: 11, carbs: 70, fat: 6),
+            items: [
+                RecognisedItem(
+                    name: "Rice", kilocalories: 250, grams: 150,
+                    confidence: ItemConfidence(estimatePercent: 80),
+                    note: .photo(confidence: .confident, approximateGrams: 150)
+                ),
+                RecognisedItem(
+                    name: "Chicken breast", kilocalories: 180, grams: 100,
+                    confidence: ItemConfidence(estimatePercent: 70),
+                    note: .photo(confidence: .confident, approximateGrams: 100)
+                ),
+            ]
+        )
+    }
+
+    /// **The defect the owner reported twice.** Every row of an older meal is
+    /// figureless, so the sum rule declined and the delta rule had nothing to
+    /// take a difference of: the calories moved and the macros did not, on any
+    /// row, however the message was worded.
+    ///
+    /// The rows are priced against the table at the amounts already recorded
+    /// for them before a single instruction is applied, so the sum rule applies
+    /// and the meal's macros are what its rows now say.
+    @Test("a meal whose rows never carried macros moves them when an amount changes")
+    func macrosMoveOnAMealWithNoRowFigures() throws {
+        let meal = unpricedMeal()
+
+        let adjusted = try #require(
+            MealAdjuster.apply(
+                MealAdjustmentIntent(changes: [MealAdjustmentIntent.Change(itemNumber: 1, grams: 300)]),
+                to: meal,
+                table: table
+            )
+        )
+
+        let rice = try price("Rice", at: 300)
+        let chicken = try price("Chicken breast", at: 100)
+        #expect(adjusted.macros == rice.macros + chicken.macros)
+        #expect(adjusted.macros != meal.macros)
+    }
+
+    /// **The row nobody asked about must not move where the user can see it.**
+    /// Pricing fills in the chicken's macros, which is a figure that was
+    /// missing; it must not touch the chicken's calories, its name, its note or
+    /// its confidence, because a stored figure changing under a row the message
+    /// never mentioned is a change the user did not ask for.
+    ///
+    /// The rice is the row the message was about, and it is re-priced from the
+    /// table in full — which is the change that *was* asked for.
+    @Test("pricing a row for its macros leaves its calories, name and confidence alone")
+    func pricingIsInvisibleOnRowsTheMessageDidNotName() throws {
+        let meal = unpricedMeal()
+
+        let adjusted = try #require(
+            MealAdjuster.apply(
+                MealAdjustmentIntent(changes: [MealAdjustmentIntent.Change(itemNumber: 1, grams: 300)]),
+                to: meal,
+                table: table
+            )
+        )
+
+        let chicken = try price("Chicken breast", at: 100)
+        // The chicken gained the table's macros and nothing else. Its stored
+        // energy is still the model's 180 and not the table's figure for 100 g.
+        #expect(adjusted.items[1].macros == chicken.macros)
+        #expect(adjusted.items[1].kilocalories == 180)
+        #expect(adjusted.items[1].kilocalories != chicken.kilocalories)
+        #expect(adjusted.items[1].name == "Chicken breast")
+        #expect(adjusted.items[1].grams == 100)
+        #expect(adjusted.items[1].confidence == ItemConfidence(estimatePercent: 70))
+        #expect(adjusted.items[1].note == .photo(confidence: .confident, approximateGrams: 100))
+
+        // And the row that was asked about is priced in full, energy included.
+        let rice = try price("Rice", at: 300)
+        #expect(adjusted.items[0].kilocalories == rice.kilocalories)
+        #expect(adjusted.items[0].macros == rice.macros)
+        #expect(adjusted.items[0].confidence == ItemConfidence(estimatePercent: 80))
+    }
+
+    /// **One row the table has never heard of used to freeze the whole meal**,
+    /// including when the message was about a different row entirely. It no
+    /// longer does: the rice is priced at the weight it already had, so the
+    /// change to it has a real figure on both sides and the delta rule — which
+    /// is still what applies, because summing would drop the unknown row —
+    /// finally has something to move by.
+    @Test("a meal with one row the table cannot cover still moves when another row changes")
+    func macrosMoveAroundAnUngroundableRow() throws {
+        let meal = AdjustableMeal(
+            title: "Rice and something",
+            kilocalories: 630,
+            macros: MacroTotals(protein: 11, carbs: 70, fat: 6),
+            items: [
+                RecognisedItem(
+                    name: "Rice", kilocalories: 250, grams: 150,
+                    note: .photo(confidence: .confident, approximateGrams: 150)
+                ),
+                RecognisedItem(
+                    name: "Zzznotafood", kilocalories: 200, grams: 100,
+                    note: .photo(confidence: .unsure, approximateGrams: 100)
+                ),
+                RecognisedItem(
+                    name: "Chicken breast", kilocalories: 180, grams: 100,
+                    note: .photo(confidence: .confident, approximateGrams: 100)
+                ),
+            ]
+        )
+
+        let adjusted = try #require(
+            MealAdjuster.apply(
+                MealAdjustmentIntent(changes: [MealAdjustmentIntent.Change(itemNumber: 1, grams: 300)]),
+                to: meal,
+                table: table
+            )
+        )
+
+        let before = try price("Rice", at: 150)
+        let after = try price("Rice", at: 300)
+        #expect(adjusted.macros == MacroTotals(
+            protein: meal.macros.protein + (after.macros.protein - before.macros.protein),
+            carbs: meal.macros.carbs + (after.macros.carbs - before.macros.carbs),
+            fat: meal.macros.fat + (after.macros.fat - before.macros.fat)
+        ))
+        #expect(adjusted.macros != meal.macros)
+
+        // The unknown row is still unknown, and is untouched in every other
+        // respect too. The chicken is priced for its macros and keeps its
+        // energy, exactly as on a meal with no unknown row in it.
+        #expect(adjusted.items[1].macros == nil)
+        #expect(adjusted.items[1].kilocalories == 200)
+        #expect(adjusted.items[1].name == "Zzznotafood")
+        #expect(adjusted.items[2].macros == (try price("Chicken breast", at: 100)).macros)
+        #expect(adjusted.items[2].kilocalories == 180)
+    }
+
+    /// **What stands when nothing in the meal can be priced.** A single row
+    /// whose name no CIQUAL row covers has no macro figure before the message
+    /// and none after it, so the sum is impossible and the delta is honestly
+    /// zero: the meal keeps the model's macro estimate while its energy scales
+    /// with the amount. That is the same answer as before this pass existed,
+    /// and it is the honest one — nothing on the device knows what that row is
+    /// made of.
+    @Test("a meal of rows the table cannot cover keeps the macro figure it had")
+    func anUngroundableMealKeepsItsStandingMacros() throws {
+        let standing = MacroTotals(protein: 12, carbs: 44, fat: 9)
+        let meal = AdjustableMeal(
+            title: "Something the table has never heard of",
+            kilocalories: 300,
+            macros: standing,
+            items: [
+                RecognisedItem(
+                    name: "Zzznotafood", kilocalories: 300, grams: 100,
+                    note: .photo(confidence: .confident, approximateGrams: 100)
+                )
+            ]
+        )
+
+        let adjusted = try #require(
+            MealAdjuster.apply(
+                MealAdjustmentIntent(changes: [MealAdjustmentIntent.Change(itemNumber: 1, grams: 150)]),
+                to: meal,
+                table: table
+            )
+        )
+
+        #expect(adjusted.items[0].macros == nil)
+        #expect(adjusted.macros == standing)
+        #expect(adjusted.kilocalories == 450)
+    }
+
+    /// A turn that moved nothing writes nothing, and that includes the macros
+    /// this pass would have filled in. `nil` is what tells the caller the meal
+    /// is as it was, so a question about a meal must not come back holding a
+    /// repriced version of it.
+    @Test("a question about a meal does not price its rows behind the user's back")
+    func aQuestionPricesNothing() {
+        let question = MealAdjustmentIntent(reply: "How filling is this?")
+
+        #expect(MealAdjuster.apply(question, to: unpricedMeal(), table: table) == nil)
+    }
 }

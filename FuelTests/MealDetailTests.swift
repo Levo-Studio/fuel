@@ -380,6 +380,68 @@ struct MealDetailTests {
         #expect(try store.entry(withID: entry.entryID)?.isFavourite == true)
     }
 
+    // MARK: - Adjusting a meal logged before its rows were priced
+
+    /// **The defect end to end, on the path the owner met it on.** A meal that
+    /// has been in the store since before grounding wrote per-row macros: rows
+    /// with names and weights the table knows, no macro figure on either of
+    /// them, and the model's own meal-wide guess above them. A chat turn raises
+    /// one amount, and what the store holds afterwards has to be a meal whose
+    /// protein, carbohydrate and fat followed.
+    ///
+    /// The expectation is priced out of the bundled table here rather than
+    /// written as a constant, so the test cannot agree with a fixture instead
+    /// of with the arithmetic.
+    @Test("adjusting an amount on an older meal writes moved macros to the store")
+    func adjustingAnOlderMealMovesItsStoredMacros() throws {
+        let store = try makeStore()
+        let guessed = MacroTotals(protein: 11, carbs: 70, fat: 6)
+        let entry = try store.log(
+            title: "Rice and chicken",
+            kilocalories: 430,
+            macros: guessed,
+            loggedAt: at(19, 20),
+            source: .photo,
+            items: [
+                RecognisedItem(
+                    name: "Rice", kilocalories: 250, grams: 150,
+                    note: .photo(confidence: .confident, approximateGrams: 150)
+                ),
+                RecognisedItem(
+                    name: "Chicken breast", kilocalories: 180, grams: 100,
+                    note: .photo(confidence: .confident, approximateGrams: 100)
+                ),
+            ]
+        )
+        let model = try makeModel(entry: entry, store: store, client: ScriptedClient(answer: .success(Self.reestimate)))
+
+        let adjusted = try #require(
+            MealAdjuster.applyAgainstBundledTable(
+                MealAdjustmentIntent(changes: [MealAdjustmentIntent.Change(itemNumber: 1, grams: 300)]),
+                to: model.adjustableMeal
+            )
+        )
+        #expect(model.apply(adjusted))
+
+        let table = try FoodTable.bundled()
+        let rice = try #require(FoodTableGrounding.bestMatch(for: "Rice", preferring: .prepared, in: table))
+        let chicken = try #require(
+            FoodTableGrounding.bestMatch(for: "Chicken breast", preferring: .prepared, in: table)
+        )
+        let expected = PortionCalculator.portion(of: rice.per100g, grams: 300).macros
+            + PortionCalculator.portion(of: chicken.per100g, grams: 100).macros
+
+        let stored = try #require(try store.entry(withID: entry.entryID))
+        #expect(stored.macros == expected)
+        #expect(stored.macros != guessed)
+        #expect(model.draft.macros == expected)
+        // The row the message never named keeps its name and the calorie figure
+        // it was logged with. Only the macro figure it never had is filled in.
+        #expect(stored.items[1].name == "Chicken breast")
+        #expect(stored.items[1].kilocalories == 180)
+        #expect(stored.items[0].name == "Rice")
+    }
+
     // MARK: - Re-analysing
 
     /// The one the write-back exists for: the meal is re-priced, not logged a

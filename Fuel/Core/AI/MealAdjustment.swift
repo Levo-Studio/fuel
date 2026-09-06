@@ -263,10 +263,26 @@ nonisolated struct MealAdjustmentOutcome: Sendable, Equatable {
 /// plate. Summing the rows has no such hole, because it never asks what a row
 /// used to be.
 ///
-/// Where some row still has no macro figure the delta rule is what stands, and
-/// it is unchanged: the meal's macro figure is then the model's meal-wide
-/// estimate, which keeps that row's share exactly as the model guessed it
-/// because nothing on the device knows what that share was.
+/// **That was half a fix, and the other half is that the rows are priced
+/// before any instruction is applied to them.** Summing needs *every* row to
+/// carry a figure, so one row without one froze the macros of the whole meal —
+/// including when the message was about a different row entirely, and
+/// including the commonest case there is, a meal logged before any row carried
+/// macros at all, where every row is that row. `pricingMacros(of:in:)` runs
+/// first and gives each figureless row CIQUAL's macros for the amount already
+/// recorded against it, so a meal from before this shipped reaches the three
+/// instructions as a meal whose rows are priced. It fills the macros in and
+/// leaves the energy exactly as stored, which is the difference between
+/// answering the message and rewriting the meal; see that function.
+///
+/// Where a row still has no macro figure — a name no CIQUAL row covers, a row
+/// with no weight recorded, a row whose table entry has a macro gap of its own
+/// — the sum remains impossible and the delta rule is what stands, unchanged:
+/// the meal's macro figure is the model's meal-wide estimate, moved by the
+/// honest differences on the rows that had a real figure on both sides of the
+/// change. What the pricing pass buys such a meal is that a row it priced now
+/// *has* a figure on both sides, so a change to it moves the meal instead of
+/// contributing nothing to it.
 nonisolated enum MealAdjuster {
 
     // MARK: - Entry point
@@ -298,7 +314,7 @@ nonisolated enum MealAdjuster {
         to meal: AdjustableMeal,
         table: FoodTable?
     ) -> AdjustedMeal? {
-        var items = meal.items
+        var items = meal.items.map { pricingMacros(of: $0, in: table) }
         var kilocalorieDelta = 0
         var macroDelta = MacroTotals.zero
         var moved = false
@@ -373,6 +389,85 @@ nonisolated enum MealAdjuster {
                 ?? MealArithmetic.macros(meal.macros, movedBy: macroDelta),
             items: items
         )
+    }
+
+    // MARK: - Pricing a row that never carried macros
+
+    /// `item` with CIQUAL's protein, carbohydrate and fat filled in, where it
+    /// had none and the table can price the amount already recorded against
+    /// it. Otherwise `item`, untouched.
+    ///
+    /// **Every row, and not only the rows the message names — that is the
+    /// whole of why it exists.** `MealArithmetic.macros(ofRows:)` is all of
+    /// them or none of them, so one figureless row anywhere in the list sends
+    /// the meal down the delta rule however many of the others moved, and a row
+    /// that had no prior figure contributes nothing to that delta either. A
+    /// meal logged before grounding wrote per-row macros carries a list where
+    /// *every* row is that row, and that is the meal the owner reported twice:
+    /// the message raised the rice, the calories followed it, and the protein,
+    /// carbohydrate and fat stood at the values of an amount no longer on the
+    /// plate.
+    ///
+    /// **Only the macros are written; the kilocalorie figure is left exactly as
+    /// it stands.** The table answers both — `PortionCalculator` returns all
+    /// four numbers from one lookup — and taking the energy as well would move
+    /// a row the user never mentioned, and with it the meal's total and the
+    /// day's ring, on the strength of a lookup that happens to succeed today
+    /// over a meal logged weeks ago. Filling in a figure that was missing is
+    /// not a change the user can see; a different number beside a row they did
+    /// not ask about is. So the row keeps the energy the meal's own total was
+    /// already reconciled against, and gains the table's macros.
+    ///
+    /// That does split one row's four figures across two sources.
+    /// `RecognisedItem.macros` states what still holds and what no longer does:
+    /// a non-`nil` value there is a CIQUAL figure, and it says nothing about
+    /// where the number above it came from. The cost is the divergence this
+    /// file's own header sets out at length — a user multiplying out the macro
+    /// bars lands a few per cent under the ring — and it is much the smaller of
+    /// the two, because the alternative is a stored calorie figure moving on
+    /// its own.
+    ///
+    /// **Nothing about how the row presents itself changes**: the name is the
+    /// model's, the note under it is the model's, and so is the confidence.
+    /// That last is `repricing(_:to:in:)`'s reading rather than
+    /// `reidentifying(_:as:in:)`'s, and for the sharper version of the same
+    /// reason — `ItemConfidence` carries the model's own answers about its own
+    /// work, a correction clears it because the *user* has just said the model
+    /// read the food wrong, and here nobody has said anything about this row at
+    /// all. `groundingPercent` is where a verdict on a table match would go if
+    /// one were ever asked for, and nothing writes it.
+    ///
+    /// A row the table cannot cover comes back untouched, and so do a row with
+    /// no weight recorded and a row whose CIQUAL entry has a macro gap of its
+    /// own — the polenta case, where writing a zero would print a measurement
+    /// nobody made. The meal keeps the delta rule for those, exactly as before.
+    ///
+    /// **A turn that moves nothing writes nothing.** These rows are discarded
+    /// along with everything else when `apply` answers `nil`, so a question
+    /// about a meal cannot quietly reprice it.
+    private static func pricingMacros(of item: RecognisedItem, in table: FoodTable?) -> RecognisedItem {
+        guard
+            item.macros == nil,
+            let table,
+            let grams = item.weightInGrams,
+            grams > 0,
+            let match = FoodTableGrounding.bestMatch(
+                for: item.name,
+                preferring: preparation(of: item.name),
+                in: table
+            )
+        else {
+            return item
+        }
+
+        let portion = PortionCalculator.portion(of: match.per100g, grams: Double(grams))
+        guard !portion.incompleteMacros else {
+            return item
+        }
+
+        var priced = item
+        priced.macros = portion.macros
+        return priced
     }
 
     // MARK: - Re-pricing one row

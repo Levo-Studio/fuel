@@ -48,21 +48,30 @@ nonisolated struct RecognisedItem: Codable, Hashable, Sendable, Identifiable {
     /// model is never asked for a per-item macro breakdown — `EstimateContract`
     /// itemises `kilocalories` but only `protein_g`/`carbs_g`/`fat_g` at the
     /// meal level — so this is empty for every item until something else
-    /// supplies it. Today, the one supplier is `FoodTableGrounding`: a food
-    /// resolved to a CIQUAL row with complete macro data gets its real
-    /// protein, carbs and fat here, priced from that row and the item's own
-    /// weight. A resolved row with a gap in its own data — CIQUAL has no fat
-    /// figure for cooked polenta — leaves this `nil` rather than writing a
-    /// zero no measurement backs; see `PortionNutrition.incompleteMacros`.
+    /// supplies it. Two things do, and both price it the same way:
+    /// `FoodTableGrounding` when the meal is first estimated, and
+    /// `MealAdjuster` when a message arrives about a meal holding a row that
+    /// never got a figure. A food resolved to a CIQUAL row with complete macro
+    /// data gets its real protein, carbs and fat here, priced from that row and
+    /// the item's own weight. A resolved row with a gap in its own data —
+    /// CIQUAL has no fat figure for cooked polenta — leaves this `nil` rather
+    /// than writing a zero no measurement backs; see
+    /// `PortionNutrition.incompleteMacros`.
     ///
     /// **This doubles as the only marker this type needs.** A non-`nil` value
     /// is a CIQUAL figure and is shown silently; a `nil` value is the model's
     /// own estimate and whatever `note` already says about it —
     /// `.unsure`/`.estimated` where the model said so — still applies exactly
-    /// as before. There is deliberately no second flag: `kilocalories` and
-    /// `macros` are always resolved together, from the same table row and the
-    /// same weight, so a reader never has to reconcile a kilocalorie figure
-    /// that came from one place with a macro figure that came from another.
+    /// as before. There is deliberately no second flag.
+    ///
+    /// **What it does not say is where `kilocalories` came from.** On the
+    /// estimating path the two are resolved together, out of one table row at
+    /// one weight. `MealAdjuster` deliberately parts them on a row it prices
+    /// after the fact: it takes the macros and leaves the energy where it
+    /// stood, because a stored calorie figure moving under a row the user never
+    /// mentioned is a change they can see, and filling in a missing macro
+    /// figure is not. So a non-`nil` value here says this row's macros are
+    /// CIQUAL's, and says nothing about the number above them.
     var macros: MacroTotals?
 
     /// How sure the model is about this row, per step of the work that produced
