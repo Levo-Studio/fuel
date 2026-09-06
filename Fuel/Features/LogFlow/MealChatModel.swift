@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 // MARK: - The meal being talked about
 
@@ -221,6 +222,16 @@ final class MealChatModel {
     private let provider: AIProvider
     private let pace: @Sendable () async -> Void
 
+    /// Whether the user has asked for less motion, read when a walk starts
+    /// rather than held, so an analysis begun after the setting changed
+    /// honours it.
+    ///
+    /// Injected for the reason `pace` is: a test decides it rather than the
+    /// simulator's accessibility settings. What it decides is
+    /// `AnalysisStep.walk(reduceMotion:)`, and the rule behind that answer is
+    /// `FuelMotion.resolvePacedNarration`.
+    private let reduceMotion: @MainActor () -> Bool
+
     private var conversation: Task<Void, Never>?
 
     /// Which message the sheet is currently listening to.
@@ -247,6 +258,7 @@ final class MealChatModel {
         keys: any MealKeyPresence = KeychainStore(),
         provider: AIProvider = .claude,
         pace: @escaping @Sendable () async -> Void = { try? await Task.sleep(for: FuelMotion.analysisStepHold) },
+        reduceMotion: @escaping @MainActor () -> Bool = { UIAccessibility.isReduceMotionEnabled },
         messages: [MealChatMessage] = [],
         arriving: String? = nil
     ) {
@@ -257,6 +269,7 @@ final class MealChatModel {
         self.keys = keys
         self.provider = provider
         self.pace = pace
+        self.reduceMotion = reduceMotion
     }
 
     // MARK: - Sending
@@ -386,7 +399,7 @@ final class MealChatModel {
 
                 case .adjusting:
                     guard stepper == nil else { break }
-                    stage = .analysing(.analysingMeal)
+                    stage = .analysing(.sendingRequest)
                     stepper = Task { [weak self] in await self?.walkSteps(as: run) }
 
                 case .finished(let value):
@@ -424,12 +437,12 @@ final class MealChatModel {
         _ = await stepper?.value
     }
 
-    /// Walks steps two to four, guarded by run identity as well as by its own
+    /// Walks the captions after the first, guarded by run identity as well as by its own
     /// cancellation — `currentRun` is bumped synchronously the moment a run is
     /// superseded, before any cancellation has had time to propagate to this
     /// unstructured task.
     private func walkSteps(as run: Int) async {
-        for step in AnalysisStep.allCases.dropFirst() {
+        for step in AnalysisStep.walk(reduceMotion: reduceMotion()) {
             await pace()
             guard !Task.isCancelled, isCurrent(run) else { return }
             stage = .analysing(step)

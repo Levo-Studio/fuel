@@ -183,16 +183,33 @@ struct CameraLogTests {
         #expect(model.draft?.advice == "Mostly carbohydrate.")
     }
 
-    @Test("the scan walks all four analysis steps in the drawn order")
+    @Test("the four drawn steps keep the export's order, between the two that were added")
     func stepsRunInOrder() {
-        #expect(AnalysisStep.allCases == [
+        // The export draws four states and this test pinned exactly those. Two
+        // captions now stand either side of them — the request going out and
+        // the answer not being back — so what is still the export's claim is
+        // the order of its own four, and that nothing was inserted between
+        // them. `AnalysisWalkTests` pins the whole sequence.
+        #expect(AnalysisStep.allCases.dropFirst().dropLast() == [
             .analysingMeal,
             .identifyingIngredients,
             .estimatingAmounts,
             .calculatingNutrition,
         ])
-        // Quarters, one per step, exactly as the export fills the 120×2 bar.
-        #expect(AnalysisStep.allCases.map(\.progress) == [0.25, 0.5, 0.75, 1])
+
+        // Quarters, one per drawn step, exactly as the export fills the 120×2
+        // bar — and the two added captions take no share of their own, so
+        // every drawn frame still stands where it is drawn. Dividing by the
+        // count would move three of the four.
+        #expect(AnalysisStep.analysingMeal.progress == 0.25)
+        #expect(AnalysisStep.identifyingIngredients.progress == 0.5)
+        #expect(AnalysisStep.estimatingAmounts.progress == 0.75)
+        #expect(AnalysisStep.calculatingNutrition.progress == 1)
+
+        // Before the export's first state the track is bare, and the caption
+        // that outlasts the walk holds the full bar rather than exceeding it.
+        #expect(AnalysisStep.sendingRequest.progress == 0)
+        #expect(AnalysisStep.waitingForModel.progress == 1)
     }
 
     @Test("the result's label is the one the day rule gives that moment")

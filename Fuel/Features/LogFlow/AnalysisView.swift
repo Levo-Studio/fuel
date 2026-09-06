@@ -8,7 +8,7 @@ import SwiftUI
 /// The export draws the four analysis screens over the frozen photo, because
 /// the only mode that had run by screen 08 is the camera one. The bar, the
 /// step labels and the `CANCEL` under them say nothing about a photograph —
-/// they describe the work — so the text mode walks the same four states with
+/// they describe the work — so the text mode walks the same states with
 /// nothing behind them but the surface screen 12 already sits on. What the
 /// export does not draw is a picture where there is none.
 enum AnalysisBackdrop {
@@ -30,14 +30,22 @@ enum AnalysisBackdrop {
 
 // MARK: - Analysis
 
-/// Screens 08 to 11: a quarter-filled bar and the current step, over whatever
-/// the backdrop puts behind them — the frozen frame, dimmed, after a photo;
-/// the bare camera surface after a typed sentence.
+/// Screens 08 to 11: a part-filled bar and the current step, over whatever the
+/// backdrop puts behind them — the frozen frame, dimmed, after a photo; the
+/// bare camera surface after a typed sentence.
 ///
-/// **One screen rendered four times.** The export draws four frames, and the
-/// only difference between them is how much of the 120×2 bar is painted and
-/// which of the four labels sits under it. Building four views would be
-/// building three copies of the same drawing.
+/// **One screen rendered once per caption.** The export draws four frames, and
+/// the only difference between them is how much of the 120×2 bar is painted and
+/// which label sits under it. Building a view per state would be building
+/// copies of the same drawing.
+///
+/// `AnalysisStep` now carries two captions the export does not draw, on either
+/// side of the four it does, and they are drawn exactly as the four are: same
+/// type, same colour, same 120×2 bar, same 20pt gap, same place. **What the
+/// count changes is the share of the bar each caption stands at** — the
+/// export's own rule is one share per step, and it draws quarters because it
+/// draws four. That is the one consequence of the count that reaches a pixel,
+/// and it is the rule generalised rather than replaced.
 ///
 /// It covers the whole flow rather than sitting inside `LogFlowScaffold`,
 /// because the export gives it no tab bar and no cancel row — the `CANCEL`
