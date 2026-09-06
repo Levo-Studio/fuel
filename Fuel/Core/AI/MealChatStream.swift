@@ -17,7 +17,7 @@ nonisolated struct MealChatStreamProgress: Sendable, Equatable {
     /// direction; an open `changes` array with an object in it is the model
     /// already writing the change.
     ///
-    /// The finished turn asks the same question of the same two arrays and
+    /// The finished turn asks the same question of the same three arrays and
     /// keeps the answer as `MealAdjustmentIntent.askedForAChange`, so the
     /// analysis states cannot run over a turn that then lands as a question,
     /// nor a question be met at the end by a note about amounts.
@@ -108,7 +108,7 @@ nonisolated enum MealChatStreamReader {
                 switch key {
                 case Self.replyKey:
                     progress.sentence = Self.sentence(at: value, in: raw)
-                case Self.changesKey, Self.additionsKey:
+                case Self.changesKey, Self.correctionsKey, Self.additionsKey:
                     progress.movesSomething = progress.movesSomething || Self.hasAnElement(at: value, in: raw)
                 default:
                     break
@@ -133,6 +133,7 @@ nonisolated enum MealChatStreamReader {
 
     private static let replyKey = "reply"
     private static let changesKey = "changes"
+    private static let correctionsKey = "corrections"
     private static let additionsKey = "additions"
 
     // MARK: - The sentence
