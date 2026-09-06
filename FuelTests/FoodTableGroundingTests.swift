@@ -42,8 +42,8 @@ struct FoodTableGroundingTests {
         #expect(grounded.kilocalories == 158)             // 72 + (158 - 72)
 
         // Raw polenta's macros are complete in CIQUAL, so the item gets its
-        // own real figures, and — this being the meal's only item — those
-        // figures become the meal's macros outright.
+        // own real figures, and — this row being the whole of the meal — the
+        // sum of the rows is that one row's figures.
         let expected = MacroTotals(protein: 4, carbs: 33, fat: 1)   // 7.88/74/1.8 x 0.45
         #expect(grounded.items[0].macros == expected)
         #expect(grounded.macros == expected)
@@ -440,18 +440,20 @@ struct FoodTableGroundingTests {
         #expect(grounded.kilocalories == 0)
     }
 
-    /// A meal's macros can only honestly move when there is exactly one item
-    /// to have supplied them — see this file's own doc comment for why. Two
-    /// items each still get their own real figures; the meal's aggregate,
-    /// which the model split across them in a way nothing here can recover,
-    /// stays exactly as estimated.
-    @Test("Two grounded items each get real macros; the meal's aggregate does not move")
-    func multiItemMacrosStayAggregate() {
-        let modelMacros = MacroTotals(protein: 11, carbs: 22, fat: 33)
+    /// Both items ground, so between them they account for the whole plate and
+    /// the meal's macros are their sum — not the model's meal-wide guess, which
+    /// described the same food and disagreed with the rows drawn under it.
+    ///
+    /// The expected total is deliberately written as the two rows added up
+    /// rather than as a literal: what is being pinned is that the meal follows
+    /// its rows, so a change to either row's arithmetic must move this
+    /// expectation with it instead of leaving a constant standing over it.
+    @Test("Two grounded items make the meal's macros between them")
+    func multiItemMacrosSumTheRows() {
         let estimate = MealEstimate(
             title: "Rice and chicken",
             kilocalories: 999,
-            macros: modelMacros,
+            macros: MacroTotals(protein: 11, carbs: 22, fat: 33),
             items: [
                 RecognisedItem(
                     name: "Rice", kilocalories: 300,
@@ -468,16 +470,50 @@ struct FoodTableGroundingTests {
 
         #expect(grounded.items[0].macros == MacroTotals(protein: 5, carbs: 42, fat: 1))
         #expect(grounded.items[1].macros == MacroTotals(protein: 30, carbs: 0, fat: 8))
+        #expect(grounded.macros == MacroTotals(protein: 35, carbs: 42, fat: 9))
+
+        guard let first = grounded.items[0].macros, let second = grounded.items[1].macros else {
+            Issue.record("both rows ground, so both carry a macro figure")
+            return
+        }
+        #expect(grounded.macros == first + second)
+    }
+
+    /// The other half of the same rule, and the reason it is not simply "sum
+    /// whatever is there". One row the table cannot resolve means the rows no
+    /// longer account for the plate, so summing the resolved ones would drop
+    /// that row's protein, carbohydrate and fat out of a figure drawn as the
+    /// whole meal's. The model's meal-wide estimate stands instead.
+    @Test("One unresolved row leaves the meal's macros as estimated")
+    func oneUnresolvedRowKeepsTheEstimate() {
+        let modelMacros = MacroTotals(protein: 11, carbs: 22, fat: 33)
+        let estimate = MealEstimate(
+            title: "Rice and something",
+            kilocalories: 600,
+            macros: modelMacros,
+            items: [
+                RecognisedItem(
+                    name: "Rice", kilocalories: 300,
+                    note: .photo(confidence: .confident, approximateGrams: 150)
+                ),
+                RecognisedItem(
+                    name: "Grandmother's Sunday casserole", kilocalories: 300,
+                    note: .photo(confidence: .unsure, approximateGrams: 200)
+                )
+            ]
+        )
+
+        let grounded = FoodTableGrounding.ground(estimate, mode: .photo, originalText: nil, table: table)
+
+        #expect(grounded.items[0].macros != nil)
+        #expect(grounded.items[1].macros == nil)
         #expect(grounded.macros == modelMacros)
     }
 
-    /// The sole-item collapse is specifically an *item-count* rule, not a
-    /// generic "meal totals move when anything grounds" rule — this pins that
-    /// a two-item meal declines the meal-level correction even though both of
-    /// its items resolve, which `multiItemMacrosStayAggregate` already checks
-    /// on the macro side; this checks the reverse would-be trap does not
-    /// exist on the kilocalorie side either, i.e. that kilocalorie grounding
-    /// was never gated on item count to begin with.
+    /// The macro rule is about whether the rows account for the meal; the
+    /// kilocalorie rule never was, because every row carries a real prior
+    /// kilocalorie figure to take a delta against whatever else is true of it.
+    /// This pins that the two did not get tangled together.
     @Test("Kilocalorie grounding was never gated on item count")
     func kilocalorieDeltaIgnoresItemCount() {
         let estimate = MealEstimate(

@@ -33,18 +33,26 @@ import Foundation
 /// estimate.
 ///
 /// Meal level is where the missing prior actually matters, and it is handled
-/// rather than guessed at: **when the reply holds exactly one item, that
-/// item's grounded macros become the meal's macros outright**, because with
-/// one item the meal's prior macro estimate and that item's implied,
-/// unstated prior macro estimate are the same number — there is nothing else
-/// in the meal for the model to have been describing. This is not a special
-/// case bolted onto the delta idea; it is what the delta collapses to when
-/// the only available "before" is the meal's own total: `new = old + (item -
-/// old) = item`. For two items or more, no such identity holds — nothing
-/// says how the model's one meal-wide guess was ever split between them —
-/// and the meal's macros are left exactly as estimated. Splitting it by
-/// kilocalorie share would answer that question with a number CIQUAL never
-/// produced, which is the mistake this whole table exists to stop making.
+/// rather than guessed at: **when every item of the reply comes out of this
+/// pass with a complete macro figure, the meal's macros become the sum of
+/// them.** Nothing is apportioned to reach that — there is no "before" to
+/// reconcile, because the rows together *are* the meal, and a total over a
+/// breakdown that describes every line of it is arithmetic rather than a
+/// guess. `MealArithmetic.macros(ofRows:)` is the rule and is shared with
+/// every other place a meal's rows move.
+///
+/// **Where one item did not ground, the meal's macros are left exactly as
+/// estimated**, and that is the case the `nil` from that rule is for: nothing
+/// says how the model's one meal-wide guess was ever split between the rows,
+/// so summing the grounded ones would silently drop the rest of the plate, and
+/// splitting the estimate by kilocalorie share would answer the question with a
+/// number CIQUAL never produced — the mistake this whole table exists to stop
+/// making.
+///
+/// The one-item case this used to state on its own is not a special case and
+/// is not written as one any more: with a single grounded item the sum *is*
+/// that item's figure, which is what the old rule said the long way round.
+///
 /// Kilocalories are not bound by any of this, because every item always
 /// carries its own real prior figure: the existing per-item delta applies
 /// unconditionally, at any item count.
@@ -94,14 +102,7 @@ nonisolated enum FoodTableGrounding {
     ) -> MealEstimate {
         let textWeight = soleTextWeight(for: estimate, mode: mode, originalText: originalText)
 
-        // Whether the meal has exactly one item, decided once, up front,
-        // rather than re-derived inside the loop below — see this type's own
-        // doc comment for why one item is the one case a meal-level macro
-        // correction has an honest "before" to work from.
-        let isSoleItem = estimate.items.count == 1
-
         var kilocalorieDelta = 0
-        var soleItemMacros: MacroTotals?
 
         let items = estimate.items.map { item -> RecognisedItem in
             guard let weight = weight(for: item, mode: mode, soleTextWeight: textWeight) else {
@@ -138,9 +139,6 @@ nonisolated enum FoodTableGrounding {
             // without every macro, so this gap never reaches `kilocalories`.
             if !portion.incompleteMacros {
                 grounded.macros = portion.macros
-                if isSoleItem {
-                    soleItemMacros = portion.macros
-                }
             }
 
             return grounded
@@ -148,13 +146,8 @@ nonisolated enum FoodTableGrounding {
 
         var grounded = estimate
         grounded.items = items
-        // The floor matches `PortionCalculator`'s own: a negative meal is not
-        // a value that reaches the day's ring regardless of how a delta got
-        // there.
-        grounded.kilocalories = max(0, estimate.kilocalories + kilocalorieDelta)
-        if let soleItemMacros {
-            grounded.macros = soleItemMacros
-        }
+        grounded.kilocalories = MealArithmetic.kilocalories(estimate.kilocalories, movedBy: kilocalorieDelta)
+        grounded.macros = MealArithmetic.macros(ofRows: items.map(\.macros)) ?? estimate.macros
         return grounded
     }
 

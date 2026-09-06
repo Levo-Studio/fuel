@@ -104,23 +104,22 @@ nonisolated struct MealResultDraft: Equatable, Sendable {
     /// **Refused on the last remaining row** — see `canRemoveItems` for why, and
     /// for why a list that arrived empty is not the same case.
     ///
-    /// **The total follows the row out, and the macros do not.** The asymmetry
-    /// is `FoodTableGrounding`'s, for the same reason: a row always carries its
+    /// **The total follows the row out by subtraction, and the macros follow it
+    /// only where the rows that are left can say so.** A row always carries its
     /// own kilocalorie figure, and the meal's total has already been reconciled
-    /// against it — that file adjusts the meal total by each row's own delta
-    /// when it corrects one — so taking that figure back out is arithmetic on
-    /// two numbers the model itself produced. A row's macros are the other
-    /// case. The model is asked for `protein_g`/`carbs_g`/`fat_g` once, for the
-    /// whole meal, and never per item, so the meal's macro figure was never
-    /// composed from the rows and there is nothing in it to subtract; a row's
-    /// `macros`, where it has any, is a CIQUAL figure that never reached the
-    /// meal level at all. Subtracting it would take a number out that was never
-    /// put in.
+    /// against it — `FoodTableGrounding` adjusts the meal total by each row's
+    /// own delta when it corrects one — so taking that figure back out is
+    /// arithmetic on two numbers the model itself produced.
     ///
-    /// So the macros stand, describing a meal one line larger than the one
-    /// drawn under them. That is the honest state of a figure nobody can
-    /// recompute without inventing the split, and it is unchanged from before
-    /// this method did any arithmetic at all.
+    /// The macros go through `MealArithmetic.macros(ofRows:)`, which is the
+    /// same rule the grounding pass and the chat use. Where every surviving row
+    /// carries a complete macro figure the meal's macros are their sum, and the
+    /// removed row's share leaves with it. Where one does not, the meal's macro
+    /// figure is the model's meal-wide estimate — asked for once, never per
+    /// item — and there is nothing in it attributable to the row that went, so
+    /// it stands, describing a meal one line larger than the one drawn under it.
+    /// That is the honest state of a figure nobody can recompute without
+    /// inventing the split.
     ///
     /// **A removal alone asks the model nothing.** There is no new text for it
     /// to price — the user has said a line does not belong, which is a fact
@@ -136,7 +135,8 @@ nonisolated struct MealResultDraft: Equatable, Sendable {
         // A row the user rewrote keeps the figure it arrived with even though
         // the screen stops drawing it, so this is the same subtraction either
         // way: what that row contributed to the total is what comes back out.
-        kilocalories = max(0, kilocalories - removed.kilocalories)
+        kilocalories = MealArithmetic.kilocalories(kilocalories, movedBy: -removed.kilocalories)
+        macros = MealArithmetic.macros(ofRows: items.map(\.macros)) ?? macros
         // And the accuracy figure is re-averaged over what is left. A row the
         // user threw out is not part of this meal, so how sure the model was
         // about it is not part of how sure it is about this meal. Nothing is
@@ -236,12 +236,15 @@ nonisolated struct MealResultDraft: Equatable, Sendable {
     /// standing line describes the meal before one row changed, which is a
     /// closer description of what is on the screen than a remark about the row
     /// on its own, and closer than nothing. The macros are the harder case and
-    /// the answer is `FoodTableGrounding`'s again: the model is asked for
-    /// macros once, for the whole meal, and never per row, so the meal's macro
-    /// figure has no part in it attributable to the rows that changed and
-    /// nothing that can honestly be taken out. Splitting it by kilocalorie
-    /// share would answer that question with a number nobody produced. They
-    /// stand until a reply about the whole meal replaces them, below.
+    /// the answer is `MealArithmetic`'s: where every row of the spliced list
+    /// carries a complete macro figure the meal's macros are their sum, because
+    /// the rows then account for the whole meal and there is nothing to
+    /// apportion. Where one does not, the model was asked for macros once, for
+    /// the whole meal, and never per row, so the meal's macro figure has no
+    /// part in it attributable to the rows that changed and nothing that can
+    /// honestly be taken out — splitting it by kilocalorie share would answer
+    /// that question with a number nobody produced — and it stands until a
+    /// reply about the whole meal replaces it, below.
     ///
     /// **When every row was changed there is nothing left to protect**, the
     /// reply describes the entire meal, and this is the wholesale replacement
@@ -279,6 +282,7 @@ nonisolated struct MealResultDraft: Equatable, Sendable {
         // exactly what it was asked to price. Both halves are numbers a model
         // wrote about the food they name; nothing here is apportioned.
         merged.kilocalories = untouched.reduce(estimate.kilocalories) { $0 + $1.kilocalories }
+        merged.macros = MealArithmetic.macros(ofRows: merged.items.map(\.macros)) ?? macros
         merged.userWrittenItems = []
         merged.hasItemEdits = false
         return merged
