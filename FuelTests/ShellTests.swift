@@ -1302,6 +1302,7 @@ private struct BackPopShellProbe: View {
                 navigation: model.dayNavigation,
                 isTravellingBackward: model.dayTravelIsBackward,
                 gettingStarted: model.gettingStarted,
+                emptyDay: model.emptyDay,
                 onOpenSettings: model.openSettings,
                 onAddEntry: model.openLogFlow,
                 onOpenMeal: model.openMealDetail,

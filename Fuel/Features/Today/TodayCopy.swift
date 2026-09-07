@@ -165,6 +165,19 @@ nonisolated enum TodayCopy {
         String(localized: "today.gettingStarted.heading")
     }
 
+    /// The one row a day with nothing on it carries, in the place a meal's name
+    /// would stand.
+    static var emptyDayTitle: String {
+        String(localized: "today.emptyDay.title")
+    }
+
+    /// The `+` at the end of that row. Screen 13's glyph, in screen 05's list —
+    /// see `TodayEmptyDayView`, which says why that is the plus rather than the
+    /// add button's.
+    static var emptyDayAddGlyph: String {
+        String(localized: "today.emptyDay.add.glyph")
+    }
+
     static func gettingStartedTitle(_ step: TodayGettingStartedStep) -> String {
         switch step {
         case .theme: String(localized: "today.gettingStarted.theme")

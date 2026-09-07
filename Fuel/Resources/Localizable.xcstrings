@@ -2515,6 +2515,30 @@
         }
       }
     },
+    "today.emptyDay.add.glyph" : {
+      "comment" : "The + at the end of the row an empty day carries. Screen 13's own plus, drawn at the end of a Recent row.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+"
+          }
+        }
+      }
+    },
+    "today.emptyDay.title" : {
+      "comment" : "The one row Today draws on a day that is still running and has nothing logged to it. Opens the log flow. Not in the export.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Log a meal"
+          }
+        }
+      }
+    },
     "today.entry.hint" : {
       "comment" : "VoiceOver hint on a row of the day list, which opens the meal. Not in the export.",
       "extractionState" : "manual",
