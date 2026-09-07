@@ -43,10 +43,13 @@ nonisolated struct TodayEmptyDay: Hashable, Sendable {
     /// | `18:00 – 23:59` | Dinner |
     ///
     /// The afternoon is `Lunch` and not `Snack`, which is worth stating because
-    /// it is the opposite of what Settings' four clock rows read like: lunch's
-    /// reach runs through the `15:00 – 17:59` gap on a day that never got one,
-    /// and on an empty day it never did. See `MainMeal.claimable(atMinuteOfDay:)`
-    /// and `design/Fuel Design Notes.md`.
+    /// it reaches past the hours Settings prints. Screen 17 draws three rows,
+    /// one per main meal, and lunch's stops at `14:59`; lunch's *reach* runs on
+    /// through the gap after it on a day that never got one, and an empty day
+    /// never did. Those rows are the plain-language summary the user reads
+    /// rather than the rule — `AutomaticLabelsSection` names all three places
+    /// the two part company. The rule itself is
+    /// `MainMeal.claimable(atMinuteOfDay:)`.
     let label: MealLabel
 
     // MARK: - Whether it is offered
