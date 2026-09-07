@@ -492,6 +492,11 @@ struct TodayEmptyDayDrawingTests {
 
     /// The plus is drawn where a row's value is drawn: on the trailing edge of
     /// the content, inside the screen's own margin.
+    ///
+    /// The band between the two rules, not the whole trailing half — the closing
+    /// rule runs the width of the content and reaches the same margin, so a
+    /// scan that included it would report the margin whether or not anything
+    /// was drawn in the row at all.
     @Test("the plus stands on the row's trailing edge")
     func thePlusIsOnTheTrailingEdge() throws {
         let emptyDay = try #require(Self.emptyDay(.breakfast))
@@ -499,13 +504,13 @@ struct TodayEmptyDayDrawingTests {
         let drawing = try #require(screen.drawing)
 
         let heading = try #require(firstInk(in: try profile(of: screen)))
-        let rule = try rule(in: screen, below: heading)
-        let row = CGRect(
-            x: drawing.size.width / 2,
-            y: CGFloat(rule + 1),
-            width: drawing.size.width / 2,
-            height: drawing.size.height - CGFloat(rule + 1)
-        )
+        let opening = try rule(in: screen, below: heading)
+        let closing = try rule(in: screen, below: opening + 2)
+
+        var row = band(from: opening, to: closing, of: drawing)
+        row.origin.x = drawing.size.width / 2
+        row.size.width = drawing.size.width / 2
+
         let box = try #require(
             drawing.inkBox(against: DrawnPixels.Channels(Self.palette.background), in: row),
             "nothing is drawn on the trailing half of the row"
