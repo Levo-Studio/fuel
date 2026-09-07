@@ -31,6 +31,11 @@ struct TodayView: View {
     /// beginning.
     let gettingStarted: TodayGettingStarted
 
+    /// The row a day that is still running and has nothing on it carries, or
+    /// `nil` when Today does not offer one. Which is which is `TodayEmptyDay`'s
+    /// to decide, not this view's — see `dayOrEmptyState`.
+    let emptyDay: TodayEmptyDay?
+
     let onOpenSettings: () -> Void
     let onAddEntry: () -> Void
 
@@ -162,23 +167,32 @@ struct TodayView: View {
         .fuelAnimation(FuelMotion.dayChange, value: presentation.date)
     }
 
-    /// The day, the checklist that stands in for it at the beginning, or the
-    /// line a past day with nothing on it carries.
+    /// The day, one of the two things that stand in for it while it is empty,
+    /// or the line a past day with nothing on it carries.
     ///
     /// The checklist is offered on an empty day *and only until the first meal
-    /// is logged* — after that it is gone for good, and a later empty day is
-    /// drawn as it always was: the header, the summary, and nothing under it.
+    /// is logged* — after that it is gone for good. What a later empty day gets
+    /// in its place is `TodayEmptyDayView`: one meal section, headed with the
+    /// label a meal logged at this moment would be filed under, and one row
+    /// offering to log it.
     ///
-    /// **The checklist is never offered on a past day**, however empty that day
-    /// is and however new the user. It says "here are three things to set up",
-    /// which is about the app rather than about a day, and a Tuesday in March
-    /// is not where that belongs. What a past day with nothing on it gets is
-    /// its own line, and the two are not the same statement: today with nothing
-    /// on it *yet* is a day still running, which is why the export's own
-    /// nothing is still the right answer there.
+    /// **Neither is offered on a past day**, however empty that day is and
+    /// however new the user. The checklist says "here are three things to set
+    /// up", which is about the app rather than about a day; the row would
+    /// promise a meal on a day the log flow cannot write to. What a past day
+    /// with nothing on it gets is its own line.
+    ///
+    /// The row is asked for before the checklist rather than after, and the
+    /// order is deliberate: the choice between the two belongs to
+    /// `TodayEmptyDay`, which refuses to exist while the checklist is offered,
+    /// so a second reading of the same question here would be a second place
+    /// for the two to disagree. Only `hasEntries` is asked twice — the day list
+    /// wins on this side, and on that one it is what makes the label honest.
     @ViewBuilder private var dayOrEmptyState: some View {
         if presentation.hasEntries {
             TodayDayList(groups: presentation.groups, onSelect: onOpenMeal)
+        } else if let emptyDay {
+            TodayEmptyDayView(emptyDay: emptyDay, onAddEntry: onAddEntry)
         } else if navigation.isToday {
             if gettingStarted.isOffered {
                 TodayGettingStartedView(
@@ -424,10 +438,12 @@ private struct TodayDayArrow: View {
 
 /// One line, where the day list would be.
 ///
-/// **Not the get-started checklist**, which is the other thing that stands in
-/// this place and answers a different question. The checklist is about the app
-/// being new; this is about a day being empty, and a Tuesday in March with
-/// nothing on it is not a user who has not started — it is a day nobody logged.
+/// **Neither of the two things that stand in this place on today**, and each
+/// answers a different question. The checklist is about the app being new; the
+/// empty day's row is about a day that is still running, and offers to log into
+/// it. This is about a day that is over: a Tuesday in March with nothing on it
+/// is not a user who has not started and not a day with time left in it — it is
+/// a day nobody logged, and there is nothing left to offer for it.
 ///
 /// The line is `monoNote`, muted: the type screen 17 draws its privacy footer
 /// in, which is this app's existing shape for a quiet statement of fact. No new
@@ -589,6 +605,7 @@ private struct TodayPlusGlyph: Shape {
         navigation: TodayPreviewData.navigation(showing: TodayPreviewData.date),
         isTravellingBackward: false,
         gettingStarted: TodayPreviewData.retiredChecklist,
+        emptyDay: nil,
         onOpenSettings: {},
         onAddEntry: {},
         onOpenMeal: { _ in },
@@ -609,6 +626,7 @@ private struct TodayPlusGlyph: Shape {
         navigation: TodayPreviewData.navigation(showing: TodayPreviewData.date),
         isTravellingBackward: false,
         gettingStarted: TodayPreviewData.retiredChecklist,
+        emptyDay: nil,
         onOpenSettings: {},
         onAddEntry: {},
         onOpenMeal: { _ in },
@@ -629,6 +647,7 @@ private struct TodayPlusGlyph: Shape {
         navigation: TodayPreviewData.navigation(showing: TodayPreviewData.date),
         isTravellingBackward: false,
         gettingStarted: TodayPreviewData.firstRunChecklist,
+        emptyDay: nil,
         onOpenSettings: {},
         onAddEntry: {},
         onOpenMeal: { _ in },
@@ -649,6 +668,7 @@ private struct TodayPlusGlyph: Shape {
         navigation: TodayPreviewData.navigation(showing: TodayPreviewData.date),
         isTravellingBackward: false,
         gettingStarted: TodayPreviewData.retiredChecklist,
+        emptyDay: TodayPreviewData.emptyDay,
         onOpenSettings: {},
         onAddEntry: {},
         onOpenMeal: { _ in },
@@ -672,6 +692,7 @@ private struct TodayPlusGlyph: Shape {
         navigation: TodayPreviewData.navigation(showing: TodayPreviewData.pastDate),
         isTravellingBackward: true,
         gettingStarted: TodayPreviewData.retiredChecklist,
+        emptyDay: nil,
         onOpenSettings: {},
         onAddEntry: {},
         onOpenMeal: { _ in },
@@ -712,6 +733,16 @@ private enum TodayPreviewData {
     /// Four days before it, so both a `Yesterday` and a weekday title are a
     /// step away and the walk back has somewhere to go.
     static let pastDate = Calendar.current.date(byAdding: .day, value: -4, to: date) ?? date
+
+    /// The row a still-running empty day carries, at the hour the export's own
+    /// status bar reads.
+    static let emptyDay = TodayEmptyDay(
+        isToday: true,
+        hasEntries: false,
+        isGettingStartedOffered: false,
+        now: date.addingTimeInterval(34_860),
+        calendar: .current
+    )
 
     /// A browse whose day is the one the preview draws and whose history
     /// reaches a fortnight behind it, so the arrows show both of their states:

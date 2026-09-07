@@ -72,6 +72,7 @@ struct TodayListFadeTests {
                 hasChosenAccent: true,
                 hasLoggedMeal: true
             ),
+            emptyDay: nil,
             onOpenSettings: {},
             onAddEntry: {},
             onOpenMeal: { _ in },

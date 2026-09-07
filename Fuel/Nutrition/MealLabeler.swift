@@ -19,9 +19,17 @@ import Foundation
 /// `MainMeal.claimable(atMinuteOfDay:)`.
 ///
 /// The clock rows in Settings and the prototype's `labelFor(hour)` both look
-/// like this rule and are not it: the first is the plain-language summary the
-/// user reads, the second is demo scaffolding for a prototype that has no day
-/// history to reason about.
+/// like this rule and are not it.
+///
+/// The rows are the plain-language summary the user reads. Screen 17 draws
+/// three of them, one per main meal, and each stops short of where that meal
+/// actually reaches; `AutomaticLabelsSection` names all three divergences. The
+/// export draws a fourth row, `Snack  15:00 – 17:59`, which is deliberately not
+/// built — a snack has no window, so a row naming hours for it states something
+/// this rule does not do.
+///
+/// The stub is demo scaffolding for a prototype that has no day history to
+/// reason about.
 ///
 /// The labeler never asks what time it is. Every entry point takes the moment
 /// it should reason about, so the rule is testable without a clock.

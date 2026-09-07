@@ -181,6 +181,17 @@ final class RootShellModel {
     /// cover goes away.
     private(set) var gettingStarted: TodayGettingStarted
 
+    /// The row Today draws on a day that is still running and has nothing on
+    /// it, or `nil` when it draws none.
+    ///
+    /// Recomputed with `today` and *also* on a day change, unlike the checklist
+    /// beside it: whether the day being shown is today is one of the three
+    /// things that decide it, and that answer changes on every swipe.
+    ///
+    /// It is a row and never an entry. Nothing here is written, and the value
+    /// carries no calories to be written — see `TodayEmptyDay`.
+    private(set) var emptyDay: TodayEmptyDay?
+
     /// The onboarding flow's own state, built once so a re-render of the shell
     /// cannot drop a half-typed key or restart the key test.
     ///
@@ -304,8 +315,16 @@ final class RootShellModel {
         // session, and a launch is not a continuation of it.
         let navigation = Self.navigation(for: store, showing: nil)
         self.dayNavigation = navigation
-        self.today = Self.presentation(for: store, on: navigation.day)
-        self.gettingStarted = Self.checklist(store: store, preferences: preferences)
+        let today = Self.presentation(for: store, on: navigation.day)
+        self.today = today
+        let gettingStarted = Self.checklist(store: store, preferences: preferences)
+        self.gettingStarted = gettingStarted
+        self.emptyDay = Self.emptyDay(
+            navigation: navigation,
+            presentation: today,
+            gettingStarted: gettingStarted,
+            calendar: store.calendar
+        )
         self.logFlow = LogFlowModel(store: store)
         // One read, spent on both halves. Two reads could not disagree today —
         // nothing runs between them — but they are two sources for a value the
@@ -383,6 +402,39 @@ final class RootShellModel {
         )
     }
 
+    /// Whether Today offers the empty day's row, and what its heading names.
+    ///
+    /// **The clock is read here**, the way it is read for the browse's bounds
+    /// directly below, and for the same reason: this is the composition layer,
+    /// and `TodayEmptyDay` is handed the moment it should reason about rather
+    /// than reaching for one — which is what lets the label rule be pinned
+    /// hour by hour without a simulator.
+    ///
+    /// The reading is as fresh as the last re-read of Today, which happens on
+    /// every return from a cover, on every push and pop, and on every day
+    /// change. A user who leaves an empty Today standing across a meal boundary
+    /// sees the previous heading until something brings them back to it; the
+    /// entry itself is never affected, because the label is derived again from
+    /// the clock at the moment the meal is logged.
+    private static func emptyDay(
+        navigation: TodayDayNavigation,
+        presentation: TodayPresentation,
+        gettingStarted: TodayGettingStarted,
+        calendar: Calendar
+    ) -> TodayEmptyDay? {
+        TodayEmptyDay(
+            isToday: navigation.isToday,
+            hasEntries: presentation.hasEntries,
+            isGettingStartedOffered: gettingStarted.isOffered,
+            now: Date(),
+            // The store's own calendar, not `.current`, for the reason the
+            // browse takes it: which day an entry belongs to is the store's
+            // question, and a second calendar here would name a meal by one
+            // clock and file it by another.
+            calendar: calendar
+        )
+    }
+
     /// Which days can be browsed, read from the store each time.
     ///
     /// A store that cannot be read has no history to walk into, and `nil` there
@@ -432,6 +484,12 @@ final class RootShellModel {
         dayNavigation = Self.navigation(for: store, showing: dayNavigation.day)
         today = Self.presentation(for: store, on: dayNavigation.day)
         gettingStarted = Self.checklist(store: store, preferences: preferences)
+        emptyDay = Self.emptyDay(
+            navigation: dayNavigation,
+            presentation: today,
+            gettingStarted: gettingStarted,
+            calendar: store.calendar
+        )
     }
 
     // MARK: - Moving between days
@@ -471,6 +529,17 @@ final class RootShellModel {
         // The day only — the checklist and the range have not moved, and a full
         // refresh here would re-read the whole store on every swipe.
         today = Self.presentation(for: store, on: moved.day)
+        // The row is not in that exemption: whether the day being shown is
+        // today is one of the three things that decide it, and stepping off
+        // today is exactly what a swipe does. Leaving it standing would put an
+        // offer to log onto a Tuesday in March, which is the one thing it must
+        // not do.
+        emptyDay = Self.emptyDay(
+            navigation: moved,
+            presentation: today,
+            gettingStarted: gettingStarted,
+            calendar: store.calendar
+        )
     }
 
     // MARK: - Leaving and returning to Today
