@@ -317,6 +317,11 @@ nonisolated enum MealAdjuster {
         var items = meal.items.map { pricingMacros(of: $0, in: table) }
         var kilocalorieDelta = 0
         var macroDelta = MacroTotals.zero
+        // The energy that moved on rows carrying no macro figure of their own.
+        // It is what the meal's macros are apportioned by where the rows cannot
+        // sum — see `MealArithmetic.macros(_:movedBy:andByTheEnergyShareOf:
+        // ofAMealOf:)`, which holds the whole of that rule and its cost.
+        var unpricedKilocalorieDelta = 0
         var moved = false
 
         // Later changes to the same row win, which is what reading a list in
@@ -336,8 +341,7 @@ nonisolated enum MealAdjuster {
                 continue
             }
 
-            kilocalorieDelta += repriced.kilocalories - previous.kilocalories
-            macroDelta = macroDelta + macroChange(from: previous, to: repriced)
+            account(previous, repriced, &kilocalorieDelta, &macroDelta, &unpricedKilocalorieDelta)
             items[index] = repriced
             moved = true
         }
@@ -361,8 +365,7 @@ nonisolated enum MealAdjuster {
                 continue
             }
 
-            kilocalorieDelta += corrected.kilocalories - previous.kilocalories
-            macroDelta = macroDelta + macroChange(from: previous, to: corrected)
+            account(previous, corrected, &kilocalorieDelta, &macroDelta, &unpricedKilocalorieDelta)
             items[index] = corrected
             moved = true
         }
@@ -374,6 +377,11 @@ nonisolated enum MealAdjuster {
             kilocalorieDelta += item.kilocalories
             if let macros = item.macros {
                 macroDelta = macroDelta + macros
+            } else {
+                // A row the table priced for energy and not for macros — a
+                // CIQUAL entry with a gap of its own. It joins the meal, so the
+                // meal's macros owe it its share.
+                unpricedKilocalorieDelta += item.kilocalories
             }
             items.append(item)
             moved = true
@@ -386,7 +394,12 @@ nonisolated enum MealAdjuster {
         return AdjustedMeal(
             kilocalories: MealArithmetic.kilocalories(meal.kilocalories, movedBy: kilocalorieDelta),
             macros: MealArithmetic.macros(ofRows: items.map(\.macros))
-                ?? MealArithmetic.macros(meal.macros, movedBy: macroDelta),
+                ?? MealArithmetic.macros(
+                    meal.macros,
+                    movedBy: macroDelta,
+                    andByTheEnergyShareOf: unpricedKilocalorieDelta,
+                    ofAMealOf: meal.kilocalories
+                ),
             items: items
         )
     }
@@ -681,24 +694,39 @@ nonisolated enum MealAdjuster {
 
     // MARK: - Arithmetic
 
-    /// The macro delta between two states of one row, and `zero` where there
-    /// is no honest one.
+    /// Books one row's move into the three running figures.
     ///
-    /// Both sides have to be real figures. A row that had no macros and now
-    /// has them has not *changed* by anything the meal's own macro total knows
-    /// about — that total was estimated over a meal in which this row's
-    /// contribution was never stated — so adding the new figure to it would be
-    /// counting the row twice. A row that had them and lost them is the same
-    /// story backwards.
-    private static func macroChange(from previous: RecognisedItem, to current: RecognisedItem) -> MacroTotals {
+    /// **The energy always counts; which macro pot it counts into is the whole
+    /// of the decision.** Where the row has a real macro figure on both sides
+    /// of the change, the difference between them is exact and goes to
+    /// `macroDelta`. Where it does not — a name no CIQUAL row covers, a row
+    /// whose table entry has a macro gap of its own — nothing on the device
+    /// knows what that row is made of, and its energy goes to
+    /// `unpricedKilocalories` so the meal's macros can follow it by proportion
+    /// instead of standing still.
+    ///
+    /// A row that had no macros and now has them belongs in neither: the
+    /// meal's standing macro figure was estimated over a meal in which this
+    /// row's contribution was never stated, so adding the new figure to it
+    /// would count the row twice — and its energy has moved by a real
+    /// difference the pricing pass did not invent, which is what `macroDelta`
+    /// is for. Its share is therefore taken as the energy it moved, exactly as
+    /// for a row that is still figureless.
+    private static func account(
+        _ previous: RecognisedItem,
+        _ current: RecognisedItem,
+        _ kilocalorieDelta: inout Int,
+        _ macroDelta: inout MacroTotals,
+        _ unpricedKilocalories: inout Int
+    ) {
+        let energy = current.kilocalories - previous.kilocalories
+        kilocalorieDelta += energy
+
         guard let before = previous.macros, let after = current.macros else {
-            return .zero
+            unpricedKilocalories += energy
+            return
         }
-        return MacroTotals(
-            protein: after.protein - before.protein,
-            carbs: after.carbs - before.carbs,
-            fat: after.fat - before.fat
-        )
+        macroDelta = macroDelta + (after - before)
     }
 
     /// Rounded to a whole number, never negative, and never a trap.

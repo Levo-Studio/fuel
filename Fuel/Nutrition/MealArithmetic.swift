@@ -111,17 +111,84 @@ nonisolated enum MealArithmetic {
         max(0, standing + delta)
     }
 
-    /// A meal's macros after its rows moved by `delta`, floored the same way.
+    /// A meal's macros after its rows moved by `delta`, and after the rows that
+    /// have no macro figure of their own gained or lost
+    /// `unpricedKilocalories` of energy out of a meal that stood at
+    /// `standingKilocalories`. Floored the same way.
     ///
     /// Only reached where `macros(ofRows:)` declined — a meal in which some row
     /// has no macro figure of its own. Then the meal's standing figure is the
-    /// model's meal-wide estimate, and the only honest correction to it is the
-    /// difference on a row that had a real figure on both sides of the change.
-    static func macros(_ standing: MacroTotals, movedBy delta: MacroTotals) -> MacroTotals {
+    /// model's meal-wide estimate, and it is corrected from two directions.
+    ///
+    /// **`delta` is the exact half**: the difference on a row that had a real
+    /// figure on both sides of the change. Nothing is assumed about it.
+    ///
+    /// **The energy share is the half that stops a meal freezing, and it is an
+    /// apportioning rather than a measurement.** A row CIQUAL cannot cover —
+    /// `Chicken curry with rice` matches no published row, and the table asks
+    /// for full coverage or nothing — has no macro figure before a change and
+    /// none after it, so `delta` has nothing to say about it. Leaving it at
+    /// that was the bug the owner reported: halving such a meal halved its
+    /// calories and left its protein, carbohydrate and fat at the values of a
+    /// portion no longer on the plate, on the same screen, describing the same
+    /// food. Standing still is not the neutral answer there. It is a figure
+    /// that is known to be wrong, drawn beside one that has just been corrected.
+    ///
+    /// So a row nothing can price moves the meal's macros in the proportion it
+    /// moved the meal's energy. That is the one thing the standing figure does
+    /// say about such a row: it is a whole-meal estimate over a meal of
+    /// `standingKilocalories`, and a row that is now half again as much food is
+    /// not described by it any more. A meal made entirely of rows the table
+    /// cannot cover therefore scales exactly — double the amount, double both
+    /// numbers — which is the answer a user would arrive at with a pencil.
+    ///
+    /// **The cost, stated rather than hidden**: where a meal holds priced rows
+    /// as well, the share is taken against the whole meal's energy, so an
+    /// unpriced row is credited with a little of what the priced rows already
+    /// account for. It is an estimate applied to an estimate, and it is bounded
+    /// by the size of the row that moved. The alternative was a number known to
+    /// describe a portion nobody ate.
+    ///
+    /// A meal with no standing energy has no share to take, and the delta is
+    /// then all there is.
+    static func macros(
+        _ standing: MacroTotals,
+        movedBy delta: MacroTotals,
+        andByTheEnergyShareOf unpricedKilocalories: Int,
+        ofAMealOf standingKilocalories: Int
+    ) -> MacroTotals {
         MacroTotals(
-            protein: max(0, standing.protein + delta.protein),
-            carbs: max(0, standing.carbs + delta.carbs),
-            fat: max(0, standing.fat + delta.fat)
+            protein: moved(standing.protein, by: delta.protein, andBy: unpricedKilocalories, of: standingKilocalories),
+            carbs: moved(standing.carbs, by: delta.carbs, andBy: unpricedKilocalories, of: standingKilocalories),
+            fat: moved(standing.fat, by: delta.fat, andBy: unpricedKilocalories, of: standingKilocalories)
         )
+    }
+
+    /// One macro, moved by an exact difference and by its share of an energy
+    /// change nothing could price.
+    private static func moved(
+        _ standing: Int,
+        by delta: Int,
+        andBy unpricedKilocalories: Int,
+        of standingKilocalories: Int
+    ) -> Int {
+        guard standingKilocalories > 0, unpricedKilocalories != 0 else {
+            return max(0, standing + delta)
+        }
+        let share = Double(standing) * Double(unpricedKilocalories) / Double(standingKilocalories)
+        return max(0, standing + delta + whole(share))
+    }
+
+    /// Rounded to a whole number, and never a trap.
+    ///
+    /// **Signed, unlike `PortionCalculator`'s own `whole`**: a row that got
+    /// smaller carries a negative share, and flooring it here would drop
+    /// exactly the direction this rule exists to follow. The floor is applied
+    /// once, to the figure the share lands on.
+    private static func whole(_ value: Double) -> Int {
+        guard let rounded = Int(exactly: value.rounded()) else {
+            return 0
+        }
+        return rounded
     }
 }

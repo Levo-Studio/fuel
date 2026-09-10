@@ -66,10 +66,56 @@ struct MealArithmeticTests {
     func macroFloor() {
         let moved = MealArithmetic.macros(
             MacroTotals(protein: 10, carbs: 40, fat: 5),
-            movedBy: MacroTotals(protein: -30, carbs: 12, fat: -1)
+            movedBy: MacroTotals(protein: -30, carbs: 12, fat: -1),
+            andByTheEnergyShareOf: 0,
+            ofAMealOf: 500
         )
 
         #expect(moved == MacroTotals(protein: 0, carbs: 52, fat: 4))
+    }
+
+    /// **Energy that nothing could price moves the macros in proportion to it.**
+    /// A meal whose rows CIQUAL cannot cover has no per-row figure to take a
+    /// difference of, and standing still there prints the macros of a portion
+    /// that is no longer on the plate.
+    @Test("A macro follows the share of the energy that nothing could price")
+    func macrosFollowAnUnpricedEnergyShare() {
+        let standing = MacroTotals(protein: 30, carbs: 60, fat: 20)
+
+        // Half the meal's energy gone: half of each macro with it.
+        #expect(
+            MealArithmetic.macros(standing, movedBy: .zero, andByTheEnergyShareOf: -300, ofAMealOf: 600)
+                == MacroTotals(protein: 15, carbs: 30, fat: 10)
+        )
+        // And half again as much: half again as much of each.
+        #expect(
+            MealArithmetic.macros(standing, movedBy: .zero, andByTheEnergyShareOf: 300, ofAMealOf: 600)
+                == MacroTotals(protein: 45, carbs: 90, fat: 30)
+        )
+    }
+
+    /// The two corrections are applied together, and the exact one is not
+    /// scaled: a meal holding both a priced row that moved and an unpriced one
+    /// gets the real difference from the first and a share from the second.
+    @Test("An exact delta and an energy share are both applied")
+    func bothCorrectionsApply() {
+        let moved = MealArithmetic.macros(
+            MacroTotals(protein: 20, carbs: 40, fat: 10),
+            movedBy: MacroTotals(protein: 5, carbs: 0, fat: 0),
+            andByTheEnergyShareOf: 100,
+            ofAMealOf: 400
+        )
+
+        #expect(moved == MacroTotals(protein: 30, carbs: 50, fat: 13))
+    }
+
+    /// A meal recorded at no energy has no share to divide, and the arithmetic
+    /// must answer rather than divide by zero.
+    @Test("A meal with no energy takes no share")
+    func noEnergyNoShare() {
+        let standing = MacroTotals(protein: 4, carbs: 5, fat: 6)
+
+        #expect(MealArithmetic.macros(standing, movedBy: .zero, andByTheEnergyShareOf: 40, ofAMealOf: 0) == standing)
     }
 
     // MARK: - The energy rule

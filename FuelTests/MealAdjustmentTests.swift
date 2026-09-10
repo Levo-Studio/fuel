@@ -539,10 +539,19 @@ struct MealAdjusterTests {
         #expect(adjusted.items[1].kilocalories == 400)
         #expect(adjusted.items[1].grams == 200)
         #expect(adjusted.items[1].macros == nil)
-        // It contributes nothing to the macro total, because nothing on the
-        // device knows what share of the meal's macros it ever had.
-        #expect(adjusted.macros == meal.macros)
         #expect(adjusted.kilocalories == meal.kilocalories + 200)
+
+        // The row itself still has no macro figure — nothing on the device
+        // knows what it is made of — but the meal's own estimate does move,
+        // by the share of its energy this row just gained. Standing still
+        // would print the protein of a portion that is no longer on the plate.
+        let share = Double(200) / Double(meal.kilocalories)
+        #expect(adjusted.macros == MacroTotals(
+            protein: meal.macros.protein + Int((Double(meal.macros.protein) * share).rounded()),
+            carbs: meal.macros.carbs + Int((Double(meal.macros.carbs) * share).rounded()),
+            fat: meal.macros.fat + Int((Double(meal.macros.fat) * share).rounded())
+        ))
+        #expect(adjusted.macros != meal.macros)
     }
 
     @Test("a row with no weight and no table row cannot be re-priced at all")
@@ -1321,20 +1330,11 @@ struct MealAdjusterTests {
         #expect(adjusted.items[2].kilocalories == 180)
     }
 
-    /// **What stands when nothing in the meal can be priced.** A single row
-    /// whose name no CIQUAL row covers has no macro figure before the message
-    /// and none after it, so the sum is impossible and the delta is honestly
-    /// zero: the meal keeps the model's macro estimate while its energy scales
-    /// with the amount. That is the same answer as before this pass existed,
-    /// and it is the honest one — nothing on the device knows what that row is
-    /// made of.
-    @Test("a meal of rows the table cannot cover keeps the macro figure it had")
-    func anUngroundableMealKeepsItsStandingMacros() throws {
-        let standing = MacroTotals(protein: 12, carbs: 44, fat: 9)
-        let meal = AdjustableMeal(
+    private func ungroundableMeal(macros: MacroTotals) -> AdjustableMeal {
+        AdjustableMeal(
             title: "Something the table has never heard of",
             kilocalories: 300,
-            macros: standing,
+            macros: macros,
             items: [
                 RecognisedItem(
                     name: "Zzznotafood", kilocalories: 300, grams: 100,
@@ -1342,6 +1342,23 @@ struct MealAdjusterTests {
                 )
             ]
         )
+    }
+
+    /// **The defect the owner reported a third time, and the one this rule
+    /// exists for.** A meal of rows no CIQUAL entry covers — `Chicken curry
+    /// with rice` is the everyday shape of it — has no macro figure on any row
+    /// before the message and none after it, so the sum is impossible and the
+    /// exact delta is zero. The meal used to keep the model's macro estimate
+    /// while its energy scaled with the amount: half the calories beside all of
+    /// the protein, on one screen, describing one plate.
+    ///
+    /// Its macros now scale with it. A meal made entirely of rows nothing can
+    /// price is the case where the apportioning is not an approximation at all:
+    /// the whole of the standing figure belongs to the whole of the energy, so
+    /// half the food is half of both numbers.
+    @Test("a meal of rows the table cannot cover scales its macros with its amounts")
+    func anUngroundableMealScalesItsStandingMacros() throws {
+        let meal = ungroundableMeal(macros: MacroTotals(protein: 12, carbs: 44, fat: 8))
 
         let adjusted = try #require(
             MealAdjuster.apply(
@@ -1351,9 +1368,98 @@ struct MealAdjusterTests {
             )
         )
 
+        // Half again as much food: half again as much of all four figures.
         #expect(adjusted.items[0].macros == nil)
-        #expect(adjusted.macros == standing)
         #expect(adjusted.kilocalories == 450)
+        #expect(adjusted.macros == MacroTotals(protein: 18, carbs: 66, fat: 12))
+    }
+
+    /// The same rule in the direction the owner hit it: a portion that turned
+    /// out to be smaller. Halving the amount halves the energy, and the macros
+    /// go with it rather than standing at the values of a portion nobody ate.
+    @Test("a smaller amount takes the macros of a meal the table cannot price down with it")
+    func anUngroundableMealShrinksItsStandingMacros() throws {
+        let meal = ungroundableMeal(macros: MacroTotals(protein: 30, carbs: 60, fat: 20))
+
+        let adjusted = try #require(
+            MealAdjuster.apply(
+                MealAdjustmentIntent(changes: [MealAdjustmentIntent.Change(itemNumber: 1, grams: 50)]),
+                to: meal,
+                table: table
+            )
+        )
+
+        #expect(adjusted.kilocalories == 150)
+        #expect(adjusted.macros == MacroTotals(protein: 15, carbs: 30, fat: 10))
+    }
+
+    /// **A meal with no energy has no share to take**, and the arithmetic must
+    /// not divide by it. Nothing moves, and nothing crashes.
+    @Test("a meal recorded at no energy at all keeps the macros it was given")
+    func aMealWithNoEnergyKeepsItsMacros() throws {
+        let standing = MacroTotals(protein: 4, carbs: 5, fat: 6)
+        let meal = AdjustableMeal(
+            title: "Nothing much",
+            kilocalories: 0,
+            macros: standing,
+            items: [
+                RecognisedItem(
+                    name: "Zzznotafood", kilocalories: 0, grams: 100,
+                    note: .photo(confidence: .confident, approximateGrams: 100)
+                )
+            ]
+        )
+
+        let adjusted = try #require(
+            MealAdjuster.apply(
+                MealAdjustmentIntent(changes: [MealAdjustmentIntent.Change(itemNumber: 1, grams: 200)]),
+                to: meal,
+                table: table
+            )
+        )
+
+        #expect(adjusted.kilocalories == 0)
+        #expect(adjusted.macros == standing)
+    }
+
+    /// The macros are floored where a share would take them below zero, for the
+    /// reason the energy is: a negative figure is not a smaller meal.
+    @Test("a share that would take a macro below zero stops at zero")
+    func macrosAreFlooredAtZero() throws {
+        let meal = AdjustableMeal(
+            title: "Something the table has never heard of",
+            kilocalories: 300,
+            macros: MacroTotals(protein: 5, carbs: 5, fat: 5),
+            items: [
+                RecognisedItem(
+                    name: "Zzznotafood", kilocalories: 300, grams: 100,
+                    note: .photo(confidence: .confident, approximateGrams: 100)
+                ),
+                RecognisedItem(
+                    name: "Zzzalsonotafood", kilocalories: 300, grams: 100,
+                    note: .photo(confidence: .confident, approximateGrams: 100)
+                ),
+            ]
+        )
+
+        let adjusted = try #require(
+            MealAdjuster.apply(
+                MealAdjustmentIntent(
+                    changes: [
+                        MealAdjustmentIntent.Change(itemNumber: 1, grams: 10),
+                        MealAdjustmentIntent.Change(itemNumber: 2, grams: 10),
+                    ]
+                ),
+                to: meal,
+                table: table
+            )
+        )
+
+        // Both figures hit their floor: the rows the model wrote add up to more
+        // energy than the meal it wrote them under, which is a reply Fuel does
+        // not get to assume away.
+        #expect(adjusted.macros == .zero)
+        #expect(adjusted.kilocalories == 0)
     }
 
     /// A turn that moved nothing writes nothing, and that includes the macros

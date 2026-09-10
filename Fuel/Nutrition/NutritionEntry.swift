@@ -32,6 +32,20 @@ nonisolated struct MacroTotals: Hashable, Sendable, Codable {
     static func += (lhs: inout MacroTotals, rhs: MacroTotals) {
         lhs = lhs + rhs
     }
+
+    /// The difference between two macro figures.
+    ///
+    /// Unfloored, and deliberately: this is a delta rather than a meal, so a
+    /// negative component is the honest answer for a row that got smaller. The
+    /// floor belongs where the delta is applied to a standing figure — see
+    /// `MealArithmetic.macros(_:movedBy:andByTheEnergyShareOf:ofAMealOf:)`.
+    static func - (lhs: MacroTotals, rhs: MacroTotals) -> MacroTotals {
+        MacroTotals(
+            protein: lhs.protein - rhs.protein,
+            carbs: lhs.carbs - rhs.carbs,
+            fat: lhs.fat - rhs.fat
+        )
+    }
 }
 
 // MARK: - Daily totals
