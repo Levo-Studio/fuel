@@ -158,7 +158,11 @@ struct MealResultDraftTests {
 
         #expect(subject.items.map(\.name) == ["Rice"])
         #expect(subject.kilocalories == 200)
-        #expect(subject.macros == MacroTotals(protein: 30, carbs: 40, fat: 10))
+        // Neither row carries a macro figure of its own, so the meal's own
+        // estimate loses the share of it the removed row's energy stood for —
+        // 180 of 380 kcal. It used to lose nothing, and described a meal one
+        // line larger than the list under it.
+        #expect(subject.macros == MacroTotals(protein: 16, carbs: 21, fat: 5))
         #expect(subject.hasItemEdits)
         #expect(subject.canReanalyse == false)
         #expect(subject.itemSentence.isEmpty)
@@ -169,10 +173,10 @@ struct MealResultDraftTests {
     /// carbohydrate and fat leave with it rather than staying in a total drawn
     /// over a shorter list.
     ///
-    /// `removalSubtractsAndAsksNothing` above is the other half of the rule and
-    /// is deliberately left as it is: its rows carry no macro figures, so
-    /// subtracting one would take out a number that was never put in, and the
-    /// model's meal-wide estimate stands.
+    /// `removalSubtractsAndAsksNothing` above is the other half of the rule:
+    /// its rows carry no macro figures, so there is no figure to subtract and
+    /// the removed row takes its share of the model's meal-wide estimate
+    /// instead.
     @Test("a removal takes the row's macros out where every row has its own")
     func removalSubtractsMacrosWhereTheRowsHaveThem() {
         let rice = RecognisedItem(

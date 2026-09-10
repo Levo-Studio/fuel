@@ -114,12 +114,18 @@ nonisolated struct MealResultDraft: Equatable, Sendable {
     /// The macros go through `MealArithmetic.macros(ofRows:)`, which is the
     /// same rule the grounding pass and the chat use. Where every surviving row
     /// carries a complete macro figure the meal's macros are their sum, and the
-    /// removed row's share leaves with it. Where one does not, the meal's macro
-    /// figure is the model's meal-wide estimate — asked for once, never per
-    /// item — and there is nothing in it attributable to the row that went, so
-    /// it stands, describing a meal one line larger than the one drawn under it.
-    /// That is the honest state of a figure nobody can recompute without
-    /// inventing the split.
+    /// removed row's share leaves with it.
+    ///
+    /// Where one does not, the meal's macro figure is the model's meal-wide
+    /// estimate — asked for once, never per item — and the row that went takes
+    /// what it can be said to have contributed: its own figure where it had
+    /// one, and otherwise the share of the estimate its energy stood for. It
+    /// used to take nothing at all, so a meal the table cannot price gave back
+    /// a row's calories and kept every gram of its protein, carbohydrate and
+    /// fat — a figure describing a meal one line larger than the one drawn
+    /// under it. `MealArithmetic.macros(_:movedBy:andByTheEnergyShareOf:
+    /// ofAMealOf:)` holds that rule, and states what the apportioning assumes
+    /// and what it costs.
     ///
     /// **A removal alone asks the model nothing.** There is no new text for it
     /// to price — the user has said a line does not belong, which is a fact
@@ -135,8 +141,15 @@ nonisolated struct MealResultDraft: Equatable, Sendable {
         // A row the user rewrote keeps the figure it arrived with even though
         // the screen stops drawing it, so this is the same subtraction either
         // way: what that row contributed to the total is what comes back out.
+        let standingKilocalories = kilocalories
         kilocalories = MealArithmetic.kilocalories(kilocalories, movedBy: -removed.kilocalories)
-        macros = MealArithmetic.macros(ofRows: items.map(\.macros)) ?? macros
+        macros = MealArithmetic.macros(ofRows: items.map(\.macros))
+            ?? MealArithmetic.macros(
+                macros,
+                movedBy: removed.macros.map { .zero - $0 } ?? .zero,
+                andByTheEnergyShareOf: removed.macros == nil ? -removed.kilocalories : 0,
+                ofAMealOf: standingKilocalories
+            )
         // And the accuracy figure is re-averaged over what is left. A row the
         // user threw out is not part of this meal, so how sure the model was
         // about it is not part of how sure it is about this meal. Nothing is

@@ -325,11 +325,11 @@ struct CameraLogTests {
         // on two numbers the model wrote — 460 for the meal, 70 for the leaf
         // spinach it has just been told does not belong.
         #expect(model.draft?.kilocalories == 390)
-        // The macros stand. The model is asked for them once for the whole meal
-        // and never per row, so there is nothing in that figure attributable to
-        // the row that left, and taking a share of it out would be a number
-        // nobody produced.
-        #expect(model.draft?.macros == MacroTotals(protein: 34, carbs: 28, fat: 23))
+        // Neither row carries a macro figure of its own, so the meal's macros
+        // lose the share of the model's whole-meal estimate that the removed
+        // row's 70 of 460 kcal stood for. They used to stand still, and then
+        // described a meal with the spinach still on it.
+        #expect(model.draft?.macros == MacroTotals(protein: 29, carbs: 24, fat: 19))
         // And there is nothing left to ask about: no row here holds text the
         // model has not read.
         #expect(model.draft?.canReanalyse == false)
